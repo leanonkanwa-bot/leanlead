@@ -1,0 +1,50 @@
+"""End-to-end pipeline runner — transcribe → plan → render."""
+
+from __future__ import annotations
+
+import traceback
+from pathlib import Path
+
+from app.agent.planner import FormatHint, plan_edit
+from app.api.jobs import store
+from app.core.config import settings
+from app.engine.render import render
+from app.engine.transcribe import transcribe
+
+
+def run_job(job_id: str, src: Path, instructions: str, format_hint: FormatHint) -> None:
+    try:
+        store.update(job_id, status="transcribing", progress=10,
+                     message="Transcribing audio with Whisper…")
+        transcript = transcribe(src).to_dict()
+
+        store.update(job_id, status="planning", progress=40,
+                     message="Asking the agent for an edit plan…")
+        plan = plan_edit(transcript, instructions, format_hint=format_hint)
+
+        store.update(job_id, status="rendering", progress=70,
+                     message="Rendering with FFmpeg…")
+        out_path = settings.outputs_dir / f"{job_id}.mp4"
+        work_dir = settings.work_dir / job_id
+        result = render(src, transcript, plan, work_dir, out_path)
+
+        store.update(
+            job_id,
+            status="done",
+            progress=100,
+            message="Done.",
+            result={
+                "video_url": f"/api/download/{job_id}",
+                "packaging": result["packaging"],
+                "format": result["format"],
+                "duration": result["duration"],
+                "plan": result["plan"],
+            },
+        )
+    except Exception as e:
+        store.update(
+            job_id,
+            status="error",
+            error=f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
+            message="Job failed.",
+        )

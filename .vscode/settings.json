@@ -1,0 +1,8 @@
+{
+  "python.analysis.extraPaths": ["backend"],
+  "python.analysis.typeCheckingMode": "basic",
+  "python.terminal.activateEnvironment": true,
+  "files.associations": {
+    "*.ass": "plaintext"
+  }
+}

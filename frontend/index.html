@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Video Editor Agent</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <h1>AI Video Editor Agent</h1>
+        <p class="sub">
+          Upload raw. Drop instructions. Get a high-retention edit.
+        </p>
+      </header>
+
+      <section class="card">
+        <form id="form">
+          <label class="drop" for="video">
+            <span id="dropLabel">Click or drop your raw video here</span>
+            <input id="video" name="video" type="file" accept="video/*" required />
+          </label>
+
+          <label>
+            Format
+            <select name="format_hint">
+              <option value="auto">Auto (decide from duration)</option>
+              <option value="short">Short — Reels / TikTok / Shorts</option>
+              <option value="long">Long — YouTube cinematic</option>
+            </select>
+          </label>
+
+          <label>
+            Instructions for the agent
+            <textarea
+              name="instructions"
+              rows="6"
+              placeholder="e.g. Keep only the strongest takes. Hook must be the line about temptation. End on the principle. Punch in on every emphasis word."
+            ></textarea>
+          </label>
+
+          <button type="submit" id="submit">Edit my video</button>
+        </form>
+      </section>
+
+      <section class="card status hidden" id="statusCard">
+        <div class="row">
+          <strong id="statusLabel">Queued</strong>
+          <span id="statusMsg" class="muted"></span>
+        </div>
+        <div class="bar"><div id="barFill"></div></div>
+      </section>
+
+      <section class="card result hidden" id="resultCard">
+        <h2>Edit ready</h2>
+        <video id="player" controls playsinline></video>
+        <a id="downloadLink" class="btn" download>Download mp4</a>
+        <div class="packaging">
+          <div><span class="tag">Title</span><p id="pkgTitle"></p></div>
+          <div><span class="tag">Thumbnail word</span><p id="pkgThumb"></p></div>
+          <div><span class="tag">End caption</span><p id="pkgEnd"></p></div>
+        </div>
+        <details>
+          <summary>Edit plan (raw)</summary>
+          <pre id="planJson"></pre>
+        </details>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
