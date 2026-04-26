@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
 
+    # If set, the API and frontend require this token via cookie or header.
+    # Leave empty to allow anonymous access (only do this for local dev).
+    access_password: str = ""
+
     @property
     def uploads_dir(self) -> Path:
         return (BACKEND_DIR / self.storage_uploads).resolve()

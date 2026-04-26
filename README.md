@@ -131,6 +131,55 @@ Everything the agent "knows" lives in `backend/app/agent/rules.py`:
 
 To change the agent's behavior, edit those blocks. No code changes needed.
 
+## Deploy as a public website
+
+The repo ships with a `Dockerfile`, `render.yaml`, `railway.json` and
+`fly.toml`. Pick the platform that fits.
+
+### Render.com (one-click)
+
+1. Push this repo to GitHub (already done if you cloned it).
+2. Click **New → Blueprint** on Render and pick this repo.
+3. Render reads `render.yaml`, generates `ACCESS_PASSWORD` for you, and
+   asks you for `ANTHROPIC_API_KEY`. Paste it.
+4. Wait ~5 min for the Docker build. The site is live at
+   `https://leanlead.onrender.com` (or your custom domain).
+
+### Railway.app
+
+1. Click **Deploy from GitHub repo** on Railway, pick this repo.
+2. Railway uses `railway.json` + `Dockerfile` automatically.
+3. Add env vars in Settings → Variables:
+   - `ANTHROPIC_API_KEY` — your key
+   - `ACCESS_PASSWORD` — pick a long random string
+4. Generate a domain. Done.
+
+### Fly.io (CLI)
+
+```bash
+brew install flyctl
+fly auth login
+fly launch --copy-config --no-deploy            # uses fly.toml
+fly secrets set ANTHROPIC_API_KEY=sk-ant-... ACCESS_PASSWORD=$(openssl rand -hex 24)
+fly deploy
+```
+
+### Anywhere else (raw Docker)
+
+```bash
+docker build -t leanlead .
+docker run -p 8000:8000 \
+  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -e ACCESS_PASSWORD=$(openssl rand -hex 24) \
+  leanlead
+```
+
+### Important — `ACCESS_PASSWORD`
+
+If you leave `ACCESS_PASSWORD` empty, the site is **public** and anyone
+who knows the URL can spend your Anthropic credits. Always set a strong
+password before exposing the URL.
+
 ## Roadmap
 
 - [ ] **Multi-take support** — accept multiple raw clips, transcribe in

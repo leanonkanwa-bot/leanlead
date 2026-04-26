@@ -1,3 +1,9 @@
+const loginCard = document.getElementById("loginCard");
+const appCard = document.getElementById("appCard");
+const loginForm = document.getElementById("loginForm");
+const loginPwd = document.getElementById("loginPwd");
+const loginErr = document.getElementById("loginErr");
+
 const form = document.getElementById("form");
 const submitBtn = document.getElementById("submit");
 const dropLabel = document.getElementById("dropLabel");
@@ -14,6 +20,38 @@ const pkgThumb = document.getElementById("pkgThumb");
 const pkgEnd = document.getElementById("pkgEnd");
 const planJson = document.getElementById("planJson");
 
+(async () => {
+  try {
+    const res = await fetch("/api/auth/status", { credentials: "same-origin" });
+    const j = await res.json();
+    if (j.required && !j.authed) {
+      loginCard.classList.remove("hidden");
+    } else {
+      appCard.classList.remove("hidden");
+    }
+  } catch {
+    appCard.classList.remove("hidden");
+  }
+})();
+
+loginForm?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  loginErr.textContent = "";
+  const fd = new FormData();
+  fd.set("password", loginPwd.value);
+  const res = await fetch("/api/auth/login", {
+    method: "POST",
+    body: fd,
+    credentials: "same-origin",
+  });
+  if (!res.ok) {
+    loginErr.textContent = "Wrong password.";
+    return;
+  }
+  loginCard.classList.add("hidden");
+  appCard.classList.remove("hidden");
+});
+
 videoInput.addEventListener("change", () => {
   const f = videoInput.files?.[0];
   if (f) dropLabel.textContent = `${f.name} — ${(f.size / (1024 * 1024)).toFixed(1)} MB`;
@@ -29,9 +67,20 @@ form.addEventListener("submit", async (e) => {
   const fd = new FormData(form);
   let res;
   try {
-    res = await fetch("/api/edit", { method: "POST", body: fd });
+    res = await fetch("/api/edit", {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin",
+    });
   } catch (err) {
     return fail(`Upload failed: ${err.message}`);
+  }
+  if (res.status === 401) {
+    loginCard.classList.remove("hidden");
+    appCard.classList.add("hidden");
+    statusCard.classList.add("hidden");
+    submitBtn.disabled = false;
+    return;
   }
   if (!res.ok) return fail(`Server: ${res.status} ${await res.text()}`);
   const { job_id } = await res.json();
@@ -41,7 +90,7 @@ form.addEventListener("submit", async (e) => {
 async function poll(jobId) {
   while (true) {
     await new Promise((r) => setTimeout(r, 1500));
-    const res = await fetch(`/api/jobs/${jobId}`);
+    const res = await fetch(`/api/jobs/${jobId}`, { credentials: "same-origin" });
     if (!res.ok) return fail(`Lost the job: ${res.status}`);
     const job = await res.json();
     setStatus(job.status, job.message || "", job.progress || 0);

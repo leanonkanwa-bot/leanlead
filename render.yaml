@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: leanlead
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ACCESS_PASSWORD
+        generateValue: true
+      - key: ANTHROPIC_MODEL
+        value: claude-opus-4-7
+      - key: WHISPER_MODEL
+        value: base

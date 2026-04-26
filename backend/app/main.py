@@ -2,13 +2,23 @@
 
 from __future__ import annotations
 
+import secrets
 import shutil
 from pathlib import Path
 from typing import Literal
 
-from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api.jobs import store
@@ -25,18 +35,73 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+AUTH_COOKIE = "lle_token"
+
+
+def _auth_required() -> bool:
+    return bool(settings.access_password)
+
+
+def _check_auth(request: Request) -> None:
+    if not _auth_required():
+        return
+    token = request.cookies.get(AUTH_COOKIE) or request.headers.get("x-access-token")
+    if not token or not secrets.compare_digest(token, settings.access_password):
+        raise HTTPException(status_code=401, detail="auth required")
+
 
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/healthz")
+def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/api/auth/status")
+def auth_status(request: Request) -> dict:
+    if not _auth_required():
+        return {"required": False, "authed": True}
+    cookie = request.cookies.get(AUTH_COOKIE)
+    authed = bool(cookie) and secrets.compare_digest(cookie, settings.access_password)
+    return {"required": True, "authed": authed}
+
+
+@app.post("/api/auth/login")
+def auth_login(password: str = Form(...)) -> Response:
+    if not _auth_required():
+        return JSONResponse({"ok": True})
+    if not secrets.compare_digest(password, settings.access_password):
+        raise HTTPException(401, "wrong password")
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie(
+        AUTH_COOKIE,
+        settings.access_password,
+        httponly=True,
+        samesite="lax",
+        max_age=60 * 60 * 24 * 30,
+        secure=False,
+    )
+    return resp
+
+
+@app.post("/api/auth/logout")
+def auth_logout() -> Response:
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(AUTH_COOKIE)
+    return resp
+
+
 @app.post("/api/edit")
 async def submit_edit(
+    request: Request,
     background: BackgroundTasks,
     video: UploadFile = File(...),
     instructions: str = Form(""),
     format_hint: Literal["short", "long", "auto"] = Form("auto"),
+    _: None = Depends(_check_auth),
 ) -> JSONResponse:
     if not settings.anthropic_api_key:
         raise HTTPException(500, "ANTHROPIC_API_KEY not set in backend/.env")
@@ -53,7 +118,7 @@ async def submit_edit(
 
 
 @app.get("/api/jobs/{job_id}")
-def get_job(job_id: str) -> dict:
+def get_job(job_id: str, request: Request, _: None = Depends(_check_auth)) -> dict:
     job = store.get(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -61,7 +126,7 @@ def get_job(job_id: str) -> dict:
 
 
 @app.get("/api/download/{job_id}")
-def download(job_id: str):
+def download(job_id: str, request: Request, _: None = Depends(_check_auth)):
     out = settings.outputs_dir / f"{job_id}.mp4"
     if not out.exists():
         raise HTTPException(404, "Output not ready")

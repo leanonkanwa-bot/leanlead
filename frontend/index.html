@@ -3,19 +3,40 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Video Editor Agent</title>
+    <meta name="theme-color" content="#0b0b0f" />
+    <title>LeanLead — AI Video Editor</title>
+    <meta name="description" content="Upload raw. Drop instructions. Get a high-retention edit." />
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <main class="shell">
       <header>
-        <h1>AI Video Editor Agent</h1>
+        <div class="brand">
+          <span class="dot"></span>
+          <span class="brand-name">LeanLead</span>
+        </div>
+        <h1>Edit your raw video into a viral one.</h1>
         <p class="sub">
-          Upload raw. Drop instructions. Get a high-retention edit.
+          Upload raw footage. Drop instructions. The agent transcribes, cuts,
+          zooms, captions, and packages — short form or long form. Built on the
+          same retention laws used by the best YouTubers and storytellers.
         </p>
       </header>
 
-      <section class="card">
+      <section class="card hidden" id="loginCard">
+        <h2>Access</h2>
+        <p class="muted">This instance is password-protected.</p>
+        <form id="loginForm">
+          <label>
+            Password
+            <input id="loginPwd" type="password" autocomplete="current-password" required />
+          </label>
+          <button type="submit">Unlock</button>
+          <p id="loginErr" class="err"></p>
+        </form>
+      </section>
+
+      <section class="card hidden" id="appCard">
         <form id="form">
           <label class="drop" for="video">
             <span id="dropLabel">Click or drop your raw video here</span>
@@ -66,6 +87,11 @@
           <pre id="planJson"></pre>
         </details>
       </section>
+
+      <footer>
+        Powered by Claude + Whisper + FFmpeg.
+        <a href="https://github.com/leanonkanwa-bot/leanlead" target="_blank" rel="noopener">Source</a>.
+      </footer>
     </main>
 
     <script src="./app.js"></script>
