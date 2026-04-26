@@ -6,8 +6,6 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
 
-import whisper
-
 from app.core.config import settings
 
 
@@ -15,8 +13,11 @@ _model = None
 
 
 def _load_model():
+    """Lazy import + load. Keeps `import whisper` (which pulls torch) off the
+    server's cold-start path so /healthz responds within Railway's window."""
     global _model
     if _model is None:
+        import whisper  # noqa: PLC0415 — intentional lazy import
         _model = whisper.load_model(settings.whisper_model)
     return _model
 
@@ -62,7 +63,7 @@ class Transcript:
 
 def transcribe(video_path: Path) -> Transcript:
     model = _load_model()
-    result = model.transcribe(
+    result = model.transcribe(  # type: ignore[union-attr]
         str(video_path),
         word_timestamps=True,
         verbose=False,
