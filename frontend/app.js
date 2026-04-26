@@ -160,6 +160,12 @@ async function poll(jobId) {
   while (true) {
     await new Promise((r) => setTimeout(r, 1500));
     const res = await fetch(`/api/jobs/${jobId}`, { credentials: "same-origin" });
+    if (res.status === 404) {
+      return fail(
+        "The server restarted and your job was lost. " +
+          "Please re-upload your video.",
+      );
+    }
     if (!res.ok) return fail(`Lost the job: ${res.status}`);
     const job = await res.json();
     setStatus(job.status, job.message || "", job.progress || 0);

@@ -180,6 +180,34 @@ If you leave `ACCESS_PASSWORD` empty, the site is **public** and anyone
 who knows the URL can spend your Anthropic credits. Always set a strong
 password before exposing the URL.
 
+### Important — persistent storage (mount a Volume)
+
+The container's filesystem is **ephemeral** on every cloud platform
+listed above. Without a persistent disk mount, every deploy or crash
+wipes uploads + the job log, and any in-flight render is lost.
+
+The app stores everything that needs to survive at
+`/app/backend/storage` (uploads, intermediate clips, finished mp4s,
+the job log `jobs.json`). Mount a persistent disk there.
+
+- **Railway**: project → service → **Settings → Volumes →
+  + Add Volume**. Mount path: `/app/backend/storage`. Pick the smallest
+  size that fits your largest expected video (e.g. 5 GB for short-form,
+  50 GB if you handle hours of long form).
+- **Render**: blueprint → service → **Disks → Add Disk**. Mount path
+  `/app/backend/storage`, size to taste.
+- **Fly**: `fly volumes create leanlead_storage --size 10` and add to
+  `fly.toml`:
+
+  ```toml
+  [[mounts]]
+    source = "leanlead_storage"
+    destination = "/app/backend/storage"
+  ```
+
+Without a Volume the app still runs, but every redeploy turns active
+jobs into a "Server restarted — please re-upload" error.
+
 ## Roadmap
 
 - [ ] **Multi-take support** — accept multiple raw clips, transcribe in
