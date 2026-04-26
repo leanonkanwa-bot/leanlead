@@ -1,8 +1,12 @@
 const $ = (id) => document.getElementById(id);
 
-const loginCard = $("loginCard");
-const appCard = $("appCard");
+const loginCard = $("login");
+const appCard = $("tool");
 const loginForm = $("loginForm");
+
+if (!appCard) {
+  console.error("LeanLead: #tool not found in DOM. Did the HTML structure change?");
+}
 const loginPwd = $("loginPwd");
 const loginErr = $("loginErr");
 
