@@ -65,9 +65,20 @@ loginForm?.addEventListener("submit", async (e) => {
 
 videoInput.addEventListener("change", () => {
   const f = videoInput.files?.[0];
-  if (f) {
-    dropLabel.textContent = `${f.name} — ${(f.size / (1024 * 1024)).toFixed(1)} MB`;
-    drop.classList.add("has-file");
+  if (!f) return;
+  dropLabel.textContent = `${f.name} — ${(f.size / (1024 * 1024)).toFixed(1)} MB`;
+  drop.classList.add("has-file");
+  if (f.size > 500 * 1024 * 1024) {
+    const mb = (f.size / (1024 * 1024)).toFixed(0);
+    if (!confirm(
+      `This file is ${mb} MB — over the recommended 500 MB.\n\n` +
+      `Upload alone may take 10+ minutes, then transcription + render ` +
+      `on a shared CPU can take 1–3 hours.\n\nContinue anyway?`
+    )) {
+      videoInput.value = "";
+      dropLabel.textContent = "Click or drop your raw video here";
+      drop.classList.remove("has-file");
+    }
   }
 });
 
@@ -84,37 +95,65 @@ videoInput.addEventListener("change", () => {
   })
 );
 
-form.addEventListener("submit", async (e) => {
+form.addEventListener("submit", (e) => {
   e.preventDefault();
   resultCard.classList.add("hidden");
   statusCard.classList.remove("hidden");
   statusCard.scrollIntoView({ behavior: "smooth", block: "center" });
-  setStatus("queued", "Uploading…", 5);
+  setStatus("queued", "Starting upload…", 0);
   submitBtn.disabled = true;
   submitBtn.querySelector(".btn-label").textContent = "Working…";
 
+  // XMLHttpRequest gives us upload.onprogress; fetch doesn't.
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/api/edit");
+  xhr.withCredentials = true;
+
+  let lastShown = 0;
+  xhr.upload.addEventListener("progress", (ev) => {
+    if (!ev.lengthComputable) return;
+    const loadedMb = ev.loaded / (1024 * 1024);
+    const totalMb = ev.total / (1024 * 1024);
+    const pctReal = ev.loaded / ev.total;
+    // Reserve 0–25% of the visual bar for upload (transcribe/plan/render fill the rest).
+    const uiPct = Math.min(25, Math.round(pctReal * 25));
+    if (uiPct !== lastShown) {
+      lastShown = uiPct;
+      setStatus(
+        "queued",
+        `Uploading ${loadedMb.toFixed(0)} / ${totalMb.toFixed(0)} MB`,
+        uiPct,
+      );
+    }
+  });
+
+  xhr.addEventListener("load", () => {
+    if (xhr.status === 401) {
+      loginCard.classList.remove("hidden");
+      appCard.classList.add("hidden");
+      statusCard.classList.add("hidden");
+      submitBtn.disabled = false;
+      submitBtn.querySelector(".btn-label").textContent = "Edit my video";
+      return;
+    }
+    if (xhr.status < 200 || xhr.status >= 300) {
+      return fail(`Server: ${xhr.status} ${xhr.responseText}`);
+    }
+    try {
+      const { job_id } = JSON.parse(xhr.responseText);
+      setStatus("queued", "Upload complete. Server processing…", 28);
+      poll(job_id);
+    } catch (err) {
+      fail(`Bad server response: ${err.message}`);
+    }
+  });
+
+  xhr.addEventListener("error", () => fail("Network error during upload."));
+  xhr.addEventListener("abort", () => fail("Upload aborted."));
+  xhr.addEventListener("timeout", () => fail("Upload timed out."));
+
   const fd = new FormData(form);
-  let res;
-  try {
-    res = await fetch("/api/edit", {
-      method: "POST",
-      body: fd,
-      credentials: "same-origin",
-    });
-  } catch (err) {
-    return fail(`Upload failed: ${err.message}`);
-  }
-  if (res.status === 401) {
-    loginCard.classList.remove("hidden");
-    appCard.classList.add("hidden");
-    statusCard.classList.add("hidden");
-    submitBtn.disabled = false;
-    submitBtn.querySelector(".btn-label").textContent = "Edit my video";
-    return;
-  }
-  if (!res.ok) return fail(`Server: ${res.status} ${await res.text()}`);
-  const { job_id } = await res.json();
-  poll(job_id);
+  xhr.send(fd);
 });
 
 async function poll(jobId) {
