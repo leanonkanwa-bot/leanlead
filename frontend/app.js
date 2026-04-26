@@ -1,24 +1,30 @@
-const loginCard = document.getElementById("loginCard");
-const appCard = document.getElementById("appCard");
-const loginForm = document.getElementById("loginForm");
-const loginPwd = document.getElementById("loginPwd");
-const loginErr = document.getElementById("loginErr");
+const $ = (id) => document.getElementById(id);
 
-const form = document.getElementById("form");
-const submitBtn = document.getElementById("submit");
-const dropLabel = document.getElementById("dropLabel");
-const videoInput = document.getElementById("video");
-const statusCard = document.getElementById("statusCard");
-const statusLabel = document.getElementById("statusLabel");
-const statusMsg = document.getElementById("statusMsg");
-const barFill = document.getElementById("barFill");
-const resultCard = document.getElementById("resultCard");
-const player = document.getElementById("player");
-const downloadLink = document.getElementById("downloadLink");
-const pkgTitle = document.getElementById("pkgTitle");
-const pkgThumb = document.getElementById("pkgThumb");
-const pkgEnd = document.getElementById("pkgEnd");
-const planJson = document.getElementById("planJson");
+const loginCard = $("loginCard");
+const appCard = $("appCard");
+const loginForm = $("loginForm");
+const loginPwd = $("loginPwd");
+const loginErr = $("loginErr");
+
+const form = $("form");
+const submitBtn = $("submit");
+const drop = document.querySelector(".drop");
+const dropLabel = $("dropLabel");
+const videoInput = $("video");
+
+const statusCard = $("statusCard");
+const statusLabel = $("statusLabel");
+const statusMsg = $("statusMsg");
+const statusPip = $("statusPip");
+const barFill = $("barFill");
+
+const resultCard = $("resultCard");
+const player = $("player");
+const downloadLink = $("downloadLink");
+const pkgTitle = $("pkgTitle");
+const pkgThumb = $("pkgThumb");
+const pkgEnd = $("pkgEnd");
+const planJson = $("planJson");
 
 (async () => {
   try {
@@ -50,19 +56,38 @@ loginForm?.addEventListener("submit", async (e) => {
   }
   loginCard.classList.add("hidden");
   appCard.classList.remove("hidden");
+  appCard.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
 videoInput.addEventListener("change", () => {
   const f = videoInput.files?.[0];
-  if (f) dropLabel.textContent = `${f.name} — ${(f.size / (1024 * 1024)).toFixed(1)} MB`;
+  if (f) {
+    dropLabel.textContent = `${f.name} — ${(f.size / (1024 * 1024)).toFixed(1)} MB`;
+    drop.classList.add("has-file");
+  }
 });
+
+["dragenter", "dragover"].forEach((ev) =>
+  drop.addEventListener(ev, (e) => {
+    e.preventDefault();
+    drop.classList.add("dragover");
+  })
+);
+["dragleave", "drop"].forEach((ev) =>
+  drop.addEventListener(ev, (e) => {
+    e.preventDefault();
+    drop.classList.remove("dragover");
+  })
+);
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   resultCard.classList.add("hidden");
   statusCard.classList.remove("hidden");
+  statusCard.scrollIntoView({ behavior: "smooth", block: "center" });
   setStatus("queued", "Uploading…", 5);
   submitBtn.disabled = true;
+  submitBtn.querySelector(".btn-label").textContent = "Working…";
 
   const fd = new FormData(form);
   let res;
@@ -80,6 +105,7 @@ form.addEventListener("submit", async (e) => {
     appCard.classList.add("hidden");
     statusCard.classList.add("hidden");
     submitBtn.disabled = false;
+    submitBtn.querySelector(".btn-label").textContent = "Edit my video";
     return;
   }
   if (!res.ok) return fail(`Server: ${res.status} ${await res.text()}`);
@@ -99,30 +125,52 @@ async function poll(jobId) {
   }
 }
 
+const STATUS_LABELS = {
+  queued: "Queued",
+  transcribing: "Transcribing",
+  planning: "Planning the edit",
+  rendering: "Rendering",
+  done: "Done",
+  error: "Error",
+};
+const STATUS_PIPS = {
+  queued: "1/4",
+  transcribing: "2/4",
+  planning: "3/4",
+  rendering: "4/4",
+  done: "✓",
+  error: "✗",
+};
+
 function setStatus(status, message, progress) {
-  const labels = {
-    queued: "Queued",
-    transcribing: "Transcribing",
-    planning: "Planning the edit",
-    rendering: "Rendering",
-    done: "Done",
-    error: "Error",
-  };
-  statusLabel.textContent = labels[status] || status;
+  statusLabel.textContent = STATUS_LABELS[status] || status;
   statusMsg.textContent = message;
+  statusPip.textContent = STATUS_PIPS[status] || "…";
   barFill.style.width = `${progress}%`;
-  if (status === "error") barFill.style.background = "var(--err)";
-  else barFill.style.background = "var(--accent)";
+  if (status === "error") {
+    barFill.style.background = "var(--err)";
+    statusPip.style.color = "var(--err)";
+    statusPip.style.borderColor = "rgba(255,92,122,.3)";
+    statusPip.style.background = "rgba(255,92,122,.08)";
+  } else {
+    barFill.style.background = "linear-gradient(90deg, var(--accent), var(--accent-2))";
+    statusPip.style.color = "var(--accent)";
+    statusPip.style.borderColor = "rgba(255,214,10,.2)";
+    statusPip.style.background = "rgba(255,214,10,.08)";
+  }
 }
 
 function fail(msg) {
   submitBtn.disabled = false;
+  submitBtn.querySelector(".btn-label").textContent = "Edit my video";
   setStatus("error", msg, 100);
 }
 
 function showResult(jobId, result) {
   submitBtn.disabled = false;
+  submitBtn.querySelector(".btn-label").textContent = "Edit another";
   resultCard.classList.remove("hidden");
+  resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
   player.src = `/api/download/${jobId}`;
   downloadLink.href = `/api/download/${jobId}`;
   const pkg = result?.packaging || {};
