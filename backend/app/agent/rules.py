@@ -131,6 +131,33 @@ PACKAGING (output of every job)
       Format: <observation> → <thought trigger>.
 """
 
+HARD_RULES = """\
+HARD RULES (production correctness — non-negotiable)
+
+These prevent silent failures the viewer DOES feel even if they can't name it.
+Distilled from browser-use/video-use's shipped rules + our own pipeline.
+
+  1. NEVER cut inside a word. Every keep_segment start/end MUST snap to a
+     word boundary from the transcript.
+  2. PAD every cut edge. Working window: 30–200ms. Whisper timestamps drift
+     50–100ms; padding absorbs that drift.
+       - Tighter (≈40–60ms) for short-form energy.
+       - Looser (≈120–180ms) for long-form cinematic.
+  3. Prefer SILENCE GAPS ≥ 400ms as cut targets — cleanest audible cuts.
+     150–400ms is usable but check both sides. <150ms is unsafe.
+  4. NEVER reason audio and video independently. Every cut must work on both.
+  5. Preserve audio peaks — laughs, punchlines, breath-hits. Extend past
+     punchlines to include reactions; the laugh IS the beat.
+  6. The renderer applies 30ms audio fades at every segment boundary. Don't
+     plan cuts in places where 30ms of fade would erase a critical syllable.
+  7. Subtitles are burned LAST in the filter chain — never under overlays.
+  8. Animations / B-roll overlays must START at least one frame BEFORE the
+     payoff word and HOLD ≥ 1s on their final state before cutting away.
+  9. Easing on every animation is cubic, never linear. Linear looks robotic.
+ 10. If you reorder, the order in `keep_segments` IS the playback order.
+     Do not assume the model can re-sort later.
+"""
+
 
 def system_prompt(format_hint: str | None = None) -> str:
     """
@@ -161,7 +188,7 @@ def system_prompt(format_hint: str | None = None) -> str:
     else:
         blocks.extend([ZOOM_PLAN_SHORT, ZOOM_PLAN_LONG])
 
-    blocks.extend([BROLL_RULES, CAPTION_RULES, PACKAGING_RULES])
+    blocks.extend([BROLL_RULES, CAPTION_RULES, PACKAGING_RULES, HARD_RULES])
 
     blocks.append(
         """

@@ -133,11 +133,20 @@ To change the agent's behavior, edit those blocks. No code changes needed.
 
 ## Roadmap
 
+- [ ] **Multi-take support** — accept multiple raw clips, transcribe in
+      parallel, let the agent pick the best take of each beat. Adopt
+      video-use's EDL JSON format at that point.
+- [ ] **HTML B-roll renderer** — instantiate HyperFrames compositions with
+      the user's brand palette and overlay them on the timeline (see
+      `docs/INTEGRATIONS.md`).
 - [ ] Replace in-memory job store with Redis (multi-worker safe).
-- [ ] Real B-roll fetcher (Pexels / Storyblocks API).
 - [ ] Auto-export 9:16, 1:1, 16:9 versions in one run.
 - [ ] Voice-intensity detection for silence-before-impact placement.
 - [ ] User accounts + per-user style presets (the SaaS layer).
+
+See **[`docs/INTEGRATIONS.md`](./docs/INTEGRATIONS.md)** for what we
+borrowed from `browser-use/video-use` and how `heygen-com/hyperframes`
+fits into the roadmap.
 
 ## License
 

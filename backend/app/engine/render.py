@@ -2,17 +2,22 @@
 FFmpeg renderer. Takes the EditPlan + transcript + raw video and produces the
 final edited video.
 
-Pipeline:
-  1. For each keep_segment, produce a trimmed clip (lossless cut).
-  2. Concat clips into a single mid file.
-  3. Apply zoom plan via zoompan filter (drift, punch_in, pull_out).
-  4. Burn ASS subtitles built from the transcript + emphasis words.
-  5. Return final mp4 path + packaging metadata.
+Pipeline (production-correct order):
+  1. SNAP each keep_segment edge to the nearest word boundary (Hard Rule 1).
+  2. PAD the edges: 30–200ms working window (Hard Rule 2). Tighter for short
+     form, looser for long form.
+  3. Per-segment extract with 30ms audio fades baked in (Hard Rule 6, prevents
+     audible pops at every cut).
+  4. Lossless `-c copy` concat of segments (no double-encode).
+  5. Single re-encode pass: scale/crop → zoompan → burn ASS subtitles LAST
+     (Hard Rule 7, never under overlays).
+
+Borrows the per-segment-extract / lossless-concat / 30ms-afade pattern from
+browser-use/video-use's helpers/render.py, which is the proven shape.
 """
 
 from __future__ import annotations
 
-import json
 import shlex
 import subprocess
 from pathlib import Path
@@ -20,6 +25,11 @@ from typing import Any
 
 from app.agent.planner import EditPlan
 from app.engine.captions import WordTiming, build_ass
+
+
+SHORT_PAD_S = 0.05   # 50ms — tight, energetic
+LONG_PAD_S = 0.15    # 150ms — cinematic breathing room
+AUDIO_FADE_S = 0.03  # 30ms — anti-pop fade at every segment boundary
 
 
 def _run(cmd: list[str]) -> None:
@@ -43,14 +53,75 @@ def _probe_duration(path: Path) -> float:
     return float(out.strip())
 
 
-def _cut_segment(src: Path, start: float, end: float, dst: Path) -> None:
-    duration = max(0.05, end - start)
+def _flat_words(transcript: dict[str, Any]) -> list[tuple[float, float]]:
+    out: list[tuple[float, float]] = []
+    for seg in transcript.get("segments", []):
+        for w in seg.get("words", []):
+            try:
+                out.append((float(w["start"]), float(w["end"])))
+            except (KeyError, TypeError, ValueError):
+                continue
+    out.sort()
+    return out
+
+
+def _snap_to_word_boundary(
+    t: float,
+    words: list[tuple[float, float]],
+    edge: str,
+) -> float:
+    """
+    Snap a cut time to the nearest word boundary (Hard Rule 1).
+    edge='start' snaps to the START of the next word; edge='end' snaps to the
+    END of the previous word — so we never cut INTO a word.
+    """
+    if not words:
+        return t
+    if edge == "start":
+        # find earliest word that starts at or after t; if none, keep t.
+        for ws, _ in words:
+            if ws >= t - 0.01:
+                return ws
+        return t
+    # end: find the latest word that ends at or before t.
+    last = t
+    for _, we in words:
+        if we <= t + 0.01:
+            last = we
+        else:
+            break
+    return last
+
+
+def _cut_segment(
+    src: Path,
+    start: float,
+    end: float,
+    dst: Path,
+    target_w: int,
+    target_h: int,
+    fps: int,
+) -> None:
+    """Per-segment extract with 30ms audio fades baked in (Hard Rule 6)."""
+    duration = max(0.1, end - start)
+    fade_out_start = max(0.0, duration - AUDIO_FADE_S)
+    af = (
+        f"afade=t=in:st=0:d={AUDIO_FADE_S},"
+        f"afade=t=out:st={fade_out_start:.3f}:d={AUDIO_FADE_S}"
+    )
+    vf = (
+        f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+        f"crop={target_w}:{target_h},fps={fps}"
+    )
     _run([
         "ffmpeg", "-y", "-loglevel", "error",
         "-ss", f"{start:.3f}", "-i", str(src),
         "-t", f"{duration:.3f}",
+        "-vf", vf,
+        "-af", af,
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-        "-c:a", "aac", "-b:a", "192k",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-movflags", "+faststart",
         str(dst),
     ])
@@ -112,9 +183,16 @@ def render(
 ) -> dict[str, Any]:
     work_dir.mkdir(parents=True, exist_ok=True)
 
+    short_form = plan.format == "short"
+    target_w, target_h = (1080, 1920) if short_form else (1920, 1080)
+    fps = 30
+    pad = SHORT_PAD_S if short_form else LONG_PAD_S
+
     keep = plan.keep_segments or [
         {"start": 0.0, "end": float(transcript.get("duration", 0.0))}
     ]
+    words = _flat_words(transcript)
+    src_duration = float(transcript.get("duration", 0.0)) or _probe_duration(src)
 
     parts: list[Path] = []
     cum = 0.0
@@ -122,12 +200,21 @@ def render(
     remapped_words: list[WordTiming] = []
 
     for i, seg in enumerate(keep):
-        s = float(seg["start"])
-        e = float(seg["end"])
-        if e <= s:
+        s_raw = float(seg["start"])
+        e_raw = float(seg["end"])
+        if e_raw <= s_raw:
             continue
+        # Hard Rule 1 — snap to word boundaries
+        s = _snap_to_word_boundary(s_raw, words, edge="start")
+        e = _snap_to_word_boundary(e_raw, words, edge="end")
+        # Hard Rule 2 — pad cut edges
+        s = max(0.0, s - pad)
+        e = min(src_duration, e + pad) if src_duration > 0 else e + pad
+        if e - s < 0.15:
+            continue
+
         part = work_dir / f"part_{i:04d}.mp4"
-        _cut_segment(src, s, e, part)
+        _cut_segment(src, s, e, part, target_w, target_h, fps)
         parts.append(part)
 
         for zp in plan.zoom_plan:
@@ -160,7 +247,6 @@ def render(
     _concat(parts, concat_path)
     total_duration = _probe_duration(concat_path)
 
-    short_form = plan.format == "short"
     ass_path = work_dir / "captions.ass"
     build_ass(
         remapped_words,
@@ -169,16 +255,12 @@ def render(
         emphasis_words=set(plan.caption_emphasis_words),
     )
 
-    z_expr, xy_expr = _build_zoom_expression(remapped_zoom, total_duration)
+    z_expr, xy_expr = _build_zoom_expression(remapped_zoom, total_duration, fps=fps)
     x_expr, y_expr = xy_expr.split(";")
-
-    target_w, target_h = (1080, 1920) if short_form else (1920, 1080)
-    fps = 30
     total_frames = max(1, int(total_duration * fps))
 
+    # Hard Rule 7 — subtitles LAST in the filter chain.
     vf = (
-        f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
-        f"crop={target_w}:{target_h},"
         f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':"
         f"d=1:s={target_w}x{target_h}:fps={fps},"
         f"ass={ass_path.as_posix()}"
