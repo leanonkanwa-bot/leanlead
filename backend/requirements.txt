@@ -3,7 +3,7 @@ uvicorn[standard]==0.32.0
 python-multipart==0.0.17
 pydantic==2.9.2
 pydantic-settings==2.6.1
-anthropic==0.39.0
+anthropic>=0.42,<1
 openai-whisper==20240930
 ffmpeg-python==0.2.0
 aiofiles==24.1.0
