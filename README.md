@@ -180,6 +180,33 @@ If you leave `ACCESS_PASSWORD` empty, the site is **public** and anyone
 who knows the URL can spend your Anthropic credits. Always set a strong
 password before exposing the URL.
 
+### Important — pick the right plan size
+
+The hardest constraint is **RAM**. Whisper + torch hold the model in memory:
+
+| Whisper model | RAM you need | Notes |
+|---|---|---|
+| `tiny` (default) | ~1 GB total | Default in `.env.example`. Fast, OK quality for clear speech. |
+| `base` | ~1.5 GB total | Better punctuation. Set `WHISPER_MODEL=base`. |
+| `small` | ~3 GB total | Multilingual robustness. |
+| `medium` | ~6 GB total | Best ROI for accuracy. Won't fit on Railway Trial. |
+
+The slim Docker image itself fits in ~1 GB resident; the rest is the
+loaded Whisper model + the working buffers during inference.
+
+Recommended starting plans:
+
+- **Railway Hobby ($5/mo)** — 8 GB RAM, 8 vCPU. Comfortably runs `base`
+  or `small`.
+- **Railway Trial / Free** — limited; default to `tiny`.
+- **Render Starter** — 512 MB RAM, won't fit anything beyond `tiny` and
+  even then is tight; bump to Standard for `base+`.
+- **Fly.io shared-cpu-1x@2gb** — runs `tiny` / `base`. Bump to 4–8 GB for
+  larger models.
+
+**If you see `502 Bad Gateway` mid-job** the container OOM'd. Either
+bump your plan's RAM, or downgrade `WHISPER_MODEL` to `tiny`.
+
 ### Important — persistent storage (mount a Volume)
 
 The container's filesystem is **ephemeral** on every cloud platform

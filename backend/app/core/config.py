@@ -14,7 +14,10 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-opus-4-7"
-    whisper_model: str = "base"
+    # tiny ≈ 390 MB RAM, base ≈ 1 GB. Default to tiny so the app fits on
+    # small Railway / Render dynos. Set WHISPER_MODEL=base|small|medium|large
+    # in your env to trade RAM for accuracy.
+    whisper_model: str = "tiny"
 
     storage_uploads: str = "storage/uploads"
     storage_outputs: str = "storage/outputs"

@@ -157,16 +157,38 @@ form.addEventListener("submit", (e) => {
 });
 
 async function poll(jobId) {
+  let consecutive5xx = 0;
   while (true) {
     await new Promise((r) => setTimeout(r, 1500));
-    const res = await fetch(`/api/jobs/${jobId}`, { credentials: "same-origin" });
+    let res;
+    try {
+      res = await fetch(`/api/jobs/${jobId}`, { credentials: "same-origin" });
+    } catch (err) {
+      // Network blip — give it a few tries before giving up.
+      if (++consecutive5xx > 5) return fail("Lost the connection to the server.");
+      continue;
+    }
     if (res.status === 404) {
       return fail(
         "The server restarted and your job was lost. " +
           "Please re-upload your video.",
       );
     }
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      // Bad gateway / unavailable — the container is dead or restarting.
+      // Most common cause is OOM during transcription. Don't poll forever.
+      if (++consecutive5xx > 8) {
+        return fail(
+          `The server became unreachable (${res.status}). Most likely it ran ` +
+            "out of memory during transcription or rendering. Try a shorter " +
+            "video, set WHISPER_MODEL=tiny in your environment, or upgrade " +
+            "your hosting plan.",
+        );
+      }
+      continue;
+    }
     if (!res.ok) return fail(`Lost the job: ${res.status}`);
+    consecutive5xx = 0;
     const job = await res.json();
     setStatus(job.status, job.message || "", job.progress || 0);
     if (job.status === "done") return showResult(jobId, job.result);
