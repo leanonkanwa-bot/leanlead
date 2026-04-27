@@ -290,12 +290,19 @@ def render(
         f"ass={ass_path.as_posix()}"
     )
 
+    # Final pass: zoompan is genuinely memory-hungry (it scales the input
+    # canvas internally) and libx264 'medium' holds ~40 frames in its
+    # lookahead buffer. Both together OOM small dynos. Drop to superfast
+    # + 1 thread + no rc-lookahead. Quality is still very good for social
+    # short-form; users on bigger plans can override these later.
     _run([
         "ffmpeg", "-y", "-loglevel", "error",
         "-i", str(concat_path),
         "-vf", vf,
         "-frames:v", str(total_frames),
-        "-c:v", "libx264", "-preset", "medium", "-crf", "19",
+        "-c:v", "libx264", "-preset", "superfast", "-crf", "22",
+        "-threads", "1",
+        "-x264-params", "rc-lookahead=0:bframes=0",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
