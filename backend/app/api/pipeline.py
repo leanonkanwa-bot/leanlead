@@ -9,7 +9,7 @@ from app.agent.planner import FormatHint, plan_edit
 from app.api.jobs import store
 from app.core.config import settings
 from app.engine.render import render
-from app.engine.transcribe import transcribe
+from app.engine.transcribe import transcribe, unload_model
 
 
 def run_job(job_id: str, src: Path, instructions: str, format_hint: FormatHint) -> None:
@@ -21,6 +21,10 @@ def run_job(job_id: str, src: Path, instructions: str, format_hint: FormatHint) 
         store.update(job_id, status="planning", progress=40,
                      message="Asking the agent for an edit plan…")
         plan = plan_edit(transcript, instructions, format_hint=format_hint)
+
+        # Reclaim ~250 MB of RAM before ffmpeg fires up — otherwise the
+        # encoder gets OOM-killed on small dynos (no stderr, exit signal 9).
+        unload_model()
 
         store.update(job_id, status="rendering", progress=70,
                      message="Rendering with FFmpeg…")

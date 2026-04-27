@@ -39,6 +39,16 @@ def _load_model():
     return _model
 
 
+def unload_model() -> None:
+    """Release the Whisper model and reclaim ~250 MB of RAM. Call this
+    between transcription and rendering so ffmpeg has room to encode on
+    a 1 GB dyno."""
+    global _model
+    _model = None
+    import gc  # noqa: PLC0415
+    gc.collect()
+
+
 @dataclass
 class Word:
     text: str

@@ -34,10 +34,29 @@ AUDIO_FADE_S = 0.03  # 30ms — anti-pop fade at every segment boundary
 
 def _run(cmd: list[str]) -> None:
     proc = subprocess.run(cmd, capture_output=True, text=True)
-    if proc.returncode != 0:
+    if proc.returncode == 0:
+        return
+    stderr = proc.stderr[-2000:] or "(empty — process produced no stderr)"
+    if proc.returncode < 0:
+        sig = -proc.returncode
+        hint = ""
+        if sig == 9:
+            hint = (
+                " — SIGKILL. The kernel killed ffmpeg, almost always because "
+                "the container ran out of memory. Try a shorter video, lower "
+                "WHISPER_MODEL, or upgrade your hosting plan to give the "
+                "encoder more headroom."
+            )
+        elif sig == 15:
+            hint = " — SIGTERM. Something asked ffmpeg to stop."
         raise RuntimeError(
-            f"ffmpeg failed:\n  cmd: {shlex.join(cmd)}\n  stderr: {proc.stderr[-2000:]}"
+            f"ffmpeg killed by signal {sig}{hint}\n"
+            f"  cmd: {shlex.join(cmd)}\n  stderr: {stderr}"
         )
+    raise RuntimeError(
+        f"ffmpeg failed (exit {proc.returncode}):\n"
+        f"  cmd: {shlex.join(cmd)}\n  stderr: {stderr}"
+    )
 
 
 def _probe_duration(path: Path) -> float:
@@ -113,13 +132,18 @@ def _cut_segment(
         f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
         f"crop={target_w}:{target_h},fps={fps}"
     )
+    # Light flags for the per-segment cut: ultrafast preset + CRF 22 +
+    # single thread. Keeps the per-segment encoder under ~80 MB of RAM
+    # so it survives on a small dyno. The final pass (zoompan + subs)
+    # is what controls the user-facing quality.
     _run([
         "ffmpeg", "-y", "-loglevel", "error",
         "-ss", f"{start:.3f}", "-i", str(src),
         "-t", f"{duration:.3f}",
         "-vf", vf,
         "-af", af,
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
+        "-threads", "1",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-movflags", "+faststart",
