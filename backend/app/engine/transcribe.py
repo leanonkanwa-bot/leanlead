@@ -1,8 +1,20 @@
-"""Whisper-based transcription with word-level timestamps."""
+"""Word-level transcription powered by faster-whisper.
+
+We use faster-whisper (CTranslate2 backend) instead of openai-whisper
+(PyTorch backend) because:
+
+  - No torch dependency → ~700 MB less RAM, ~700 MB less image size.
+  - int8 quantization keeps the same word-level quality at ~1/4 the
+    memory of float32. This is what lets the app survive on a 1 GB dyno.
+  - Faster on CPU (typically 3–4×).
+
+Public surface stays identical: `transcribe(path) -> Transcript` with
+`segments[i].words[j].{text,start,end}`.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -13,12 +25,17 @@ _model = None
 
 
 def _load_model():
-    """Lazy import + load. Keeps `import whisper` (which pulls torch) off the
-    server's cold-start path so /healthz responds within Railway's window."""
+    """Lazy import + load. Keeps the heavy imports off the server's
+    cold-start path so /healthz responds within the cloud platform's window."""
     global _model
     if _model is None:
-        import whisper  # noqa: PLC0415 — intentional lazy import
-        _model = whisper.load_model(settings.whisper_model)
+        from faster_whisper import WhisperModel  # noqa: PLC0415 — intentional lazy import
+
+        _model = WhisperModel(
+            settings.whisper_model,
+            device="cpu",
+            compute_type="int8",
+        )
     return _model
 
 
@@ -63,33 +80,40 @@ class Transcript:
 
 def transcribe(video_path: Path) -> Transcript:
     model = _load_model()
-    result = model.transcribe(  # type: ignore[union-attr]
+    seg_iter, info = model.transcribe(  # type: ignore[union-attr]
         str(video_path),
         word_timestamps=True,
-        verbose=False,
+        beam_size=1,        # save RAM + CPU vs the default beam_size=5
+        vad_filter=True,    # cut leading/trailing silence
     )
 
     segments: list[Segment] = []
     last_end = 0.0
-    for seg in result.get("segments", []):
+    for seg in seg_iter:
         words = [
-            Word(text=w["word"].strip(), start=float(w["start"]), end=float(w["end"]))
-            for w in seg.get("words", [])
-            if "start" in w and "end" in w
+            Word(
+                text=(w.word or "").strip(),
+                start=float(w.start),
+                end=float(w.end),
+            )
+            for w in (seg.words or [])
+            if w.start is not None and w.end is not None
         ]
         segments.append(
             Segment(
-                start=float(seg["start"]),
-                end=float(seg["end"]),
-                text=seg["text"].strip(),
+                start=float(seg.start),
+                end=float(seg.end),
+                text=(seg.text or "").strip(),
                 words=words,
             )
         )
-        last_end = max(last_end, float(seg["end"]))
+        last_end = max(last_end, float(seg.end))
+
+    full_text = " ".join(s.text for s in segments).strip()
 
     return Transcript(
-        language=result.get("language", "en"),
+        language=getattr(info, "language", "en") or "en",
         duration=last_end,
-        text=result.get("text", "").strip(),
+        text=full_text,
         segments=segments,
     )
