@@ -217,40 +217,74 @@ MOTION GRAPHICS — every graphic earns its existence
 Decoration is the enemy of retention. If a graphic does not make the
 message stronger, it does NOT appear in the output.
 
-The renderer EXECUTES these three kinds today (use them aggressively
-when the script gives you the opportunity):
+YOU HAVE TWO TOOLS: the universal `text_overlay` primitive (free-form
+text anywhere on screen, full styling control) and three composed
+templates (lower_third, stat_circle, checklist). Use the templates
+when they fit; use text_overlay for everything else. Mix them freely.
 
-  - "lower_third" — a section title that slides in from the left.
-      schema: { at, duration: 2, kind: "lower_third",
-                title: "Building Your", accent_word: "Content Machine" }
-      use: every section transition (Hook → Contrast, etc.).
+══════════════════════════════════════════════════════════
+text_overlay — the universal primitive
+══════════════════════════════════════════════════════════
+Place arbitrary text anywhere on the frame, with the font, size,
+colour, position, line-wrap, and slide direction you choose. This
+is what you reach for when you want to annotate the speaker's idea,
+add a side label, drop a thought bubble, mark a transition, etc.
 
-  - "stat_circle" — a donut chart with a big percent in the centre.
-      schema: { at, duration: 2.5, kind: "stat_circle",
-                to: 80, label: "of your time" }
-      use: every time a percentage or stat is spoken — make the number
-      land visually. duration covers the spoken sentence.
+Schema:
+  { at, duration, kind: "text_overlay",
+    text: "Don't automate what you\\ncan't do manually",
+    font: "Poppins Bold" | "Bebas Neue" | …      // any allowed font
+    size: 64,                                     // px
+    color: "#FFFFFF",                             // any hex
+    align: "left" | "center" | "right",
+    x_pct: 6, y_pct: 30,                          // % of frame WxH
+    max_width_pct: 50,                            // soft-wrap width
+    slide_in: "left" | "right" | "none" }
+
+Use `\\n` to break lines manually; use `max_width_pct` for soft wrap.
+Defaults are sensible (Poppins Bold 80px white, 6%/12%, slide-in
+left, max 50% width).
+
+══════════════════════════════════════════════════════════
+templates — for common shapes
+══════════════════════════════════════════════════════════
+
+  - "lower_third" — section title sliding in from the left.
+      { at, duration: 2, kind: "lower_third",
+        title: "Building Your", accent_word: "Content Machine" }
+      use: every section transition.
+
+  - "stat_circle" — donut chart with a big percent in the centre.
+      { at, duration: 2.5, kind: "stat_circle",
+        to: 80, label: "of your time" }
+      use: every time a percentage or stat is spoken.
 
   - "checklist" — stacked rounded pill buttons with red ✗ or green ✓.
-      schema: { at, duration: 3, kind: "checklist",
-                items: [{text: "Not a Demo", ok: false},
-                         {text: "Real Automations", ok: true}] }
-      use: when contrasting wrong vs right (Contrast or Reframe beats).
-      keep items ≤ 5 words each, ≤ 4 items total.
+      { at, duration: 3, kind: "checklist",
+        items: [{text: "Not a Demo", ok: false},
+                {text: "Real Automations", ok: true}] }
+      use: contrasting wrong vs right. Keep items ≤ 5 words each,
+      ≤ 4 items total.
 
-The renderer plans (but does NOT yet draw) these — you can still emit
-them as a brief for the human editor:
+══════════════════════════════════════════════════════════
+planned but not yet drawn — emit them as a brief
+══════════════════════════════════════════════════════════
 
   - "split"      — split-screen comparison
   - "quote"      — full-screen multi-line quote
   - "highlight"  — arrow / underline / circle pointing at the speaker
   - "flow"       — connected icons / process diagram
 
-Return everything as `motion_graphics`: list of objects with `at`,
-`duration`, `kind`, plus the kind-specific fields above.
+══════════════════════════════════════════════════════════
+pacing
+══════════════════════════════════════════════════════════
+3–8 graphics in a 60s short, 10–18 in a 5–8 min long. Don't stack
+two graphics in the same 4s window — let each breathe. Mix
+text_overlay (light, frequent) with templates (heavier, rarer
+landings) so the screen never feels static or cluttered.
 
-Pacing: aim for 3–6 graphics in a 60s short, 8–14 in a 5–8 min long.
-Don't stack two graphics in the same 4s window — let each breathe.
+Return all of them as `motion_graphics`: list of objects with `at`,
+`duration`, `kind`, plus the kind-specific fields above.
 """
 
 BROLL_RULES = """\

@@ -41,6 +41,12 @@ PALETTE = {
 }
 
 
+def _normalize_font_name(name: str) -> str:
+    """Map a human-friendly font name ('Poppins Bold') to the file basename
+    bundled in /usr/local/share/fonts/leanlead ('Poppins-Bold')."""
+    return (name or "Poppins Bold").strip().replace(" ", "-")
+
+
 def _load_font(name: str, size: int) -> ImageFont.FreeTypeFont:
     """Resolve a font we baked into the Docker image. Falls back to default
     if a system box has none of these — prevents render hard-fails."""
@@ -259,6 +265,80 @@ def render_checklist(
 
 
 # ---------------------------------------------------------------------------
+# Graphic 4 — Text Overlay (the universal primitive)
+# ---------------------------------------------------------------------------
+# Free-form text the agent can place anywhere with full styling control.
+# This is the workhorse — anything the templates don't cover, the agent
+# composes from text_overlays. Multi-line, custom font/size/color/position,
+# choice of slide-in direction.
+
+def render_text_overlay(
+    text: str,
+    out_path: Path,
+    *,
+    font_name: str = "Poppins-Bold",
+    font_size: int = 80,
+    color_hex: str | None = None,
+    align: str = "left",
+    line_spacing: int = 12,
+    max_width_px: int | None = None,
+) -> Path:
+    """Render `text` (\\n separated for multi-line) onto a transparent PNG
+    sized to fit the text. Caller decides timing + on-screen position."""
+    color = _hex_to_rgba(color_hex, PALETTE["white"])
+    font = _load_font(font_name, font_size)
+
+    raw_lines = [ln for ln in text.split("\n") if ln is not None]
+
+    # Soft wrap each input line if max_width_px is given.
+    lines: list[str] = []
+    if max_width_px and max_width_px > 0:
+        for ln in raw_lines:
+            words = ln.split()
+            cur = ""
+            for w in words:
+                trial = (cur + " " + w).strip()
+                tw, _ = _text_size(font, trial)
+                if tw <= max_width_px or not cur:
+                    cur = trial
+                else:
+                    lines.append(cur)
+                    cur = w
+            if cur:
+                lines.append(cur)
+    else:
+        lines = raw_lines or [""]
+
+    # Use font metrics for line height — getbbox is glyph-tight and clips
+    # descenders ("y", "g") on multi-line layouts.
+    ascent, descent = font.getmetrics()
+    line_h = ascent + descent
+
+    widths = [_text_size(font, ln)[0] for ln in lines]
+    width = max(widths) if widths else 1
+    height = line_h * len(lines) + line_spacing * max(0, len(lines) - 1)
+    # A few px of margin so anti-aliased edges aren't clipped.
+    pad = 4
+
+    img = Image.new("RGBA", (width + pad * 2, height + pad * 2), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    y = pad
+    for ln, lw in zip(lines, widths):
+        if align == "center":
+            x = pad + (width - lw) / 2
+        elif align == "right":
+            x = pad + (width - lw)
+        else:
+            x = pad
+        draw.text((x, y), ln, font=font, fill=color)
+        y += line_h + line_spacing
+
+    img.save(out_path, "PNG")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher — turn one motion_graphic JSON into a rendered PNG + position.
 # ---------------------------------------------------------------------------
 
@@ -328,6 +408,60 @@ def render_motion_graphic(
         # Centred horizontally, slightly above frame middle.
         x_expr = f"(W-w)/2"
         y_expr = f"(H-h)/2 - {int(target_h * 0.04)}"
+        return RenderedGraphic(
+            png=png, at=at, duration=duration,
+            x_expr=x_expr, y_expr=y_expr, kind=kind,
+        )
+
+    if kind == "text_overlay" or kind == "text" or kind == "annotation":
+        text = str(spec.get("text") or "").strip()
+        if not text:
+            return None
+        font = _normalize_font_name(spec.get("font") or "Poppins Bold")
+        font_size = int(spec.get("size") or 80)
+        color = spec.get("color") or "#FFFFFF"
+        align = (spec.get("align") or "left").lower()
+        if align not in {"left", "center", "right"}:
+            align = "left"
+
+        # Position by percentage of the frame so the agent doesn't have to
+        # know the resolution. Defaults: 6% left, 12% from top.
+        x_pct = float(spec.get("x_pct", 6)) / 100.0
+        y_pct = float(spec.get("y_pct", 12)) / 100.0
+
+        # Optional soft wrap. Default: 50% of frame width.
+        max_w_pct = float(spec.get("max_width_pct", 50)) / 100.0
+        max_width_px = int(target_w * max_w_pct) if max_w_pct > 0 else None
+
+        render_text_overlay(
+            text, png,
+            font_name=font, font_size=font_size,
+            color_hex=color, align=align,
+            max_width_px=max_width_px,
+        )
+
+        # Slide direction. Default = left → in.
+        slide = (spec.get("slide_in") or "left").lower()
+        anchor_x = int(target_w * x_pct)
+        anchor_y = int(target_h * y_pct)
+        if slide == "left":
+            x_expr = (
+                f"if(lt(t-{at:.3f},0.3),"
+                f"-w + ({anchor_x} - (-w))*"
+                f"((t-{at:.3f})/0.3)*((t-{at:.3f})/0.3)*(3-2*((t-{at:.3f})/0.3)),"
+                f"{anchor_x})"
+            )
+        elif slide == "right":
+            x_expr = (
+                f"if(lt(t-{at:.3f},0.3),"
+                f"W + ({anchor_x} - W)*"
+                f"((t-{at:.3f})/0.3)*((t-{at:.3f})/0.3)*(3-2*((t-{at:.3f})/0.3)),"
+                f"{anchor_x})"
+            )
+        else:  # "none" — instant pop-in
+            x_expr = f"{anchor_x}"
+        y_expr = f"{anchor_y}"
+
         return RenderedGraphic(
             png=png, at=at, duration=duration,
             x_expr=x_expr, y_expr=y_expr, kind=kind,
