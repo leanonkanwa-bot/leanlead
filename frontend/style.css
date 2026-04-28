@@ -235,6 +235,26 @@ input:focus, textarea:focus, select:focus {
   background: var(--accent); color: #0a0a0d; font-weight: 600;
 }
 
+/* style picker grid */
+.style-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 540px) { .style-grid { grid-template-columns: 1fr; } }
+
+/* color swatches */
+.swatches { display: flex; gap: 8px; align-items: center; }
+.swatches input { display: none; }
+.swatches .sw {
+  width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
+  background: var(--c); border: 2px solid transparent;
+  display: grid; place-items: center;
+  font-size: 11px; font-weight: 700; color: #0a0a0d;
+  transition: transform .15s, border-color .15s;
+}
+.swatches .sw:hover { transform: scale(1.05); }
+.swatches input:checked + .sw {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(255,214,10,.25);
+}
+
 /* drop zone */
 .drop {
   position: relative; cursor: pointer;

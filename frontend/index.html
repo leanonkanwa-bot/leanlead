@@ -126,6 +126,46 @@
             </label>
           </div>
 
+          <div class="style-grid">
+            <label class="field">
+              <span>Caption color</span>
+              <div class="swatches">
+                <input type="radio" name="caption_color" id="cc-white" value="white" checked />
+                <label for="cc-white" class="sw" style="--c: #FFFFFF" title="Pure white">W</label>
+                <input type="radio" name="caption_color" id="cc-yellow" value="yellow" />
+                <label for="cc-yellow" class="sw" style="--c: #FFE500" title="Electric yellow">Y</label>
+                <input type="radio" name="caption_color" id="cc-red" value="red" />
+                <label for="cc-red" class="sw" style="--c: #FF3B30" title="Clean red">R</label>
+              </div>
+            </label>
+
+            <label class="field">
+              <span>Caption position</span>
+              <select name="caption_position">
+                <option value="center">Center (big)</option>
+                <option value="bottom">Bottom (lower-third)</option>
+                <option value="side-left">Side · Left</option>
+                <option value="side-right">Side · Right</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Caption font</span>
+              <select name="caption_font">
+                <option value="Poppins Bold">Poppins Bold (default)</option>
+                <option value="Poppins ExtraBold">Poppins ExtraBold</option>
+                <option value="Inter Bold">Inter Bold</option>
+                <option value="Montserrat Bold">Montserrat Bold</option>
+                <option value="Roboto Bold">Roboto Bold</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Brand color <em>(optional · used for hyperframes)</em></span>
+              <input type="text" name="brand_color" placeholder="#FF751F" pattern="^#[0-9A-Fa-f]{6}$" />
+            </label>
+          </div>
+
           <label class="field">
             <span>Instructions for the agent <em>(optional)</em></span>
             <textarea

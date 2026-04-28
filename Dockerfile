@@ -39,8 +39,21 @@ ENV PYTHONUNBUFFERED=1 \
     HF_HOME=/app/backend/storage/.cache/huggingface
 
 # Only ffmpeg + ca-certificates at runtime. No build tools, no apt cache.
+# Fonts: roboto+inter+montserrat from apt where available, Poppins Bold +
+# ExtraBold pulled directly from upstream (the user spec mandates Poppins
+# Bold as the default caption font).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+ && apt-get install -y --no-install-recommends \
+        ffmpeg ca-certificates curl fontconfig \
+        fonts-roboto fonts-montserrat fonts-inter \
+ && mkdir -p /usr/local/share/fonts/leanlead \
+ && curl -fsSL -o /usr/local/share/fonts/leanlead/Poppins-Bold.ttf \
+        https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf \
+ && curl -fsSL -o /usr/local/share/fonts/leanlead/Poppins-ExtraBold.ttf \
+        https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf \
+ && fc-cache -f > /dev/null \
+ && apt-get purge -y curl \
+ && apt-get autoremove -y \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /var/log/*
 

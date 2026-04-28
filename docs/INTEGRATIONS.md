@@ -65,13 +65,40 @@ inform our overlay generator when we build it.
 
 ## Roadmap implication
 
-Today's pipeline (one source → cut → zoom → captions) is solid for the
-talking-head short/long form workflow. The next two things to add, both
-informed by the above, are:
+Today's pipeline (one source → cut → zoom → captions → hyperframes) is
+solid for the talking-head short/long form workflow.
 
-1. **Multi-take support** — accept multiple uploads, transcribe each,
-   build a `takes_packed.md`-style view for the planner, let it pick the
-   best take of each beat. Adopt video-use's EDL format at that point.
-2. **HTML B-roll renderer** — a worker that takes a `broll_suggestion`,
-   instantiates a HyperFrames composition with the user's brand palette,
-   renders it, and the editor overlays it at the requested timestamp.
+**Now shipped (v0.2)**
+- Hyperframes — full-screen subliminal flash cards (0.08–0.16s) the
+  agent plans every 20–30s. Native FFmpeg implementation (drawbox +
+  drawtext), no external runtime. Honors the user's brand color.
+- Hormozi/Sanchez/MrBeast/Fincher system prompt with the 10-beat
+  narrative structure, three-move zoom system, one-word caption rule,
+  cut philosophy, and full output contract (`optimized_script`,
+  `key_lines`, `motion_graphics`, `hyperframes`, `zoom_plan`).
+- One-word-per-card captions in Poppins Bold (default), with picker for
+  Inter / Montserrat / Roboto Bold. Color picker (white / electric
+  yellow / clean red). Position picker (center / bottom / side-left /
+  side-right — the iPhone aesthetic). Emphasis word at 120% scale.
+
+**Deferred to v0.3 — listed here so we don't fool ourselves**
+
+1. **Frame-by-frame video analysis** — subject position, dominant
+   colors, background. Easiest path: extract 5–10 keyframes via FFmpeg
+   and pass to Claude Vision alongside the transcript so the planner
+   can decide caption position based on where the speaker is. Cost
+   ≈$0.05/video. Skipped for v0.2 because the pipeline is already
+   tight on Railway Trial RAM.
+2. **Rich motion graphics execution** — the agent already plans
+   `count_up`, `fly_in`, `split`, `quote`, and `highlight` graphics in
+   its JSON output. Today the renderer only executes the hyperframe
+   flashes; the rest is a brief for the human or a future renderer.
+   Real implementation is a HyperFrames-style headless HTML compositor
+   (see HyperFrames notes above) or a Remotion worker.
+3. **Multi-take support** — accept multiple uploads, transcribe each,
+   build a `takes_packed.md`-style view for the planner, let it pick
+   the best take of each beat. Adopt video-use's EDL format at that
+   point.
+4. **B-roll auto-fetch** — pull a clip from Pexels / Storyblocks for
+   each `broll_suggestion`, with brand-palette grading. Today we just
+   pause captions during the b-roll window.

@@ -12,7 +12,17 @@ from app.engine.render import render
 from app.engine.transcribe import transcribe, unload_model
 
 
-def run_job(job_id: str, src: Path, instructions: str, format_hint: FormatHint) -> None:
+def run_job(
+    job_id: str,
+    src: Path,
+    instructions: str,
+    format_hint: FormatHint,
+    *,
+    caption_font: str = "Poppins Bold",
+    caption_color: str = "white",
+    caption_position: str = "center",
+    brand_color: str | None = None,
+) -> None:
     try:
         store.update(job_id, status="transcribing", progress=10,
                      message="Transcribing audio with Whisper…")
@@ -20,7 +30,15 @@ def run_job(job_id: str, src: Path, instructions: str, format_hint: FormatHint) 
 
         store.update(job_id, status="planning", progress=40,
                      message="Asking the agent for an edit plan…")
-        plan = plan_edit(transcript, instructions, format_hint=format_hint)
+        plan = plan_edit(
+            transcript,
+            instructions,
+            format_hint=format_hint,
+            brand_color=brand_color,
+            caption_color=caption_color,
+            caption_position=caption_position,
+            caption_font=caption_font,
+        )
 
         # Reclaim ~250 MB of RAM before ffmpeg fires up — otherwise the
         # encoder gets OOM-killed on small dynos (no stderr, exit signal 9).
@@ -30,7 +48,17 @@ def run_job(job_id: str, src: Path, instructions: str, format_hint: FormatHint) 
                      message="Rendering with FFmpeg…")
         out_path = settings.outputs_dir / f"{job_id}.mp4"
         work_dir = settings.work_dir / job_id
-        result = render(src, transcript, plan, work_dir, out_path)
+        result = render(
+            src,
+            transcript,
+            plan,
+            work_dir,
+            out_path,
+            caption_font=caption_font,
+            caption_color=caption_color,
+            caption_position=caption_position,
+            brand_color=brand_color,
+        )
 
         store.update(
             job_id,

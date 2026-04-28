@@ -43,6 +43,18 @@ class EditPlan:
         return self.raw.get("broll_suggestions", [])
 
     @property
+    def hyperframes(self) -> list[dict[str, Any]]:
+        return self.raw.get("hyperframes", [])
+
+    @property
+    def motion_graphics(self) -> list[dict[str, Any]]:
+        return self.raw.get("motion_graphics", [])
+
+    @property
+    def key_lines(self) -> list[str]:
+        return self.raw.get("key_lines", [])
+
+    @property
     def packaging(self) -> dict[str, Any]:
         return self.raw.get("packaging", {})
 
@@ -61,6 +73,10 @@ def plan_edit(
     transcript: dict[str, Any],
     user_instructions: str,
     format_hint: FormatHint = "auto",
+    brand_color: str | None = None,
+    caption_color: str | None = None,
+    caption_position: str | None = None,
+    caption_font: str | None = None,
 ) -> EditPlan:
     """
     Ask Claude to produce an edit plan for the given transcript.
@@ -89,8 +105,14 @@ def plan_edit(
 
     resp = _client().messages.create(
         model=settings.anthropic_model,
-        max_tokens=8000,
-        system=system_prompt(format_hint=fmt),
+        max_tokens=16000,
+        system=system_prompt(
+            format_hint=fmt,
+            brand_color=brand_color,
+            caption_color=caption_color,
+            caption_position=caption_position,
+            caption_font=caption_font,
+        ),
         messages=[user_msg],
     )
 

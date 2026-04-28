@@ -198,12 +198,71 @@ def _build_zoom_expression(
     return z_expr, f"{x_expr};{y_expr}"
 
 
+def _hex_to_rgb_at(hex6: str) -> str:
+    """Return an ffmpeg color string like 'white@1.0' or '0xRRGGBB@1.0'."""
+    h = (hex6 or "").lstrip("#").upper()
+    if len(h) != 6:
+        return "white@1.0"
+    return f"0x{h}@1.0"
+
+
+def _ass_escape_text(text: str) -> str:
+    return text.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+
+
+def _build_hyperframe_filters(
+    hyperframes: list[dict[str, Any]],
+    target_w: int,
+    target_h: int,
+    fonts_dir: str = "/usr/local/share/fonts/leanlead",
+) -> str:
+    """Return a comma-prefixed filter chain that overlays each hyperframe
+    as a full-screen colored card with a centered word/number, only during
+    its [at, at+duration] window. Empty string if no hyperframes."""
+    parts: list[str] = []
+    for hf in hyperframes:
+        try:
+            t0 = float(hf.get("at", 0))
+            dur = float(hf.get("duration", 0.1))
+        except (TypeError, ValueError):
+            continue
+        t1 = t0 + max(0.05, min(0.2, dur))
+        color = _hex_to_rgb_at(hf.get("color", "#FFE500"))
+        kind = (hf.get("kind") or "word").lower()
+
+        # Solid color flash that covers the whole frame.
+        parts.append(
+            f"drawbox=x=0:y=0:w=iw:h=ih:color={color}:t=fill"
+            f":enable='between(t,{t0:.3f},{t1:.3f})'"
+        )
+
+        if kind in {"word", "number", "image"}:
+            text = str(hf.get("content", "")).strip()
+            if text:
+                # Single bold word/number, full-screen weight.
+                # Black text on a colored flash reads fastest at 0.1s.
+                font_size = int(target_h * 0.22)
+                parts.append(
+                    f"drawtext=text='{_ass_escape_text(text)}'"
+                    f":fontfile={fonts_dir}/Poppins-ExtraBold.ttf"
+                    f":fontcolor=black:fontsize={font_size}"
+                    f":x=(w-text_w)/2:y=(h-text_h)/2"
+                    f":enable='between(t,{t0:.3f},{t1:.3f})'"
+                )
+    return ("," + ",".join(parts)) if parts else ""
+
+
 def render(
     src: Path,
     transcript: dict[str, Any],
     plan: EditPlan,
     work_dir: Path,
     output_path: Path,
+    *,
+    caption_font: str = "Poppins Bold",
+    caption_color: str = "white",
+    caption_position: str = "center",
+    brand_color: str | None = None,
 ) -> dict[str, Any]:
     work_dir.mkdir(parents=True, exist_ok=True)
 
@@ -271,22 +330,73 @@ def render(
     _concat(parts, concat_path)
     total_duration = _probe_duration(concat_path)
 
+    # Remap b-roll windows to the cut timeline so captions pause there.
+    remapped_broll: list[tuple[float, float]] = []
+    for br in plan.broll_suggestions:
+        try:
+            br_at = float(br.get("at", 0))
+            br_dur = float(br.get("duration", 0))
+        except (TypeError, ValueError):
+            continue
+        # Find the keep_segment that contains br_at and remap.
+        run = 0.0
+        for seg in keep:
+            ss = float(seg["start"])
+            ee = float(seg["end"])
+            if ss <= br_at <= ee and ee > ss:
+                start = run + (br_at - ss)
+                remapped_broll.append((start, start + br_dur))
+                break
+            run += max(0.0, ee - ss)
+
+    # Remap hyperframes to the cut timeline so they fire on the right beats.
+    remapped_hyperframes: list[dict[str, Any]] = []
+    for hf in plan.hyperframes:
+        try:
+            hf_at = float(hf.get("at", 0))
+        except (TypeError, ValueError):
+            continue
+        # Default color: hyperframe → brand_color → electric yellow.
+        hf_color = hf.get("color") or brand_color or "#FFE500"
+        run = 0.0
+        for seg in keep:
+            ss = float(seg["start"])
+            ee = float(seg["end"])
+            if ss <= hf_at <= ee and ee > ss:
+                remapped_hyperframes.append({
+                    **hf,
+                    "at": run + (hf_at - ss),
+                    "color": hf_color,
+                })
+                break
+            run += max(0.0, ee - ss)
+
     ass_path = work_dir / "captions.ass"
     build_ass(
         remapped_words,
         ass_path,
         short_form=short_form,
         emphasis_words=set(plan.caption_emphasis_words),
+        font=caption_font,
+        color=caption_color,
+        position=caption_position,
+        broll_windows=remapped_broll,
     )
 
     z_expr, xy_expr = _build_zoom_expression(remapped_zoom, total_duration, fps=fps)
     x_expr, y_expr = xy_expr.split(";")
     total_frames = max(1, int(total_duration * fps))
 
-    # Hard Rule 7 — subtitles LAST in the filter chain.
+    hyperframe_chain = _build_hyperframe_filters(
+        remapped_hyperframes, target_w, target_h
+    )
+
+    # Filter order matters (Hard Rule 7 — subs last, after every overlay):
+    #   zoompan → hyperframe flash card(s) → ass subtitles
     vf = (
         f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':"
-        f"d=1:s={target_w}x{target_h}:fps={fps},"
+        f"d=1:s={target_w}x{target_h}:fps={fps}"
+        f"{hyperframe_chain},"
         f"ass={ass_path.as_posix()}"
     )
 
@@ -315,4 +425,7 @@ def render(
         "format": plan.format,
         "packaging": plan.packaging,
         "plan": plan.raw,
+        "key_lines": plan.key_lines,
+        "hyperframes_rendered": len(remapped_hyperframes),
+        "broll_pauses": len(remapped_broll),
     }

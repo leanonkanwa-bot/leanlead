@@ -101,6 +101,10 @@ async def submit_edit(
     video: UploadFile = File(...),
     instructions: str = Form(""),
     format_hint: Literal["short", "long", "auto"] = Form("auto"),
+    caption_font: str = Form("Poppins Bold"),
+    caption_color: str = Form("white"),
+    caption_position: Literal["center", "bottom", "side-left", "side-right"] = Form("center"),
+    brand_color: str = Form(""),
     _: None = Depends(_check_auth),
 ) -> JSONResponse:
     if not settings.anthropic_api_key:
@@ -113,7 +117,17 @@ async def submit_edit(
     with dest.open("wb") as f:
         shutil.copyfileobj(video.file, f)
 
-    background.add_task(run_job, job.id, dest, instructions, format_hint)
+    background.add_task(
+        run_job,
+        job.id,
+        dest,
+        instructions,
+        format_hint,
+        caption_font=caption_font,
+        caption_color=caption_color,
+        caption_position=caption_position,
+        brand_color=brand_color or None,
+    )
     return JSONResponse({"job_id": job.id, "status": job.status})
 
 
