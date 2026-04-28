@@ -5,7 +5,27 @@ in the running product today. We shipped what fits without breaking
 the OOM constraint on Railway Trial. This document is the honest list
 of what's NOT in v0.2 and why, plus how each one would land.
 
-## v0.2 ships (today)
+## v0.3 ships (today)
+
+- **PIL motion graphics renderer.** Three of the user-spec graphics now
+  render as RGBA PNGs and composite onto the timeline via FFmpeg
+  filter_complex with slide-in animation:
+  - **Lower Third Title** — white title + accent-coloured second line,
+    slides in from the left over 0.3s with smoothstep easing. Match for
+    the "Building Your / Content Machine" reference.
+  - **Stat Circle** — blue donut chart with bold "<N>%" in the centre +
+    a sub-label below. Match for the "80% of your time" reference.
+  - **Checklist Reveal** — stacked rounded pill buttons, red ✗ or green
+    ✓ icons, white labels. Match for the "Not a Demo / Not Theory /
+    Real Automations" reference.
+- Agent prompt rewritten so it actively schedules these three graphics
+  on the right beats (lower_third on every section transition,
+  stat_circle on every spoken statistic, checklist on every wrong-vs-
+  right contrast).
+- The renderer keeps planning (but doesn't yet draw) `split`, `quote`,
+  `highlight`, `flow`. They surface in the JSON output as a brief.
+
+## v0.2 ships
 
 - Smoothstep-eased zoom (no shake) with center-locked anchor.
 - B-roll duration clamped to [2.5s, 4s] in the renderer + the agent
@@ -76,33 +96,27 @@ matches the label.
 **To ship this:** budget 4–5 days. Best done after face position so
 the placement logic shares helpers.
 
-### 3. Rich motion graphics renderer
+### 3. Rich motion graphics renderer (partial in v0.3)
 
-**What was asked:** stat circles (animated donuts with count-up),
-checklist reveals (X / ✓ pill buttons), split comparisons (red/green
-50/50), flow diagrams (animated nodes + arrows), lower-third titles,
-arrow callouts.
+**Now shipped:** Lower Third Title, Stat Circle, Checklist Reveal.
 
-**Why deferred:** Each is its own animation. FFmpeg's `drawtext` and
-`drawbox` can do flat overlays, but counting up numbers, drawing
-arrows, and animating pill buttons need a real compositor. Two
-realistic paths:
+**Still deferred (v0.3.1):**
 
-- **Headless HTML compositor** (Remotion / Puppeteer / HyperFrames)
-  rendered to mp4 segments and overlaid on the timeline. Heavy
-  toolchain (Node + Chromium = +800 MB image), but the right answer
-  long-term.
-- **PIL/cairo PNG sequences** + ffmpeg overlay. Lighter, but each
-  graphic type is hand-rolled animation code. Manageable for a small
-  fixed library.
+- **Split Comparison** — left half red-tinted "wrong way" / right half
+  green-tinted "right way". Two PIL renders + ffmpeg `xfade=hslice` or
+  two overlays positioned 0–w/2 and w/2–w. ~1 day.
+- **Flow Diagram** — connected icon nodes with curved drawn lines (the
+  starburst → document → 3 play icons reference). FFmpeg can't draw
+  curves easily; needs PIL Bezier strokes + arrow rendering. ~1 day.
+- **Arrow Callout** — curved white arrow + label. Same constraint as
+  Flow. ~0.5 day.
+- **Stat Circle count-up animation** — currently shows the final
+  percent immediately. Animating 0→N requires either a PNG sequence
+  or a programmatic ffmpeg `geq` arc, both ~0.5 day.
 
-**Today's behavior:** the agent already PLANS these graphics in its
-JSON output (`motion_graphics: [{kind, at, duration, ...}]`). The
-renderer just doesn't execute them yet. The planned data is exposed
-in the result panel for now — useful as a brief.
-
-**To ship this:** PIL path: 1 day per graphic type → ~1 week for the
-library. HTML path: 2–3 weeks of toolchain plus an animation library.
+**Approach:** stay on PIL — the headless-Chromium path is still too
+heavy. Each graphic is one Python function returning a PNG (or PNG
+sequence for animated ones).
 
 ### 4. Caption styles 2 (Split Float) and 3 (Full Screen Word)
 

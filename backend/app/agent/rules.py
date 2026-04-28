@@ -214,32 +214,43 @@ Rules:
 MOTION_GRAPHICS = """\
 MOTION GRAPHICS — every graphic earns its existence
 
-Numbers and stats:
-  Animate them. Count up from 0. ~0.8s total. Cut hard at the end.
-  Schema: { kind: "count_up", from: 0, to: <N>, duration: 0.8 }
-
-Key concepts:
-  Text flies in from bottom, holds 1.5s, cuts hard.
-  Schema: { kind: "fly_in", text: "...", duration: 2 }
-
-Comparisons:
-  Split screen. Left = wrong way. Right = right way. No labels.
-  Schema: { kind: "split", left: "...", right: "..." }
-
-Quote frames:
-  Full screen, Poppins Bold, one word at a time, timed to voice.
-  Schema: { kind: "quote", lines: ["...", "..."] }
-
-Arrows / underlines / circles:
-  Use ONLY to direct the eye. Never decorative.
-  Schema: { kind: "highlight", target: "...", anim: "underline|circle|arrow" }
-
 Decoration is the enemy of retention. If a graphic does not make the
 message stronger, it does NOT appear in the output.
 
-Return as `motion_graphics`: list with `at`, `duration`, `kind`, plus
-the kind-specific fields above. (v1 of the renderer executes only
-`fly_in` text overlays; the rest is a brief for the human or v2.)
+The renderer EXECUTES these three kinds today (use them aggressively
+when the script gives you the opportunity):
+
+  - "lower_third" — a section title that slides in from the left.
+      schema: { at, duration: 2, kind: "lower_third",
+                title: "Building Your", accent_word: "Content Machine" }
+      use: every section transition (Hook → Contrast, etc.).
+
+  - "stat_circle" — a donut chart with a big percent in the centre.
+      schema: { at, duration: 2.5, kind: "stat_circle",
+                to: 80, label: "of your time" }
+      use: every time a percentage or stat is spoken — make the number
+      land visually. duration covers the spoken sentence.
+
+  - "checklist" — stacked rounded pill buttons with red ✗ or green ✓.
+      schema: { at, duration: 3, kind: "checklist",
+                items: [{text: "Not a Demo", ok: false},
+                         {text: "Real Automations", ok: true}] }
+      use: when contrasting wrong vs right (Contrast or Reframe beats).
+      keep items ≤ 5 words each, ≤ 4 items total.
+
+The renderer plans (but does NOT yet draw) these — you can still emit
+them as a brief for the human editor:
+
+  - "split"      — split-screen comparison
+  - "quote"      — full-screen multi-line quote
+  - "highlight"  — arrow / underline / circle pointing at the speaker
+  - "flow"       — connected icons / process diagram
+
+Return everything as `motion_graphics`: list of objects with `at`,
+`duration`, `kind`, plus the kind-specific fields above.
+
+Pacing: aim for 3–6 graphics in a 60s short, 8–14 in a 5–8 min long.
+Don't stack two graphics in the same 4s window — let each breathe.
 """
 
 BROLL_RULES = """\

@@ -25,6 +25,7 @@ from typing import Any
 
 from app.agent.planner import EditPlan
 from app.engine.captions import WordTiming, build_ass
+from app.engine.graphics import render_motion_graphic
 
 
 SHORT_PAD_S = 0.05   # 50ms — tight, energetic
@@ -422,24 +423,73 @@ def render(
         remapped_hyperframes, target_w, target_h
     )
 
-    # Filter order matters (Hard Rule 7 — subs last, after every overlay):
-    #   zoompan → hyperframe flash card(s) → ass subtitles
-    vf = (
+    # Render each motion graphic (the ones we know how to draw) to a PNG.
+    # Then chain them as overlays in the final filter graph. Anything we
+    # don't yet execute (split, quote, highlight, flow, arrow_callout) is
+    # left in the JSON output as a brief — we don't fail.
+    accent_for_graphics = brand_color or "#0A84FF"
+    graphics_dir = work_dir / "graphics"
+    rendered_graphics: list[Any] = []
+    for i, mg in enumerate(plan.motion_graphics or []):
+        try:
+            mg_at = float(mg.get("at", 0))
+        except (TypeError, ValueError):
+            continue
+        # Remap the graphic timestamp onto the cut timeline.
+        run = 0.0
+        remapped_at = None
+        for seg in keep:
+            ss = float(seg["start"])
+            ee = float(seg["end"])
+            if ss <= mg_at <= ee and ee > ss:
+                remapped_at = run + (mg_at - ss)
+                break
+            run += max(0.0, ee - ss)
+        if remapped_at is None:
+            continue
+        spec = {**mg, "at": remapped_at}
+        rg = render_motion_graphic(
+            spec, graphics_dir, i,
+            target_w=target_w, target_h=target_h,
+            accent_hex=accent_for_graphics,
+        )
+        if rg is not None:
+            rendered_graphics.append(rg)
+
+    # Build the final filter chain. With no graphics to overlay, the simple
+    # -vf path is all we need; with overlays we switch to filter_complex.
+    base_filter = (
         f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':"
         f"d=1:s={target_w}x{target_h}:fps={fps}"
-        f"{hyperframe_chain},"
-        f"ass={ass_path.as_posix()}"
+        f"{hyperframe_chain}"
     )
+    ass_filter = f"ass={ass_path.as_posix()}"
 
-    # Final pass: zoompan is genuinely memory-hungry (it scales the input
-    # canvas internally) and libx264 'medium' holds ~40 frames in its
-    # lookahead buffer. Both together OOM small dynos. Drop to superfast
-    # + 1 thread + no rc-lookahead. Quality is still very good for social
-    # short-form; users on bigger plans can override these later.
-    _run([
-        "ffmpeg", "-y", "-loglevel", "error",
-        "-i", str(concat_path),
-        "-vf", vf,
+    cmd: list[str] = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(concat_path)]
+    for rg in rendered_graphics:
+        cmd += ["-i", str(rg.png)]
+
+    if rendered_graphics:
+        chain_parts: list[str] = [f"[0:v]{base_filter}[v0]"]
+        for i, rg in enumerate(rendered_graphics, start=1):
+            t0 = rg.at
+            t1 = rg.at + rg.duration
+            chain_parts.append(
+                f"[v{i-1}][{i}:v]overlay="
+                f"x='{rg.x_expr}':y='{rg.y_expr}':"
+                f"enable='between(t,{t0:.3f},{t1:.3f})'[v{i}]"
+            )
+        last_label = f"v{len(rendered_graphics)}"
+        chain_parts.append(f"[{last_label}]{ass_filter}[final]")
+        filter_complex = ";".join(chain_parts)
+        cmd += [
+            "-filter_complex", filter_complex,
+            "-map", "[final]", "-map", "0:a",
+        ]
+    else:
+        cmd += ["-vf", f"{base_filter},{ass_filter}"]
+
+    cmd += [
         "-frames:v", str(total_frames),
         "-c:v", "libx264", "-preset", "superfast", "-crf", "22",
         "-threads", "1",
@@ -448,7 +498,8 @@ def render(
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
         str(output_path),
-    ])
+    ]
+    _run(cmd)
 
     return {
         "output": str(output_path),
@@ -459,4 +510,8 @@ def render(
         "key_lines": plan.key_lines,
         "hyperframes_rendered": len(remapped_hyperframes),
         "broll_pauses": len(remapped_broll),
+        "graphics_rendered": [
+            {"kind": rg.kind, "at": rg.at, "duration": rg.duration}
+            for rg in rendered_graphics
+        ],
     }
