@@ -104,6 +104,7 @@ async def submit_edit(
     caption_font: str = Form("Poppins Bold"),
     caption_color: str = Form("white"),
     caption_position: Literal["center", "bottom", "side-left", "side-right"] = Form("center"),
+    caption_style: Literal["impact", "kinetic"] = Form("impact"),
     brand_color: str = Form(""),
     _: None = Depends(_check_auth),
 ) -> JSONResponse:
@@ -126,6 +127,7 @@ async def submit_edit(
         caption_font=caption_font,
         caption_color=caption_color,
         caption_position=caption_position,
+        caption_style=caption_style,
         brand_color=brand_color or None,
     )
     return JSONResponse({"job_id": job.id, "status": job.status})

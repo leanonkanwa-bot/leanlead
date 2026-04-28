@@ -47,10 +47,14 @@ RUN apt-get update \
         ffmpeg ca-certificates curl fontconfig \
         fonts-roboto fonts-montserrat fonts-inter \
  && mkdir -p /usr/local/share/fonts/leanlead \
- && curl -fsSL -o /usr/local/share/fonts/leanlead/Poppins-Bold.ttf \
-        https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf \
- && curl -fsSL -o /usr/local/share/fonts/leanlead/Poppins-ExtraBold.ttf \
-        https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf \
+ && cd /usr/local/share/fonts/leanlead \
+ && curl -fsSL -O https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-Bold.ttf \
+ && curl -fsSL -O https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-ExtraBold.ttf \
+ && curl -fsSL -O https://github.com/google/fonts/raw/main/ofl/poppins/Poppins-SemiBold.ttf \
+ && curl -fsSL -O https://github.com/google/fonts/raw/main/ofl/montserrat/static/Montserrat-Black.ttf \
+ && curl -fsSL -O https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf \
+ && curl -fsSL -O https://github.com/google/fonts/raw/main/ofl/dmsans/DMSans%5Bopsz%2Cwght%5D.ttf \
+ && curl -fsSL -O https://github.com/google/fonts/raw/main/ofl/spacegrotesk/SpaceGrotesk%5Bwght%5D.ttf \
  && fc-cache -f > /dev/null \
  && apt-get purge -y curl \
  && apt-get autoremove -y \

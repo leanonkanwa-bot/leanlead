@@ -21,6 +21,7 @@ def run_job(
     caption_font: str = "Poppins Bold",
     caption_color: str = "white",
     caption_position: str = "center",
+    caption_style: str = "impact",
     brand_color: str | None = None,
 ) -> None:
     try:
@@ -57,6 +58,7 @@ def run_job(
             caption_font=caption_font,
             caption_color=caption_color,
             caption_position=caption_position,
+            caption_style=caption_style,
             brand_color=brand_color,
         )
 

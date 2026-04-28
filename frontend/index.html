@@ -126,6 +126,43 @@
             </label>
           </div>
 
+          <label class="field">
+            <span>Caption style</span>
+            <div class="seg seg-2">
+              <input type="radio" name="caption_style" id="cs-impact" value="impact" checked />
+              <label for="cs-impact">Impact</label>
+              <input type="radio" name="caption_style" id="cs-kinetic" value="kinetic" />
+              <label for="cs-kinetic">Kinetic Bar</label>
+            </div>
+          </label>
+
+          <label class="field">
+            <span>Color theme</span>
+            <div class="themes">
+              <input type="radio" name="theme" id="th-darkpro" value="dark-pro" checked />
+              <label for="th-darkpro" class="theme">
+                <span class="theme-swatches">
+                  <i style="background:#0A84FF"></i><i style="background:#FFFFFF"></i><i style="background:#0A0A0A"></i>
+                </span>
+                <span>Dark Pro</span>
+              </label>
+              <input type="radio" name="theme" id="th-energy" value="high-energy" />
+              <label for="th-energy" class="theme">
+                <span class="theme-swatches">
+                  <i style="background:#FF3B30"></i><i style="background:#FFE500"></i><i style="background:#0A0A0A"></i>
+                </span>
+                <span>High Energy</span>
+              </label>
+              <input type="radio" name="theme" id="th-faith" value="faith-gold" />
+              <label for="th-faith" class="theme">
+                <span class="theme-swatches">
+                  <i style="background:#D4AF37"></i><i style="background:#FFFFFF"></i><i style="background:#1B2238"></i>
+                </span>
+                <span>Faith &amp; Gold</span>
+              </label>
+            </div>
+          </label>
+
           <div class="style-grid">
             <label class="field">
               <span>Caption color</span>
@@ -136,6 +173,8 @@
                 <label for="cc-yellow" class="sw" style="--c: #FFE500" title="Electric yellow">Y</label>
                 <input type="radio" name="caption_color" id="cc-red" value="red" />
                 <label for="cc-red" class="sw" style="--c: #FF3B30" title="Clean red">R</label>
+                <input type="radio" name="caption_color" id="cc-blue" value="blue" />
+                <label for="cc-blue" class="sw" style="--c: #0A84FF" title="Electric blue">B</label>
               </div>
             </label>
 
@@ -154,9 +193,14 @@
               <select name="caption_font">
                 <option value="Poppins Bold">Poppins Bold (default)</option>
                 <option value="Poppins ExtraBold">Poppins ExtraBold</option>
-                <option value="Inter Bold">Inter Bold</option>
+                <option value="Poppins SemiBold">Poppins SemiBold</option>
                 <option value="Montserrat Bold">Montserrat Bold</option>
+                <option value="Montserrat Black">Montserrat Black</option>
+                <option value="Inter Bold">Inter Bold</option>
                 <option value="Roboto Bold">Roboto Bold</option>
+                <option value="Bebas Neue">Bebas Neue</option>
+                <option value="DM Sans Bold">DM Sans Bold</option>
+                <option value="Space Grotesk Bold">Space Grotesk Bold</option>
               </select>
             </label>
 

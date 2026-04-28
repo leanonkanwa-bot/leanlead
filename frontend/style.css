@@ -239,6 +239,33 @@ input:focus, textarea:focus, select:focus {
 .style-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 540px) { .style-grid { grid-template-columns: 1fr; } }
 
+/* 2-column segmented (caption style) */
+.seg-2 { grid-template-columns: repeat(2, 1fr); max-width: 320px; }
+
+/* color theme picker */
+.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.themes input { display: none; }
+.themes .theme {
+  cursor: pointer; padding: 12px; border-radius: var(--radius-md);
+  border: 1.5px solid var(--line); background: var(--bg-soft);
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--muted);
+  transition: border-color .15s, color .15s;
+}
+.themes .theme:hover { border-color: var(--muted); color: var(--text); }
+.themes input:checked + .theme {
+  border-color: var(--accent); color: var(--text);
+  box-shadow: 0 0 0 1px rgba(255,214,10,.2);
+}
+.theme-swatches { display: flex; gap: 4px; }
+.theme-swatches i {
+  display: block; width: 14px; height: 14px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+@media (max-width: 540px) {
+  .themes { grid-template-columns: 1fr; }
+}
+
 /* color swatches */
 .swatches { display: flex; gap: 8px; align-items: center; }
 .swatches input { display: none; }

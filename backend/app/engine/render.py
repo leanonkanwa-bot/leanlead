@@ -172,6 +172,16 @@ def _build_zoom_expression(
     Convert the zoom plan into zoompan z/x/y expressions evaluated per output
     frame. zoompan uses 'on' = output frame number. We translate timestamps to
     frame ranges and build a chained if(...) expression.
+
+    BUG FIX — ZOOM SHAKE:
+    Linear interpolation between keyframes causes a velocity discontinuity at
+    every segment boundary, which the eye reads as a tiny jolt — repeated, it
+    feels like shake. Use smoothstep easing s = t*t*(3-2*t), which has zero
+    derivative at the endpoints. The zoom passes through every keyframe at
+    the same value but with smooth velocity, so transitions feel butter.
+
+    Anchor stays locked to the center of the frame at all times — never
+    drifts, never re-anchors mid-zoom.
     """
     if not zoom_plan:
         return "1", "iw/2-(iw/zoom/2)"
@@ -187,12 +197,23 @@ def _build_zoom_expression(
         f0 = int(s * fps)
         f1 = max(f0 + 1, int(e * fps))
         seg_dur = max(1, f1 - f0)
-        seg_expr = (
-            f"({z_from} + ({z_to}-{z_from}) * "
-            f"min(1, max(0, (on-{f0}) / {seg_dur})))"
-        )
+        kind = (step.get("kind") or "drift").lower()
+
+        # Linear progress in [0,1].
+        t = f"min(1, max(0, (on-{f0}) / {seg_dur}))"
+
+        if kind == "punch_in":
+            # Hard cut — no interpolation. The whole window holds at z_to.
+            seg_expr = f"{z_to}"
+        else:
+            # Smoothstep easing: s = t*t*(3-2*t). Zero derivative at both ends
+            # → no velocity discontinuity at segment boundaries → no shake.
+            ease = f"({t})*({t})*(3-2*({t}))"
+            seg_expr = f"({z_from} + ({z_to}-{z_from}) * ({ease}))"
+
         z_expr = f"if(between(on,{f0},{f1}),{seg_expr},{z_expr})"
 
+    # Anchor locked to frame center — independent of zoom value.
     x_expr = "iw/2-(iw/zoom/2)"
     y_expr = "ih/2-(ih/zoom/2)"
     return z_expr, f"{x_expr};{y_expr}"
@@ -262,6 +283,7 @@ def render(
     caption_font: str = "Poppins Bold",
     caption_color: str = "white",
     caption_position: str = "center",
+    caption_style: str = "impact",
     brand_color: str | None = None,
 ) -> dict[str, Any]:
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -331,6 +353,13 @@ def render(
     total_duration = _probe_duration(concat_path)
 
     # Remap b-roll windows to the cut timeline so captions pause there.
+    # BUG FIX — B-ROLL TIMING:
+    # Hard rule: 2.5s ≤ b-roll ≤ 4s. Anything shorter is a flash that just
+    # confuses the viewer. Clamp the agent's suggestion into that window;
+    # if the agent gave us 0s/0.1s of duration the clamp pulls it up to
+    # the readable floor.
+    BROLL_MIN_S = 2.5
+    BROLL_MAX_S = 4.0
     remapped_broll: list[tuple[float, float]] = []
     for br in plan.broll_suggestions:
         try:
@@ -338,6 +367,7 @@ def render(
             br_dur = float(br.get("duration", 0))
         except (TypeError, ValueError):
             continue
+        br_dur = max(BROLL_MIN_S, min(BROLL_MAX_S, br_dur))
         # Find the keep_segment that contains br_at and remap.
         run = 0.0
         for seg in keep:
@@ -380,6 +410,7 @@ def render(
         font=caption_font,
         color=caption_color,
         position=caption_position,
+        style=caption_style,
         broll_windows=remapped_broll,
     )
 

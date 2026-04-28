@@ -100,35 +100,42 @@ Hormozi rhythm pattern:
 ZOOM_SYSTEM = """\
 ZOOM SYSTEM — the tension engine. Three moves, master these three.
 
-SLOW ZOOM IN
+ABSOLUTE RULE: NO SHAKE. NO TREMBLE. EVER.
+The renderer eases every drift with smoothstep — your job is to make
+sure your zoom_plan windows DO NOT OVERLAP and that consecutive
+windows share endpoint values (the `to` of window N == the `from` of
+window N+1) so the curve is continuous. Anchor is locked to frame
+center; you do not control x/y.
+
+SLOW ZOOM IN  (kind: "drift")
   Speed: extremely slow, must be subconscious.
-  Creates: growing tension, intimacy.
+  Rate: +0.5% per second maximum (e.g. 100% → 103% over 6s).
   Use during: Hook, Consequence, Principle, Closing.
-  Rate: +1% every 2 seconds maximum.
 
-SLOW ZOOM OUT
+SLOW ZOOM OUT  (kind: "pull_out")
   Speed: slow and deliberate.
-  Creates: release, breath, perspective shift, emotional reset.
-  Use during: Story, Realization, Reframe.
-  Rate: -1% every 3 seconds.
-  Always zoom out after a peak tension moment. Let it breathe.
+  Rate: -0.5% per second maximum (e.g. 108% → 102% over 12s).
+  Use during: after peak tension, Story, Realization, Reframe.
 
-PUNCH IN
-  Instant cut. Zero transition. Hard jump.
-  Creates: pattern interrupt, emphasis, wake-up call.
-  Use on: the single most important word per section.
-  Jump: minimum +15% scale in one cut.
-  Never punch in twice within 10 seconds.
-  Punch in must always cut to silence or a KEY word. Never mid-sentence.
+PUNCH IN  (kind: "punch_in")
+  Instant cut held for the whole window.
+  Renderer DOES NOT interpolate — it locks at `to` for the whole
+  [start, end] window. Make `start` and `end` close (≈0.05s) and
+  schedule a slow zoom-in continuation right after.
+  Jump: minimum +15% scale.
+  Use on: the single most important word per section, supplied as
+  `on_word`.
+  Never twice within 10 seconds.
+  Always followed by a slow drift continuing from the new scale.
 
 Reference arc for short-form (60s):
    0–5s     100% → 103%   slow zoom in
    5–15s    103% → 108%   slow zoom in
   15–25s    108% → 102%   slow zoom OUT (breath after contrast)
   25–35s    102% → 112%   slow zoom in
-  35–45s    PUNCH IN to 122% on principle word
-  45–55s    122% → 126%   slow zoom in
-  Final     PUNCH IN to 130% — hold — cut to black
+  35.0–35.05s  PUNCH IN to 122%   (on principle word)
+  35.05–45s    122% → 126% slow zoom in
+  Final     PUNCH IN to 130% — hold — hard cut
 
 For long-form, the same shapes but with lower amplitude:
   base 100%, drift to 105–110% max, punch-ins reserved for one per chapter.
@@ -137,26 +144,42 @@ For long-form, the same shapes but with lower amplitude:
 CAPTION_RULES = """\
 CAPTION RULES — non-negotiable. The renderer enforces these mechanically.
 
-Font: Poppins Bold by default. (User may override to one alternative;
-respect their choice.)
+Font: Poppins Bold by default. The user may pick any of:
+  Poppins Bold / Poppins ExtraBold / Poppins SemiBold /
+  Montserrat Bold / Montserrat Black / Inter Bold / Roboto Bold /
+  Bebas Neue / DM Sans Bold / Space Grotesk Bold.
 
 Color: ONE single color, no shadow / outline / gradient / stroke.
-The renderer uses the color the user picked from the brand palette:
-  - Pure White    #FFFFFF
-  - Electric Yellow #FFE500
-  - Clean Red     #FF3B30
-  - or the user's brand_color override (always one color, never two).
+  - Pure White       #FFFFFF
+  - Electric Yellow  #FFE500
+  - Clean Red        #FF3B30
+  - Electric Blue    #0A84FF
+  - Orange Flash     #FF6B00
+
+SIZE — readable on a phone:
+  Standard word:  9% of video height (~175px on a 1920-tall short).
+  Emphasis word:  12% of video height (~235px on a 1920-tall short),
+                  same color, same font, just bigger.
+  The renderer applies these sizes automatically — do not return
+  custom sizes. Just return the emphasis words in
+  `caption_emphasis_words`.
 
 ONE word per caption frame. Maximum. Always.
 Words appear ONLY when they are spoken — exactly on the syllable.
 
 No punctuation in captions. Ever. No commas, no periods, no quotes.
 
-Key word emphasis: 20% larger, same color, same font. Just bigger.
-One emphasized word per sentence maximum — return them in
-`caption_emphasis_words`.
+One emphasized word per sentence maximum.
 
-Zero captions during B-roll. Pause the caption track over those windows.
+Zero captions during B-roll. Pause the caption track over those
+windows (the renderer does this automatically from `broll_suggestions`).
+
+Caption styles available to the renderer:
+  - "impact" (default)    — naked one-word card, no background, no shadow.
+                            Position controlled by user (center / bottom /
+                            side-left / side-right).
+  - "kinetic"             — one-word card with a dark bar background
+                            (#1A1A1A, ~90% opaque), forced to bottom.
 """
 
 HYPERFRAMES = """\
@@ -222,15 +245,27 @@ the kind-specific fields above. (v1 of the renderer executes only
 BROLL_RULES = """\
 B-ROLL — maximum 3 clips, ever.
 
-Placement:
+Placement (must match the spoken context — never random):
   Clip 1 → during CONTRAST   (show the wrong way visually)
   Clip 2 → during STORY      (one concrete scene from the moment)
   Clip 3 → during PAYOFF     (make the idea land visually)
 
-Duration: 2–4 seconds each. Hard cuts in, hard cuts out. No fades.
-No transitions. Captions are paused during B-roll windows.
+Each b-roll suggestion's `at` is the EXACT START of the sentence whose
+content the visual matches. Read the transcript word-by-word and pick
+b-roll moments that align with the spoken concept — not random
+intervals.
 
-If B-roll does not make the message stronger, it does not exist.
+DURATION: minimum 2.5s, maximum 4.0s. Hard cuts in, hard cuts out.
+The renderer will clamp anything outside that range — but if you
+emit 0.1s b-rolls the renderer will pull them up to 2.5s and they
+may overshoot a section. Pick the right window the first time.
+
+No transitions. No fades. No dissolves. Captions are paused during
+b-roll automatically.
+
+If b-roll does not make the message stronger, it does not exist.
+If you cannot find a sentence whose context matches a b-roll concept,
+DO NOT EMIT THAT B-ROLL. Better zero clips than mismatched ones.
 """
 
 RETENTION_MECHANICS = """\
