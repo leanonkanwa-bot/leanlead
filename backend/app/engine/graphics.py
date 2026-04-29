@@ -854,20 +854,16 @@ def render_motion_graphic(
     _fcy = (_ft + _fb) / 2   # face center y %
 
     def _safe_x_expr(graphic_w_expr: str = "w") -> str:
-        """Return the x overlay expression that puts the graphic in the
-        horizontal zone opposite to the subject."""
         if _fcx < 40:    # subject left → graphic right
             return f"W - {graphic_w_expr} - W*0.04"
         if _fcx > 60:    # subject right → graphic left
             return f"W*0.04"
-        return f"(W - {graphic_w_expr}) / 2"  # centered subject → center graphic
+        return f"(W - {graphic_w_expr}) / 2"
 
     def _safe_y_expr() -> str:
-        """Return the y overlay expression that puts the graphic in the
-        vertical zone opposite to the subject."""
         if _fcy < 40:    # face in top half → graphic at bottom
             return "H*0.62"
-        return "H*0.04"  # face in bottom/center → graphic at top
+        return "H*0.04"
 
     if kind == "lower_third" or kind == "fly_in":
         # fly_in degrades into a lower-third title — same visual, same intent.
