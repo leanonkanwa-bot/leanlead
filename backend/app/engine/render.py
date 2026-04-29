@@ -168,6 +168,8 @@ def _build_zoom_expression(
     zoom_plan: list[dict[str, Any]],
     total_duration: float,
     fps: int = 30,
+    face_cx_pct: float = 50.0,
+    face_cy_pct: float = 50.0,
 ) -> tuple[str, str]:
     """
     Convert the zoom plan into zoompan z/x/y expressions evaluated per output
@@ -181,11 +183,18 @@ def _build_zoom_expression(
     derivative at the endpoints. The zoom passes through every keyframe at
     the same value but with smooth velocity, so transitions feel butter.
 
-    Anchor stays locked to the center of the frame at all times — never
-    drifts, never re-anchors mid-zoom.
+    When face_cx_pct/face_cy_pct are not exactly 50, anchors the zoom to the
+    detected face center instead of the geometric frame center.
     """
+    if face_cx_pct != 50.0 or face_cy_pct != 50.0:
+        fx = f"max(0, min(iw-(iw/zoom), iw*{face_cx_pct/100:.4f}-(iw/zoom/2)))"
+        fy = f"max(0, min(ih-(ih/zoom), ih*{face_cy_pct/100:.4f}-(ih/zoom/2)))"
+    else:
+        fx = "iw/2-(iw/zoom/2)"
+        fy = "ih/2-(ih/zoom/2)"
+
     if not zoom_plan:
-        return "1", "iw/2-(iw/zoom/2)"
+        return "1", f"{fx};{fy}"
 
     sorted_plan = sorted(zoom_plan, key=lambda p: float(p.get("start", 0)))
 
@@ -235,10 +244,7 @@ def _build_zoom_expression(
 
         z_expr = f"if(between(on,{f0},{f1}),{seg_expr},{z_expr})"
 
-    # Anchor locked to frame center — independent of zoom value.
-    x_expr = "iw/2-(iw/zoom/2)"
-    y_expr = "ih/2-(ih/zoom/2)"
-    return z_expr, f"{x_expr};{y_expr}"
+    return z_expr, f"{fx};{fy}"
 
 
 def _hex_to_rgb_at(hex6: str) -> str:
@@ -307,6 +313,8 @@ def render(
     caption_position: str = "center",
     caption_style: str = "impact",
     brand_color: str | None = None,
+    aesthetic: str = "dark-pro",
+    subject_position: dict | None = None,
 ) -> dict[str, Any]:
     work_dir.mkdir(parents=True, exist_ok=True)
 
