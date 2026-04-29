@@ -5,7 +5,7 @@ from __future__ import annotations
 import traceback
 from pathlib import Path
 
-from app.agent.planner import FormatHint, plan_edit
+from app.agent.planner import FormatHint, analyze_subject_position, plan_edit
 from app.api.jobs import store
 from app.core.config import settings
 from app.engine.render import render
@@ -29,6 +29,10 @@ def run_job(
                      message="Transcribing audio with Whisper…")
         transcript = transcribe(src).to_dict()
 
+        store.update(job_id, status="planning", progress=35,
+                     message="Analysing subject position (vision)…")
+        subject_pos = analyze_subject_position(src)
+
         store.update(job_id, status="planning", progress=40,
                      message="Asking the agent for an edit plan…")
         plan = plan_edit(
@@ -39,6 +43,7 @@ def run_job(
             caption_color=caption_color,
             caption_position=caption_position,
             caption_font=caption_font,
+            subject_position=subject_pos,
         )
 
         # Reclaim ~250 MB of RAM before ffmpeg fires up — otherwise the

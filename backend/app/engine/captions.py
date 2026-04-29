@@ -2,9 +2,9 @@
 
 Hard rules (Hormozi/Sanchez/MrBeast caption system):
   - ONE word per card. Always. No exceptions.
-  - One single color (no shadow / outline / gradient / stroke).
+  - One single color + subtle shadow/outline for readability.
   - Font is Poppins Bold by default. User can pick from a small allowlist.
-  - Emphasis word: 20% larger, same color, same font.
+  - Emphasis-only mode (default): captions appear ONLY for emphasis words.
   - No punctuation in captions.
   - Words appear ONLY when they are spoken — start..end of each word.
 """
@@ -44,14 +44,11 @@ ALLOWED_POSITIONS = {"center", "bottom", "side-left", "side-right"}
 # Caption styles — each is a different visual treatment of the one-word card.
 ALLOWED_STYLES = {"impact", "kinetic"}
 
-# Spec from the user:
-#   standard word size = 9% of video height
-#   emphasis word size = 12% of video height
-# Our ASS PlayResY is 1920 for short, 1080 for long. So sizes are:
-SHORT_BASE_SIZE = 175   # 9.1% of 1920
-SHORT_EMPH_SIZE = 235   # 12.2% of 1920 (≈ 1.34× base)
-LONG_BASE_SIZE = 100    # 9.3% of 1080
-LONG_EMPH_SIZE = 135    # 12.5% of 1080
+# Single consistent caption size: ~7% of PlayResY.
+# One size for all captions — no tier system, no inconsistency between renders.
+# ASS PlayResY is 1920 for short form, 1080 for long form.
+CAP_SIZE_SHORT = 134    # 7.0% of 1920
+CAP_SIZE_LONG = 76      # 7.0% of 1080
 
 PUNCT_RE = re.compile(r"[.,!?;:\"'()\[\]…–—]")
 
@@ -112,10 +109,7 @@ def _ass_header(
     primary = _hex_to_ass_bgr(color_hex)
     align, ml, mr, mv = _alignment_for(position)
 
-    if short_form:
-        base_size, emph_size = SHORT_BASE_SIZE, SHORT_EMPH_SIZE
-    else:
-        base_size, emph_size = LONG_BASE_SIZE, LONG_EMPH_SIZE
+    cap_size = CAP_SIZE_SHORT if short_form else CAP_SIZE_LONG
 
     play_res_y = 1920 if short_form else 1080
     play_res_x = 1080 if short_form else 1920
@@ -128,23 +122,24 @@ def _ass_header(
         align_v = 2  # bottom-center
         margin_v = 200
         default_line = (
-            f"Style: Default,{font_name},{base_size},{primary},{primary},"
+            f"Style: Default,{font_name},{cap_size},{primary},{primary},"
             f"&H00000000,{back},1,0,0,0,100,100,0,0,4,12,0,{align_v},80,80,{margin_v},1"
         )
         emphasis_line = (
-            f"Style: Emphasis,{font_name},{emph_size},{primary},{primary},"
+            f"Style: Emphasis,{font_name},{cap_size},{primary},{primary},"
             f"&H00000000,{back},1,0,0,0,100,100,0,0,4,12,0,{align_v},80,80,{margin_v},1"
         )
     else:
-        # Style 1 — Poppins Impact (default): one color, no shadow, no outline,
-        # no gradient. Positions controlled by `position` arg.
+        # Style 1 — Impact: single size, 2px outline + 2px drop shadow for
+        # readability. OutlineColour=black, shadow from semi-transparent black.
+        # BorderStyle=1: outline+shadow. Outline=2, Shadow=2.
         default_line = (
-            f"Style: Default,{font_name},{base_size},{primary},{primary},{primary},"
-            f"&H00000000,1,0,0,0,100,100,0,0,1,0,0,{align},{ml},{mr},{mv},1"
+            f"Style: Default,{font_name},{cap_size},{primary},{primary},"
+            f"&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,2,{align},{ml},{mr},{mv},1"
         )
         emphasis_line = (
-            f"Style: Emphasis,{font_name},{emph_size},{primary},{primary},{primary},"
-            f"&H00000000,1,0,0,0,100,100,0,0,1,0,0,{align},{ml},{mr},{mv},1"
+            f"Style: Emphasis,{font_name},{cap_size},{primary},{primary},"
+            f"&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,2,{align},{ml},{mr},{mv},1"
         )
 
     return (
@@ -180,8 +175,14 @@ def build_ass(
     position: str = "center",
     style: str = "impact",
     broll_windows: Iterable[tuple[float, float]] = (),
+    emphasis_only: bool = True,
 ) -> Path:
-    """Render captions, one ASS Dialogue per spoken word."""
+    """Render captions.
+
+    When emphasis_only=True (default), only words in emphasis_words get a
+    caption card — sparse, punchy, high-retention. When False, every spoken
+    word gets a card (legacy behavior).
+    """
     if font not in ALLOWED_FONTS:
         font = "Poppins Bold"
     color_hex = ALLOWED_COLORS.get(color.lower(), color if color.startswith("#") else "FFFFFF")
@@ -193,7 +194,7 @@ def build_ass(
     if style == "kinetic":
         position = "bottom"
 
-    emphasis_words = {_strip_punct(w).lower() for w in (emphasis_words or set())}
+    emphasis_set = {_strip_punct(w).lower() for w in (emphasis_words or set())}
     broll_list = list(broll_windows)
 
     lines = [_ass_header(short_form, font, color_hex, position, style)]
@@ -205,9 +206,12 @@ def build_ass(
         # Hard rule: no captions during B-roll windows.
         if _in_window((w.start + w.end) / 2, broll_list):
             continue
-        style = "Emphasis" if clean.lower() in emphasis_words else "Default"
+        is_emphasis = clean.lower() in emphasis_set
+        if emphasis_only and not is_emphasis:
+            continue
+        style_name = "Emphasis" if is_emphasis else "Default"
         lines.append(
-            f"Dialogue: 0,{_ts(w.start)},{_ts(w.end)},{style},,0,0,0,,{clean}"
+            f"Dialogue: 0,{_ts(w.start)},{_ts(w.end)},{style_name},,0,0,0,,{clean}"
         )
 
     out_path.write_text("\n".join(lines), encoding="utf-8")

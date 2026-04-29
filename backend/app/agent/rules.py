@@ -156,28 +156,28 @@ Color: ONE single color, no shadow / outline / gradient / stroke.
   - Electric Blue    #0A84FF
   - Orange Flash     #FF6B00
 
-SIZE — readable on a phone:
-  Standard word:  9% of video height (~175px on a 1920-tall short).
-  Emphasis word:  12% of video height (~235px on a 1920-tall short),
-                  same color, same font, just bigger.
-  The renderer applies these sizes automatically — do not return
-  custom sizes. Just return the emphasis words in
-  `caption_emphasis_words`.
+EMPHASIS-ONLY CAPTIONS — sparse and punchy:
+  Captions appear ONLY for words listed in `caption_emphasis_words`.
+  Do NOT try to caption every word — the renderer suppresses non-emphasis
+  words automatically. Pick 1–3 high-impact words per clip segment, not one
+  per sentence. Rarer = more powerful.
+
+SIZE — single consistent size, ~7% of video height.
+  The renderer applies this automatically. Do NOT try to specify sizes.
+  Just return the emphasis words in `caption_emphasis_words`.
 
 ONE word per caption frame. Maximum. Always.
 Words appear ONLY when they are spoken — exactly on the syllable.
 
 No punctuation in captions. Ever. No commas, no periods, no quotes.
 
-One emphasized word per sentence maximum.
-
 Zero captions during B-roll. Pause the caption track over those
 windows (the renderer does this automatically from `broll_suggestions`).
 
 Caption styles available to the renderer:
-  - "impact" (default)    — naked one-word card, no background, no shadow.
-                            Position controlled by user (center / bottom /
-                            side-left / side-right).
+  - "impact" (default)    — one-word card, 2px outline + 2px drop-shadow
+                            for readability. Position controlled by user
+                            (center / bottom / side-left / side-right).
   - "kinetic"             — one-word card with a dark bar background
                             (#1A1A1A, ~90% opaque), forced to bottom.
 """
@@ -223,6 +223,28 @@ templates (lower_third, stat_circle, checklist). Use the templates
 when they fit; use text_overlay for everything else. Mix them freely.
 
 ══════════════════════════════════════════════════════════
+TIMING — appear AFTER the words are spoken, never before
+══════════════════════════════════════════════════════════
+Set `at` to 0.5–1.5 s AFTER the relevant sentence or key word
+STARTS being spoken — never at or before it.
+The viewer must hear the idea first, then see the graphic that
+reinforces it. A graphic that pops before the speaker says the word
+feels like a spoiler and breaks the rhythm.
+
+══════════════════════════════════════════════════════════
+POSITIONING — never cover the subject's face
+══════════════════════════════════════════════════════════
+The user message will contain a "SUBJECT POSITION" block with the
+exact y_pct safe zones detected by Claude Vision for THIS video.
+Use those coordinates — they override any generic defaults below.
+
+Generic fallbacks (when no vision data is available):
+  Portrait 1080 × 1920 → safe: y_pct ≤ 10 or y_pct ≥ 72.
+  Landscape 1920 × 1080 → safe: x_pct ≤ 10 or x_pct ≥ 62.
+For checklist and stat_circle the renderer anchors them to the
+upper zone automatically; you do not need to set y for those.
+
+══════════════════════════════════════════════════════════
 text_overlay — the universal primitive
 ══════════════════════════════════════════════════════════
 Place arbitrary text anywhere on the frame, with the font, size,
@@ -232,18 +254,19 @@ add a side label, drop a thought bubble, mark a transition, etc.
 
 Schema:
   { at, duration, kind: "text_overlay",
-    text: "Don't automate what you\\ncan't do manually",
+    text: "Dev Team\\n+ Maintenance\\n= Drag",
     font: "Poppins Bold" | "Bebas Neue" | …      // any allowed font
-    size: 64,                                     // px
+    size: 15,                                     // % of frame short edge
     color: "#FFFFFF",                             // any hex
     align: "left" | "center" | "right",
-    x_pct: 6, y_pct: 30,                          // % of frame WxH
-    max_width_pct: 50,                            // soft-wrap width
+    x_pct: 5, y_pct: 8,                          // % of frame WxH
+    max_width_pct: 25,                            // soft-wrap at 25% frame width
     slide_in: "left" | "right" | "none" }
 
+`size` is a PERCENTAGE of the frame's shorter dimension (1080 on both
+short and long form). size: 15 → 162 px — readable but not overwhelming.
 Use `\\n` to break lines manually; use `max_width_pct` for soft wrap.
-Defaults are sensible (Poppins Bold 80px white, 6%/12%, slide-in
-left, max 50% width).
+Keep x_pct ≤ 10 or ≥ 62 and y_pct ≤ 12 or ≥ 72 to stay off the face.
 
 ══════════════════════════════════════════════════════════
 templates — for common shapes
@@ -401,12 +424,16 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
 
   "motion_graphics": [
     { "at": <s>, "duration": <s>,
-      "kind": "count_up"|"fly_in"|"split"|"quote"|"highlight",
-      "text": "<for fly_in / quote>",
+      "kind": "count_up"|"fly_in"|"split"|"quote"|"highlight"|"text_overlay"|"checklist",
+      "text": "<for fly_in / text_overlay / quote>",
+      "size": 15,                              /* text_overlay: % of frame short edge */
+      "x_pct": 5, "y_pct": 8,                 /* text_overlay: stay ≤12 or ≥72 on y */
+      "max_width_pct": 25,                     /* text_overlay: wrap at 25% frame width */
       "from": <number>, "to": <number>,        /* count_up only */
       "left": "<text>", "right": "<text>",     /* split only */
       "lines": ["<word>", "<word>"],           /* quote only */
-      "anim": "underline|circle|arrow"         /* highlight only */
+      "anim": "underline|circle|arrow",        /* highlight only */
+      "bg_card": "black"|"white"|""            /* optional solid card behind graphic */
     }
   ],
 

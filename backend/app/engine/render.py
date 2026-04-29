@@ -189,8 +189,29 @@ def _build_zoom_expression(
 
     sorted_plan = sorted(zoom_plan, key=lambda p: float(p.get("start", 0)))
 
+    # Fill gaps between zoom segments with hold-at-last-value entries so z
+    # never snaps back to the default "1" during silent/non-zoom moments —
+    # that snap is what the eye reads as shake.
+    filled: list[dict] = []
+    for i, step in enumerate(sorted_plan):
+        filled.append(step)
+        curr_e = float(step.get("end", float(step.get("start", 0)) + 1))
+        z_end_val = float(step.get("to", step.get("from", 1.0)))
+        if i < len(sorted_plan) - 1:
+            next_s = float(sorted_plan[i + 1].get("start", 0))
+            if next_s > curr_e + 0.02:
+                filled.append({"start": curr_e, "end": next_s,
+                                "from": z_end_val, "to": z_end_val, "kind": "hold"})
+    # After the last zoom: hold its final value until the video ends.
+    last = sorted_plan[-1]
+    last_e = float(last.get("end", float(last.get("start", 0)) + 1))
+    last_to = float(last.get("to", last.get("from", 1.0)))
+    if total_duration > last_e + 0.02:
+        filled.append({"start": last_e, "end": total_duration,
+                        "from": last_to, "to": last_to, "kind": "hold"})
+
     z_expr = "1"
-    for step in reversed(sorted_plan):
+    for step in reversed(filled):
         s = float(step.get("start", 0))
         e = float(step.get("end", s + 1))
         z_from = float(step.get("from", 1.0))
@@ -447,6 +468,9 @@ def render(
             run += max(0.0, ee - ss)
         if remapped_at is None:
             continue
+        # Hard enforcement: graphics appear ≥0.5s after the relevant moment
+        # so they never pop up before the words are spoken.
+        remapped_at = min(remapped_at + 0.5, max(0.0, total_duration - 1.0))
         spec = {**mg, "at": remapped_at}
         rg = render_motion_graphic(
             spec, graphics_dir, i,
