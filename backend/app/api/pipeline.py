@@ -23,6 +23,7 @@ def run_job(
     caption_position: str = "center",
     caption_style: str = "impact",
     brand_color: str | None = None,
+    aesthetic: str = "dark-pro",
 ) -> None:
     try:
         store.update(job_id, status="transcribing", progress=10,
@@ -44,6 +45,7 @@ def run_job(
             caption_position=caption_position,
             caption_font=caption_font,
             subject_position=subject_pos,
+            aesthetic=aesthetic,
         )
 
         # Reclaim ~250 MB of RAM before ffmpeg fires up — otherwise the
@@ -65,6 +67,8 @@ def run_job(
             caption_position=caption_position,
             caption_style=caption_style,
             brand_color=brand_color,
+            aesthetic=aesthetic,
+            subject_position=subject_pos,
         )
 
         store.update(
