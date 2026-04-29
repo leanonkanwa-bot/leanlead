@@ -106,6 +106,7 @@ async def submit_edit(
     caption_position: Literal["center", "bottom", "side-left", "side-right"] = Form("center"),
     caption_style: Literal["impact", "kinetic"] = Form("impact"),
     brand_color: str = Form(""),
+    theme: str = Form("dark-pro"),
     _: None = Depends(_check_auth),
 ) -> JSONResponse:
     if not settings.anthropic_api_key:
@@ -129,6 +130,7 @@ async def submit_edit(
         caption_position=caption_position,
         caption_style=caption_style,
         brand_color=brand_color or None,
+        aesthetic=theme,
     )
     return JSONResponse({"job_id": job.id, "status": job.status})
 

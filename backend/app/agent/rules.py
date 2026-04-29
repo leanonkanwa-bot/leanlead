@@ -217,11 +217,6 @@ MOTION GRAPHICS — every graphic earns its existence
 Decoration is the enemy of retention. If a graphic does not make the
 message stronger, it does NOT appear in the output.
 
-YOU HAVE TWO TOOLS: the universal `text_overlay` primitive (free-form
-text anywhere on screen, full styling control) and three composed
-templates (lower_third, stat_circle, checklist). Use the templates
-when they fit; use text_overlay for everything else. Mix them freely.
-
 ══════════════════════════════════════════════════════════
 TIMING — appear AFTER the words are spoken, never before
 ══════════════════════════════════════════════════════════
@@ -243,14 +238,15 @@ Generic fallbacks (when no vision data is available):
   Landscape 1920 × 1080 → safe: x_pct ≤ 10 or x_pct ≥ 62.
 For checklist and stat_circle the renderer anchors them to the
 upper zone automatically; you do not need to set y for those.
+Full-frame types (quote_card, split_screen, versus, typography_broll,
+money_counter) render at x=0, y=0 and fill the frame — use sparingly
+so they don't cover the speaker for too long.
 
 ══════════════════════════════════════════════════════════
 text_overlay — the universal primitive
 ══════════════════════════════════════════════════════════
 Place arbitrary text anywhere on the frame, with the font, size,
-colour, position, line-wrap, and slide direction you choose. This
-is what you reach for when you want to annotate the speaker's idea,
-add a side label, drop a thought bubble, mark a transition, etc.
+colour, position, line-wrap, and slide direction you choose.
 
 Schema:
   { at, duration, kind: "text_overlay",
@@ -264,9 +260,8 @@ Schema:
     slide_in: "left" | "right" | "none" }
 
 `size` is a PERCENTAGE of the frame's shorter dimension (1080 on both
-short and long form). size: 15 → 162 px — readable but not overwhelming.
-Use `\\n` to break lines manually; use `max_width_pct` for soft wrap.
-Keep x_pct ≤ 10 or ≥ 62 and y_pct ≤ 12 or ≥ 72 to stay off the face.
+short and long form). size: 15 → 162 px. Keep x_pct ≤ 10 or ≥ 62 and
+y_pct ≤ 12 or ≥ 72 to stay off the face.
 
 ══════════════════════════════════════════════════════════
 templates — for common shapes
@@ -286,17 +281,60 @@ templates — for common shapes
       { at, duration: 3, kind: "checklist",
         items: [{text: "Not a Demo", ok: false},
                 {text: "Real Automations", ok: true}] }
-      use: contrasting wrong vs right. Keep items ≤ 5 words each,
-      ≤ 4 items total.
+      use: contrasting wrong vs right. ≤ 5 words each, ≤ 4 items.
+
+  - "quote_card" — full-frame inspirational quote block.
+      { at, duration: 3.5, kind: "quote_card",
+        text: "The quote text here", speaker: "— Person Name" }
+      use: principle moments, scripture, memorable one-liners.
+
+  - "split_screen" — left/right comparison panel.
+      { at, duration: 3, kind: "split_screen",
+        left: "Old way", right: "New way",
+        left_label: "WRONG", right_label: "RIGHT" }
+      use: before/after, wrong/right, old/new contrasts.
+
+  - "timeline" — horizontal timeline with labeled events.
+      { at, duration: 4, kind: "timeline",
+        events: [{label: "Started", year: "2019"}, {label: "Pivoted", year: "2021"}] }
+      use: journey, history, step progression.
+
+  - "versus" — two-card head-to-head comparison.
+      { at, duration: 3, kind: "versus",
+        left: "Employee", right: "Entrepreneur", winner: "right" }
+      use: direct comparisons, options, choices.
+
+  - "notification" — iPhone-style banner overlay.
+      { at, duration: 2.5, kind: "notification",
+        title: "New message", body: "You have 3 unread", app_name: "Messages" }
+      use: social proof moments, DM reveals, alert-style data.
+
+  - "typography_broll" — full-frame bold word with supporting context.
+      { at, duration: 2, kind: "typography_broll",
+        text: "FREEDOM", words: ["time", "location", "money"] }
+      use: power words, principles, emotional peaks.
+
+  - "money_counter" — large formatted dollar/number display.
+      { at, duration: 2, kind: "money_counter",
+        to: 1250000, currency: "$", positive: true }
+      use: revenue, costs, big numbers the speaker is referencing.
 
 ══════════════════════════════════════════════════════════
-planned but not yet drawn — emit them as a brief
+TRIGGER WORDS → GRAPHIC RESPONSE
 ══════════════════════════════════════════════════════════
+When the speaker mentions these, use this graphic type:
 
-  - "split"      — split-screen comparison
-  - "quote"      — full-screen multi-line quote
-  - "highlight"  — arrow / underline / circle pointing at the speaker
-  - "flow"       — connected icons / process diagram
+"percent / %" → stat_circle (count_up)
+"number / amount / cost / price / $" → money_counter
+"first / second / third / step" → timeline or checklist
+"wrong / mistake / most people think" → split_screen (left_label: "WRONG") or checklist with red X items
+"right / solution / instead" → split_screen (right_label: "RIGHT") or checklist with green items
+"versus / vs / compare" → versus or split_screen
+"God / faith / Bible / prayer / church" → quote_card with the spiritual line
+"listen / remember / key insight" → typography_broll with the key word
+Use checklist for lists of 3–5 items
+Use lower_third for section titles and transitions
+Use text_overlay for quick data points that reinforce what is being said
 
 ══════════════════════════════════════════════════════════
 pacing
@@ -424,16 +462,39 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
 
   "motion_graphics": [
     { "at": <s>, "duration": <s>,
-      "kind": "count_up"|"fly_in"|"split"|"quote"|"highlight"|"text_overlay"|"checklist",
-      "text": "<for fly_in / text_overlay / quote>",
-      "size": 15,                              /* text_overlay: % of frame short edge */
-      "x_pct": 5, "y_pct": 8,                 /* text_overlay: stay ≤12 or ≥72 on y */
-      "max_width_pct": 25,                     /* text_overlay: wrap at 25% frame width */
-      "from": <number>, "to": <number>,        /* count_up only */
-      "left": "<text>", "right": "<text>",     /* split only */
-      "lines": ["<word>", "<word>"],           /* quote only */
-      "anim": "underline|circle|arrow",        /* highlight only */
-      "bg_card": "black"|"white"|""            /* optional solid card behind graphic */
+      "kind": "count_up"|"fly_in"|"text_overlay"|"checklist"
+            |"lower_third"|"stat_circle"|"annotation"
+            |"quote_card"|"split_screen"|"timeline"|"versus"
+            |"notification"|"typography_broll"|"money_counter",
+      /* text_overlay / fly_in / annotation */
+      "text": "<text>",
+      "size": 15,           /* text_overlay: % of frame short edge */
+      "x_pct": 5, "y_pct": 8,
+      "max_width_pct": 25,
+      "slide_in": "left"|"right"|"none",
+      /* count_up / stat_circle */
+      "from": <number>, "to": <number>, "label": "<text>",
+      /* lower_third */
+      "title": "<text>", "accent_word": "<text>",
+      /* checklist */
+      "items": [{"text": "<text>", "ok": true|false}],
+      /* quote_card */
+      "quote": "<text>", "speaker": "<name>",
+      /* split_screen */
+      "left": "<text>", "right": "<text>",
+      "left_label": "WRONG", "right_label": "RIGHT",
+      /* timeline */
+      "events": [{"label": "<text>", "year": "<year>"}],
+      /* versus */
+      "left": "<name>", "right": "<name>", "winner": "left"|"right",
+      /* notification */
+      "title": "<text>", "body": "<text>", "app_name": "<text>",
+      /* typography_broll */
+      "words": ["<word>", "<word>"],
+      /* money_counter */
+      "currency": "$", "positive": true,
+      /* universal */
+      "bg_card": "black"|"white"|""
     }
   ],
 

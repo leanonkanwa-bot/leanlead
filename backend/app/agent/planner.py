@@ -168,6 +168,7 @@ def plan_edit(
     caption_position: str | None = None,
     caption_font: str | None = None,
     subject_position: dict[str, float] | None = None,
+    aesthetic: str = "dark-pro",
 ) -> EditPlan:
     """
     Ask Claude to produce an edit plan for the given transcript.
@@ -224,6 +225,7 @@ def plan_edit(
             caption_color=caption_color,
             caption_position=caption_position,
             caption_font=caption_font,
+            aesthetic=aesthetic,
         ),
         messages=[user_msg],
     )
