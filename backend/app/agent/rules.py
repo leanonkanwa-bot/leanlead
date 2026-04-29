@@ -156,28 +156,28 @@ Color: ONE single color, no shadow / outline / gradient / stroke.
   - Electric Blue    #0A84FF
   - Orange Flash     #FF6B00
 
-SIZE — readable on a phone:
-  Standard word:  9% of video height (~175px on a 1920-tall short).
-  Emphasis word:  12% of video height (~235px on a 1920-tall short),
-                  same color, same font, just bigger.
-  The renderer applies these sizes automatically — do not return
-  custom sizes. Just return the emphasis words in
-  `caption_emphasis_words`.
+EMPHASIS-ONLY CAPTIONS — sparse and punchy:
+  Captions appear ONLY for words listed in `caption_emphasis_words`.
+  Do NOT try to caption every word — the renderer suppresses non-emphasis
+  words automatically. Pick 1–3 high-impact words per clip segment, not one
+  per sentence. Rarer = more powerful.
+
+SIZE — single consistent size, ~7% of video height.
+  The renderer applies this automatically. Do NOT try to specify sizes.
+  Just return the emphasis words in `caption_emphasis_words`.
 
 ONE word per caption frame. Maximum. Always.
 Words appear ONLY when they are spoken — exactly on the syllable.
 
 No punctuation in captions. Ever. No commas, no periods, no quotes.
 
-One emphasized word per sentence maximum.
-
 Zero captions during B-roll. Pause the caption track over those
 windows (the renderer does this automatically from `broll_suggestions`).
 
 Caption styles available to the renderer:
-  - "impact" (default)    — naked one-word card, no background, no shadow.
-                            Position controlled by user (center / bottom /
-                            side-left / side-right).
+  - "impact" (default)    — one-word card, 2px outline + 2px drop-shadow
+                            for readability. Position controlled by user
+                            (center / bottom / side-left / side-right).
   - "kinetic"             — one-word card with a dark bar background
                             (#1A1A1A, ~90% opaque), forced to bottom.
 """
@@ -432,7 +432,8 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
       "from": <number>, "to": <number>,        /* count_up only */
       "left": "<text>", "right": "<text>",     /* split only */
       "lines": ["<word>", "<word>"],           /* quote only */
-      "anim": "underline|circle|arrow"         /* highlight only */
+      "anim": "underline|circle|arrow",        /* highlight only */
+      "bg_card": "black"|"white"|""            /* optional solid card behind graphic */
     }
   ],
 

@@ -391,6 +391,16 @@ class RenderedGraphic:
     y_expr: str        # ffmpeg overlay y expression
     fade_in_s: float = 0.3
     kind: str = ""
+    bg_card: str = ""  # "black" | "white" — solid card painted behind the graphic
+
+
+def _apply_bg_card(png: Path, color: str) -> None:
+    """Paint a solid-color card behind the graphic PNG (in-place)."""
+    rgba = (0, 0, 0, 210) if color == "black" else (255, 255, 255, 210)
+    with Image.open(png).convert("RGBA") as img:
+        card = Image.new("RGBA", img.size, rgba)
+        card.paste(img, (0, 0), img)
+        card.save(png)
 
 
 def render_motion_graphic(
@@ -414,6 +424,9 @@ def render_motion_graphic(
         return None
     out_dir.mkdir(parents=True, exist_ok=True)
     png = out_dir / f"mg_{index:03d}_{kind}.png"
+    bg_card = (spec.get("bg_card") or "").lower()
+    if bg_card not in ("black", "white"):
+        bg_card = ""
 
     if kind == "lower_third" or kind == "fly_in":
         # fly_in degrades into a lower-third title — same visual, same intent.
@@ -434,9 +447,11 @@ def render_motion_graphic(
             f"{margin_l})"
         )
         y_expr = f"{anchor_y}"
+        if bg_card:
+            _apply_bg_card(png, bg_card)
         return RenderedGraphic(
             png=png, at=at, duration=duration,
-            x_expr=x_expr, y_expr=y_expr, kind=kind,
+            x_expr=x_expr, y_expr=y_expr, kind=kind, bg_card=bg_card,
         )
 
     if kind == "count_up" or kind == "stat_circle":
@@ -449,9 +464,11 @@ def render_motion_graphic(
         # Upper zone — keeps the circle above the speaker's face.
         x_expr = f"(W-w)/2"
         y_expr = f"H*0.04"
+        if bg_card:
+            _apply_bg_card(png, bg_card)
         return RenderedGraphic(
             png=png, at=at, duration=duration,
-            x_expr=x_expr, y_expr=y_expr, kind=kind,
+            x_expr=x_expr, y_expr=y_expr, kind=kind, bg_card=bg_card,
         )
 
     if kind == "text_overlay" or kind == "text" or kind == "annotation":
@@ -508,9 +525,11 @@ def render_motion_graphic(
             x_expr = f"{anchor_x}"
         y_expr = f"{anchor_y}"
 
+        if bg_card:
+            _apply_bg_card(png, bg_card)
         return RenderedGraphic(
             png=png, at=at, duration=duration,
-            x_expr=x_expr, y_expr=y_expr, kind=kind,
+            x_expr=x_expr, y_expr=y_expr, kind=kind, bg_card=bg_card,
         )
 
     if kind == "checklist":
@@ -530,9 +549,11 @@ def render_motion_graphic(
         render_checklist(items, png)
         x_expr = "(W-w)/2"
         y_expr = "H*0.04"  # upper zone — above the face area
+        if bg_card:
+            _apply_bg_card(png, bg_card)
         return RenderedGraphic(
             png=png, at=at, duration=duration,
-            x_expr=x_expr, y_expr=y_expr, kind=kind,
+            x_expr=x_expr, y_expr=y_expr, kind=kind, bg_card=bg_card,
         )
 
     # Unsupported kinds (split, quote, highlight, flow, arrow_callout) —
