@@ -234,14 +234,15 @@ feels like a spoiler and breaks the rhythm.
 ══════════════════════════════════════════════════════════
 POSITIONING — never cover the subject's face
 ══════════════════════════════════════════════════════════
-Short form (portrait 1080 × 1920):
-  Safe zones → y_pct 0–12 (above the head) or y_pct 72–88 (below
-  the chin). Avoid y_pct 12–72 — the face lives there.
-  For checklist and stat_circle the renderer anchors them to the
-  upper zone automatically; you do not need to set y for those.
-Long form (landscape 1920 × 1080):
-  Safe zones → x_pct 0–10 (left band) or x_pct 62–95 (right band).
-  The face is usually at x_pct 20–60.
+The user message will contain a "SUBJECT POSITION" block with the
+exact y_pct safe zones detected by Claude Vision for THIS video.
+Use those coordinates — they override any generic defaults below.
+
+Generic fallbacks (when no vision data is available):
+  Portrait 1080 × 1920 → safe: y_pct ≤ 10 or y_pct ≥ 72.
+  Landscape 1920 × 1080 → safe: x_pct ≤ 10 or x_pct ≥ 62.
+For checklist and stat_circle the renderer anchors them to the
+upper zone automatically; you do not need to set y for those.
 
 ══════════════════════════════════════════════════════════
 text_overlay — the universal primitive
