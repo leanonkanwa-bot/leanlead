@@ -27,6 +27,13 @@ from typing import Iterable, Sequence
 from PIL import Image, ImageDraw, ImageFont
 
 
+AESTHETIC_COLORS: dict[str, dict] = {
+    "dark-pro":    {"accent": "#0A84FF", "bg": (10, 10, 10, 255),   "text": (255, 255, 255, 255), "secondary": (142, 142, 147, 255)},
+    "high-energy": {"accent": "#FF3B30", "bg": (10, 10, 10, 255),   "text": (255, 255, 255, 255), "secondary": (255, 229,   0, 255)},
+    "faith-gold":  {"accent": "#D4AF37", "bg": (27, 34, 56,  255),  "text": (255, 248, 231, 255), "secondary": (180, 160, 100, 255)},
+}
+
+
 # Brand palette — kept in sync with the front-end picker.
 PALETTE = {
     "blue":      (10, 132, 255, 255),    # Electric Blue  #0A84FF
@@ -377,6 +384,368 @@ def render_text_overlay(
 
 
 # ---------------------------------------------------------------------------
+# Graphic 5 — Quote Card (full-frame inspirational quote)
+# ---------------------------------------------------------------------------
+
+def render_quote_card(
+    quote: str,
+    speaker: str | None,
+    out_path: Path,
+    *,
+    target_w: int,
+    target_h: int,
+    accent_hex: str = "#0A84FF",
+    bg_rgba: tuple[int, int, int, int] = (10, 10, 10, 255),
+    text_rgba: tuple[int, int, int, int] = (255, 255, 255, 255),
+) -> Path:
+    img = Image.new("RGBA", (target_w, target_h), bg_rgba)
+    draw = ImageDraw.Draw(img)
+    accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
+
+    quote_font_size = int(target_h * 0.055)
+    speaker_font_size = int(target_h * 0.035)
+    deco_font_size = int(target_h * 0.15)
+
+    deco_font = _load_font("Poppins-Bold", deco_font_size)
+    quote_font = _load_font("Poppins-SemiBold", quote_font_size)
+    speaker_font = _load_font("Poppins-Bold", speaker_font_size)
+
+    pad = int(target_w * 0.08)
+    deco_x, deco_y = pad, int(target_h * 0.08)
+    draw.text((deco_x, deco_y), "“", font=deco_font, fill=accent)
+
+    max_quote_w = int(target_w * 0.84)
+    lines = _wrap_text_to_width(quote or "", quote_font, max_quote_w)
+    ascent, descent = quote_font.getmetrics()
+    line_h = ascent + descent
+    block_h = line_h * len(lines) + 8 * max(0, len(lines) - 1)
+    block_y = (target_h - block_h) // 2
+
+    for ln in lines:
+        lw, _ = _text_size(quote_font, ln)
+        draw.text(((target_w - lw) // 2, block_y), ln, font=quote_font, fill=text_rgba)
+        block_y += line_h + 8
+
+    if speaker:
+        sw, sh = _text_size(speaker_font, speaker)
+        draw.text(
+            ((target_w - sw) // 2, target_h - int(target_h * 0.12)),
+            speaker, font=speaker_font, fill=accent,
+        )
+
+    img.save(out_path, "PNG")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Graphic 6 — Split Screen (wrong/right, before/after comparison)
+# ---------------------------------------------------------------------------
+
+def render_split_screen(
+    left_text: str,
+    right_text: str,
+    out_path: Path,
+    *,
+    target_w: int,
+    target_h: int,
+    left_label: str = "WRONG",
+    right_label: str = "RIGHT",
+    accent_hex: str = "#0A84FF",
+    bg_rgba: tuple[int, int, int, int] = (10, 10, 10, 255),
+    text_rgba: tuple[int, int, int, int] = (255, 255, 255, 255),
+) -> Path:
+    img = Image.new("RGBA", (target_w, target_h), bg_rgba)
+    draw = ImageDraw.Draw(img)
+
+    half = target_w // 2
+    label_font_size = int(target_h * 0.08)
+    body_font_size = int(target_h * 0.06)
+    label_font = _load_font("Poppins-Bold", label_font_size)
+    body_font = _load_font("Poppins-Bold", body_font_size)
+
+    red_tint = Image.new("RGBA", (half, target_h), (200, 30, 30, 50))
+    img.paste(Image.alpha_composite(img.crop((0, 0, half, target_h)), red_tint), (0, 0))
+
+    green_tint = Image.new("RGBA", (half, target_h), (30, 180, 60, 50))
+    img.paste(Image.alpha_composite(img.crop((half, 0, target_w, target_h)), green_tint), (half, 0))
+
+    draw = ImageDraw.Draw(img)
+
+    lw, _ = _text_size(label_font, left_label)
+    draw.text(((half - lw) // 2, int(target_h * 0.08)), left_label, font=label_font, fill=(255, 80, 80, 255))
+
+    rw, _ = _text_size(label_font, right_label)
+    draw.text((half + (half - rw) // 2, int(target_h * 0.08)), right_label, font=label_font, fill=(60, 210, 80, 255))
+
+    max_half_w = int(half * 0.8)
+    for side_x_base, text in [(0, left_text), (half, right_text)]:
+        lines = _wrap_text_to_width(text or "", body_font, max_half_w)
+        ascent, descent = body_font.getmetrics()
+        lh = ascent + descent
+        block_h = lh * len(lines) + 8 * max(0, len(lines) - 1)
+        by = (target_h - block_h) // 2
+        for ln in lines:
+            lw2, _ = _text_size(body_font, ln)
+            draw.text((side_x_base + (half - lw2) // 2, by), ln, font=body_font, fill=text_rgba)
+            by += lh + 8
+
+    divider_x = target_w // 2
+    draw.line([(divider_x, 0), (divider_x, target_h)], fill=(255, 255, 255, 180), width=3)
+
+    vs_font = _load_font("Poppins-Bold", int(target_h * 0.045))
+    vs_text = "VS"
+    vsw, vsh = _text_size(vs_font, vs_text)
+    pill_pad = 16
+    pill_x = divider_x - vsw // 2 - pill_pad
+    pill_y = target_h // 2 - vsh // 2 - pill_pad
+    _rounded_rect(draw, (pill_x, pill_y, pill_x + vsw + pill_pad * 2, pill_y + vsh + pill_pad * 2),
+                  radius=20, fill=(40, 40, 40, 240))
+    draw.text((divider_x - vsw // 2, target_h // 2 - vsh // 2), vs_text, font=vs_font, fill=(255, 255, 255, 255))
+
+    img.save(out_path, "PNG")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Graphic 7 — Timeline (horizontal with dots and labels)
+# ---------------------------------------------------------------------------
+
+def render_timeline(
+    events: list[dict],
+    out_path: Path,
+    *,
+    target_w: int,
+    target_h: int,
+    accent_hex: str = "#0A84FF",
+    text_rgba: tuple[int, int, int, int] = (255, 255, 255, 255),
+) -> Path:
+    img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
+
+    if not events:
+        img.save(out_path, "PNG")
+        return out_path
+
+    label_font = _load_font("Poppins-Bold", int(target_h * 0.1))
+    year_font = _load_font("Poppins-SemiBold", int(target_h * 0.09))
+
+    pad_x = int(target_w * 0.08)
+    line_y = target_h // 2
+    usable_w = target_w - pad_x * 2
+    n = len(events)
+    dot_r = int(target_h * 0.06)
+    active_r = int(target_h * 0.09)
+
+    draw.line([(pad_x, line_y), (target_w - pad_x, line_y)], fill=(100, 100, 100, 200), width=4)
+
+    for idx, ev in enumerate(events):
+        x = pad_x + int(usable_w * idx / max(1, n - 1)) if n > 1 else target_w // 2
+        is_last = idx == n - 1
+        r = active_r if is_last else dot_r
+
+        if is_last:
+            for g in range(3, 0, -1):
+                glow_r = r + g * 6
+                glow_a = 40 - g * 10
+                draw.ellipse((x - glow_r, line_y - glow_r, x + glow_r, line_y + glow_r),
+                              fill=(*accent[:3], glow_a))
+            draw.ellipse((x - r, line_y - r, x + r, line_y + r), fill=accent)
+        else:
+            draw.ellipse((x - r, line_y - r, x + r, line_y + r), fill=(255, 255, 255, 220))
+
+        year_text = str(ev.get("year", ""))
+        if year_text:
+            yw, yh = _text_size(year_font, year_text)
+            draw.text((x - yw // 2, line_y - r - yh - 8), year_text, font=year_font, fill=text_rgba)
+
+        label_text = str(ev.get("label", ""))
+        if label_text:
+            lw2, lh = _text_size(label_font, label_text)
+            draw.text((x - lw2 // 2, line_y + r + 8), label_text, font=label_font, fill=text_rgba)
+
+    img.save(out_path, "PNG")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Graphic 8 — Versus (two-card head-to-head)
+# ---------------------------------------------------------------------------
+
+def render_versus(
+    left_name: str,
+    right_name: str,
+    out_path: Path,
+    *,
+    target_w: int,
+    target_h: int,
+    accent_hex: str = "#0A84FF",
+    bg_rgba: tuple[int, int, int, int] = (10, 10, 10, 255),
+    text_rgba: tuple[int, int, int, int] = (255, 255, 255, 255),
+    left_icon: str = "",
+    right_icon: str = "",
+) -> Path:
+    img = Image.new("RGBA", (target_w, target_h), bg_rgba)
+    draw = ImageDraw.Draw(img)
+    accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
+
+    card_w = int(target_w * 0.42)
+    card_h = int(target_h * 0.55)
+    card_y = (target_h - card_h) // 2
+    left_x = int(target_w * 0.03)
+    right_x = target_w - left_x - card_w
+    radius = int(card_h * 0.06)
+
+    _rounded_rect(draw, (left_x, card_y, left_x + card_w, card_y + card_h),
+                  radius=radius, fill=(30, 30, 35, 240), outline=(80, 80, 90, 200), outline_width=2)
+    _rounded_rect(draw, (right_x, card_y, right_x + card_w, card_y + card_h),
+                  radius=radius, fill=(35, 35, 40, 240), outline=accent, outline_width=3)
+
+    name_font = _load_font("Poppins-Bold", int(target_h * 0.065))
+    for cx, name in [(left_x + card_w // 2, left_name), (right_x + card_w // 2, right_name)]:
+        nw, nh = _text_size(name_font, name)
+        draw.text((cx - nw // 2, card_y + card_h // 2 - nh // 2), name, font=name_font, fill=text_rgba)
+
+    vs_font = _load_font("Poppins-Bold", int(target_h * 0.07))
+    vs_cx = target_w // 2
+    vs_text = "VS"
+    vsw, vsh = _text_size(vs_font, vs_text)
+    for off in [(2, 2), (-2, -2), (2, -2), (-2, 2)]:
+        draw.text((vs_cx - vsw // 2 + off[0], target_h // 2 - vsh // 2 + off[1]),
+                  vs_text, font=vs_font, fill=(*accent[:3], 80))
+    draw.text((vs_cx - vsw // 2, target_h // 2 - vsh // 2), vs_text, font=vs_font, fill=accent)
+
+    img.save(out_path, "PNG")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Graphic 9 — Notification Banner (iPhone-style)
+# ---------------------------------------------------------------------------
+
+def render_notification(
+    title: str,
+    body: str,
+    app_name: str,
+    out_path: Path,
+    *,
+    target_w: int,
+    target_h: int,
+    accent_hex: str = "#0A84FF",
+) -> Path:
+    banner_w = int(target_w * 0.9)
+    banner_h = int(target_h * 0.15)
+    img = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
+
+    bx = (target_w - banner_w) // 2
+    by = 0
+    _rounded_rect(draw, (bx, by, bx + banner_w, by + banner_h),
+                  radius=int(banner_h * 0.15), fill=(28, 28, 30, 240))
+
+    icon_r = int(banner_h * 0.28)
+    icon_cx = bx + int(banner_h * 0.38)
+    icon_cy = by + banner_h // 2
+    draw.ellipse((icon_cx - icon_r, icon_cy - icon_r, icon_cx + icon_r, icon_cy + icon_r), fill=accent)
+    icon_font = _load_font("Poppins-Bold", icon_r)
+    letter = (app_name or "A")[:1].upper()
+    lw, lh = _text_size(icon_font, letter)
+    draw.text((icon_cx - lw // 2, icon_cy - lh // 2), letter, font=icon_font, fill=(255, 255, 255, 255))
+
+    text_x = icon_cx + icon_r + 16
+    app_font = _load_font("Poppins-Bold", int(banner_h * 0.18))
+    title_font = _load_font("Poppins-Bold", int(banner_h * 0.2))
+    body_font = _load_font("Poppins-SemiBold", int(banner_h * 0.17))
+
+    aw, ah = _text_size(app_font, app_name or "")
+    draw.text((text_x, by + int(banner_h * 0.1)), app_name or "", font=app_font, fill=(160, 160, 165, 255))
+    draw.text((text_x, by + int(banner_h * 0.28)), title or "", font=title_font, fill=(255, 255, 255, 255))
+    draw.text((text_x, by + int(banner_h * 0.55)), body or "", font=body_font, fill=(190, 190, 195, 255))
+
+    img.save(out_path, "PNG")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Graphic 10 — Typography Broll (big word + orbiting supporting words)
+# ---------------------------------------------------------------------------
+
+def render_typography_broll(
+    word: str,
+    supporting_words: list[str],
+    out_path: Path,
+    *,
+    target_w: int,
+    target_h: int,
+    accent_hex: str = "#0A84FF",
+    bg_rgba: tuple[int, int, int, int] = (10, 10, 10, 255),
+) -> Path:
+    img = Image.new("RGBA", (target_w, target_h), bg_rgba)
+    draw = ImageDraw.Draw(img)
+    accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
+
+    main_font_size = int(target_h * 0.25)
+    main_font = _load_font("Poppins-Bold", main_font_size)
+    mw, mh = _text_size(main_font, word or "")
+    draw.text(((target_w - mw) // 2, (target_h - mh) // 2), word or "", font=main_font, fill=accent)
+
+    sup_font = _load_font("Poppins-SemiBold", int(target_h * 0.045))
+    positions = [
+        (0.15, 0.2), (0.75, 0.18), (0.08, 0.6), (0.78, 0.65), (0.4, 0.12), (0.42, 0.82),
+    ]
+    for idx, sw_text in enumerate(supporting_words or []):
+        if idx >= len(positions):
+            break
+        px_pct, py_pct = positions[idx]
+        sw_w, sw_h = _text_size(sup_font, sw_text)
+        draw.text((int(target_w * px_pct), int(target_h * py_pct)), sw_text, font=sup_font,
+                  fill=(180, 180, 180, 200))
+
+    img.save(out_path, "PNG")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
+# Graphic 11 — Money Counter (large formatted number display)
+# ---------------------------------------------------------------------------
+
+def render_money_counter(
+    amount: float | int,
+    currency_symbol: str,
+    out_path: Path,
+    *,
+    target_w: int,
+    target_h: int,
+    positive: bool = True,
+) -> Path:
+    img = Image.new("RGBA", (target_w, target_h), (10, 10, 10, 255))
+    draw = ImageDraw.Draw(img)
+    color = (48, 209, 88, 255) if positive else (255, 59, 48, 255)
+
+    try:
+        formatted = f"{int(amount):,}"
+    except (TypeError, ValueError):
+        formatted = str(amount)
+
+    num_font_size = int(target_h * 0.18)
+    num_font = _load_font("Poppins-Bold", num_font_size)
+    cur_font = _load_font("Poppins-Bold", int(num_font_size * 0.65))
+
+    nw, nh = _text_size(num_font, formatted)
+    cw, ch = _text_size(cur_font, currency_symbol or "")
+    total_w = cw + 8 + nw
+    start_x = (target_w - total_w) // 2
+    baseline_y = (target_h - nh) // 2
+
+    draw.text((start_x, baseline_y + nh - ch), currency_symbol or "", font=cur_font, fill=color)
+    draw.text((start_x + cw + 8, baseline_y), formatted, font=num_font, fill=color)
+
+    img.save(out_path, "PNG")
+    return out_path
+
+
+# ---------------------------------------------------------------------------
 # Dispatcher — turn one motion_graphic JSON into a rendered PNG + position.
 # ---------------------------------------------------------------------------
 
@@ -411,6 +780,7 @@ def render_motion_graphic(
     target_w: int,
     target_h: int,
     accent_hex: str = "#0A84FF",
+    aesthetic: str = "dark-pro",
 ) -> RenderedGraphic | None:
     """Render one motion_graphic spec to a PNG + return its placement.
 
@@ -427,6 +797,11 @@ def render_motion_graphic(
     bg_card = (spec.get("bg_card") or "").lower()
     if bg_card not in ("black", "white"):
         bg_card = ""
+
+    preset_colors = AESTHETIC_COLORS.get(aesthetic, AESTHETIC_COLORS["dark-pro"])
+    accent_hex = accent_hex or preset_colors["accent"]
+    preset_bg = preset_colors["bg"]
+    preset_text = preset_colors["text"]
 
     if kind == "lower_third" or kind == "fly_in":
         # fly_in degrades into a lower-third title — same visual, same intent.
@@ -556,6 +931,106 @@ def render_motion_graphic(
             x_expr=x_expr, y_expr=y_expr, kind=kind, bg_card=bg_card,
         )
 
-    # Unsupported kinds (split, quote, highlight, flow, arrow_callout) —
-    # the agent still plans them, the renderer just doesn't draw them yet.
+    if kind in ("quote_card", "quote"):
+        quote = str(spec.get("text") or spec.get("quote") or "").strip()
+        speaker = str(spec.get("speaker") or "").strip() or None
+        if not quote:
+            return None
+        render_quote_card(quote, speaker, png,
+                          target_w=target_w, target_h=target_h,
+                          accent_hex=accent_hex, bg_rgba=preset_bg, text_rgba=preset_text)
+        if bg_card:
+            _apply_bg_card(png, bg_card)
+        return RenderedGraphic(
+            png=png, at=at, duration=duration,
+            x_expr="0", y_expr="0", kind=kind, bg_card=bg_card,
+        )
+
+    if kind in ("split_screen", "split"):
+        left = str(spec.get("left") or "").strip()
+        right = str(spec.get("right") or "").strip()
+        left_label = str(spec.get("left_label") or "WRONG").strip()
+        right_label = str(spec.get("right_label") or "RIGHT").strip()
+        render_split_screen(left, right, png,
+                            target_w=target_w, target_h=target_h,
+                            left_label=left_label, right_label=right_label,
+                            accent_hex=accent_hex, bg_rgba=preset_bg, text_rgba=preset_text)
+        if bg_card:
+            _apply_bg_card(png, bg_card)
+        return RenderedGraphic(
+            png=png, at=at, duration=duration,
+            x_expr="0", y_expr="0", kind=kind, bg_card=bg_card,
+        )
+
+    if kind == "timeline":
+        events = spec.get("events") or []
+        render_timeline(events, png,
+                        target_w=target_w, target_h=int(target_h * 0.4),
+                        accent_hex=accent_hex, text_rgba=preset_text)
+        if bg_card:
+            _apply_bg_card(png, bg_card)
+        return RenderedGraphic(
+            png=png, at=at, duration=duration,
+            x_expr="0", y_expr="(H-h)/2", kind=kind, bg_card=bg_card,
+        )
+
+    if kind == "versus":
+        left = str(spec.get("left") or "").strip()
+        right = str(spec.get("right") or "").strip()
+        render_versus(left, right, png,
+                      target_w=target_w, target_h=target_h,
+                      accent_hex=accent_hex, bg_rgba=preset_bg, text_rgba=preset_text)
+        if bg_card:
+            _apply_bg_card(png, bg_card)
+        return RenderedGraphic(
+            png=png, at=at, duration=duration,
+            x_expr="0", y_expr="0", kind=kind, bg_card=bg_card,
+        )
+
+    if kind == "notification":
+        title = str(spec.get("title") or "").strip()
+        body = str(spec.get("body") or "").strip()
+        app_name = str(spec.get("app_name") or "").strip()
+        render_notification(title, body, app_name, png,
+                            target_w=target_w, target_h=target_h,
+                            accent_hex=accent_hex)
+        if bg_card:
+            _apply_bg_card(png, bg_card)
+        return RenderedGraphic(
+            png=png, at=at, duration=duration,
+            x_expr="0", y_expr=f"H*0.06", kind=kind, bg_card=bg_card,
+        )
+
+    if kind in ("typography_broll", "typo_broll"):
+        word = str(spec.get("text") or "").strip()
+        words = spec.get("words") or []
+        if not word:
+            return None
+        render_typography_broll(word, words, png,
+                                target_w=target_w, target_h=target_h,
+                                accent_hex=accent_hex, bg_rgba=preset_bg)
+        if bg_card:
+            _apply_bg_card(png, bg_card)
+        return RenderedGraphic(
+            png=png, at=at, duration=duration,
+            x_expr="0", y_expr="0", kind=kind, bg_card=bg_card,
+        )
+
+    if kind in ("money_counter", "counter"):
+        try:
+            amount = float(spec.get("to") or spec.get("amount") or 0)
+        except (TypeError, ValueError):
+            return None
+        currency = str(spec.get("currency") or "$")
+        positive = bool(spec.get("positive", True))
+        render_money_counter(amount, currency, png,
+                             target_w=target_w, target_h=target_h,
+                             positive=positive)
+        if bg_card:
+            _apply_bg_card(png, bg_card)
+        return RenderedGraphic(
+            png=png, at=at, duration=duration,
+            x_expr="0", y_expr="0", kind=kind, bg_card=bg_card,
+        )
+
     return None

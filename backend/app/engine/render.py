@@ -25,7 +25,7 @@ from typing import Any
 
 from app.agent.planner import EditPlan
 from app.engine.captions import WordTiming, build_ass
-from app.engine.graphics import render_motion_graphic
+from app.engine.graphics import AESTHETIC_COLORS, render_motion_graphic
 
 
 SHORT_PAD_S = 0.05   # 50ms — tight, energetic
@@ -444,7 +444,19 @@ def render(
         broll_windows=remapped_broll,
     )
 
-    z_expr, xy_expr = _build_zoom_expression(remapped_zoom, total_duration, fps=fps)
+    face_cx_pct = 50.0
+    face_cy_pct = 50.0
+    if subject_position:
+        fl = subject_position.get("face_left_pct", 25.0)
+        fr = subject_position.get("face_right_pct", 75.0)
+        ft = subject_position.get("face_top_pct", 15.0)
+        fb = subject_position.get("face_bottom_pct", 65.0)
+        face_cx_pct = (fl + fr) / 2
+        face_cy_pct = (ft + fb) / 2
+    z_expr, xy_expr = _build_zoom_expression(
+        remapped_zoom, total_duration, fps=fps,
+        face_cx_pct=face_cx_pct, face_cy_pct=face_cy_pct,
+    )
     x_expr, y_expr = xy_expr.split(";")
     total_frames = max(1, int(total_duration * fps))
 
@@ -456,7 +468,8 @@ def render(
     # Then chain them as overlays in the final filter graph. Anything we
     # don't yet execute (split, quote, highlight, flow, arrow_callout) is
     # left in the JSON output as a brief — we don't fail.
-    accent_for_graphics = brand_color or "#0A84FF"
+    preset_colors = AESTHETIC_COLORS.get(aesthetic, AESTHETIC_COLORS["dark-pro"])
+    accent_for_graphics = brand_color or preset_colors["accent"]
     graphics_dir = work_dir / "graphics"
     rendered_graphics: list[Any] = []
     for i, mg in enumerate(plan.motion_graphics or []):
@@ -484,6 +497,7 @@ def render(
             spec, graphics_dir, i,
             target_w=target_w, target_h=target_h,
             accent_hex=accent_for_graphics,
+            aesthetic=aesthetic,
         )
         if rg is not None:
             rendered_graphics.append(rg)

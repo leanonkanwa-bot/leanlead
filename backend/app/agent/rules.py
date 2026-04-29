@@ -525,14 +525,40 @@ Rules the JSON must obey:
 """
 
 
+_AESTHETIC_PRESETS = {
+    "dark-pro": (
+        "dark-pro — Apple/tech/finance feel.\n"
+        "  accent: #0A84FF (electric blue), dark bg, white text.\n"
+        "  Style: premium, precise, calm authority. Use stat_circle and lower_third heavily.\n"
+        "  Avoid chaos — every graphic earns its place with clarity."
+    ),
+    "high-energy": (
+        "high-energy — Hormozi/sales/motivation feel.\n"
+        "  accent: #FF3B30 (red), secondary: #FFE500 (yellow), black bg, white text.\n"
+        "  Style: aggressive, punchy, results-driven. Use checklist with ✗/✓, split_screen, money_counter.\n"
+        "  Every graphic should feel like a punch — no subtlety."
+    ),
+    "faith-gold": (
+        "faith-gold — spiritual/faith content feel.\n"
+        "  accent: #D4AF37 (gold), navy bg #1B2238, cream text #FFF8E7.\n"
+        "  Style: reverent, warm, timeless. Use quote_card for scripture/principle moments.\n"
+        "  Use typography_broll for power words. Avoid aggressive red/yellow elements."
+    ),
+}
+
+
 def system_prompt(
     format_hint: str | None = None,
     brand_color: str | None = None,
     caption_color: str | None = None,
     caption_position: str | None = None,
     caption_font: str | None = None,
+    aesthetic: str = "dark-pro",
 ) -> str:
     blocks = [CORE_VOICE]
+
+    preset_desc = _AESTHETIC_PRESETS.get(aesthetic, _AESTHETIC_PRESETS["dark-pro"])
+    blocks.append(f"AESTHETIC PRESET — {preset_desc}")
 
     if any([brand_color, caption_color, caption_position, caption_font]):
         ctx = ["USER STYLE CONTEXT"]
