@@ -130,24 +130,25 @@ def _cut_segment(
         f"afade=t=out:st={fade_out_start:.3f}:d={AUDIO_FADE_S}"
     )
     vf = (
-        f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+        f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase"
+        f":flags=fast_bilinear,"
         f"crop={target_w}:{target_h},fps={fps}"
     )
-    # Light flags for the per-segment cut: ultrafast preset + CRF 22 +
-    # single thread. Keeps the per-segment encoder under ~80 MB of RAM
-    # so it survives on a small dyno. The final pass (zoompan + subs)
-    # is what controls the user-facing quality.
+    # Intermediate segments are re-encoded in the final zoompan+subs pass,
+    # so quality here doesn't affect the output. Use CRF 35 + strict memory
+    # caps. Most importantly: no +faststart (moov-atom rewrite buffers the
+    # entire mdat, doubling peak RSS on large videos → SIGKILL on small dynos).
     _run([
         "ffmpeg", "-y", "-loglevel", "error",
         "-ss", f"{start:.3f}", "-i", str(src),
         "-t", f"{duration:.3f}",
         "-vf", vf,
         "-af", af,
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "22",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "35",
+        "-x264-params", "rc-lookahead=0:bframes=0:ref=1:no-mbtree=1:sync-lookahead=0",
         "-threads", "1",
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
-        "-movflags", "+faststart",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
         str(dst),
     ])
 
@@ -498,6 +499,7 @@ def render(
             target_w=target_w, target_h=target_h,
             accent_hex=accent_for_graphics,
             aesthetic=aesthetic,
+            subject_pos=subject_position,
         )
         if rg is not None:
             rendered_graphics.append(rg)
