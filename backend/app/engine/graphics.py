@@ -998,7 +998,7 @@ def render_motion_graphic(
             _apply_bg_card(png, bg_card)
         return RenderedGraphic(
             png=png, at=at, duration=duration,
-            x_expr="0", y_expr=f"H*0.06", kind=kind, bg_card=bg_card,
+            x_expr="0", y_expr="H*0.06", kind=kind, bg_card=bg_card,
         )
 
     if kind in ("typography_broll", "typo_broll"):

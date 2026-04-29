@@ -243,6 +243,28 @@ money_counter) render at x=0, y=0 and fill the frame — use sparingly
 so they don't cover the speaker for too long.
 
 ══════════════════════════════════════════════════════════
+TIMING — appear AFTER the words are spoken, never before
+══════════════════════════════════════════════════════════
+Set `at` to 0.5–1.5 s AFTER the relevant sentence or key word
+STARTS being spoken — never at or before it.
+The viewer must hear the idea first, then see the graphic that
+reinforces it. A graphic that pops before the speaker says the word
+feels like a spoiler and breaks the rhythm.
+
+══════════════════════════════════════════════════════════
+POSITIONING — never cover the subject's face
+══════════════════════════════════════════════════════════
+The user message will contain a "SUBJECT POSITION" block with the
+exact y_pct safe zones detected by Claude Vision for THIS video.
+Use those coordinates — they override any generic defaults below.
+
+Generic fallbacks (when no vision data is available):
+  Portrait 1080 × 1920 → safe: y_pct ≤ 10 or y_pct ≥ 72.
+  Landscape 1920 × 1080 → safe: x_pct ≤ 10 or x_pct ≥ 62.
+For checklist and stat_circle the renderer anchors them to the
+upper zone automatically; you do not need to set y for those.
+
+══════════════════════════════════════════════════════════
 text_overlay — the universal primitive
 ══════════════════════════════════════════════════════════
 Place arbitrary text anywhere on the frame, with the font, size,
@@ -260,8 +282,9 @@ Schema:
     slide_in: "left" | "right" | "none" }
 
 `size` is a PERCENTAGE of the frame's shorter dimension (1080 on both
-short and long form). size: 15 → 162 px. Keep x_pct ≤ 10 or ≥ 62 and
-y_pct ≤ 12 or ≥ 72 to stay off the face.
+short and long form). size: 15 → 162 px — readable but not overwhelming.
+Use `\\n` to break lines manually; use `max_width_pct` for soft wrap.
+Keep x_pct ≤ 10 or ≥ 62 and y_pct ≤ 12 or ≥ 72 to stay off the face.
 
 ══════════════════════════════════════════════════════════
 templates — for common shapes
