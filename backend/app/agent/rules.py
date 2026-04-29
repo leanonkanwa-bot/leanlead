@@ -223,6 +223,27 @@ templates (lower_third, stat_circle, checklist). Use the templates
 when they fit; use text_overlay for everything else. Mix them freely.
 
 ══════════════════════════════════════════════════════════
+TIMING — appear AFTER the words are spoken, never before
+══════════════════════════════════════════════════════════
+Set `at` to 0.5–1.5 s AFTER the relevant sentence or key word
+STARTS being spoken — never at or before it.
+The viewer must hear the idea first, then see the graphic that
+reinforces it. A graphic that pops before the speaker says the word
+feels like a spoiler and breaks the rhythm.
+
+══════════════════════════════════════════════════════════
+POSITIONING — never cover the subject's face
+══════════════════════════════════════════════════════════
+Short form (portrait 1080 × 1920):
+  Safe zones → y_pct 0–12 (above the head) or y_pct 72–88 (below
+  the chin). Avoid y_pct 12–72 — the face lives there.
+  For checklist and stat_circle the renderer anchors them to the
+  upper zone automatically; you do not need to set y for those.
+Long form (landscape 1920 × 1080):
+  Safe zones → x_pct 0–10 (left band) or x_pct 62–95 (right band).
+  The face is usually at x_pct 20–60.
+
+══════════════════════════════════════════════════════════
 text_overlay — the universal primitive
 ══════════════════════════════════════════════════════════
 Place arbitrary text anywhere on the frame, with the font, size,
@@ -232,18 +253,19 @@ add a side label, drop a thought bubble, mark a transition, etc.
 
 Schema:
   { at, duration, kind: "text_overlay",
-    text: "Don't automate what you\\ncan't do manually",
+    text: "Dev Team\\n+ Maintenance\\n= Drag",
     font: "Poppins Bold" | "Bebas Neue" | …      // any allowed font
-    size: 64,                                     // px
+    size: 15,                                     // % of frame short edge
     color: "#FFFFFF",                             // any hex
     align: "left" | "center" | "right",
-    x_pct: 6, y_pct: 30,                          // % of frame WxH
-    max_width_pct: 50,                            // soft-wrap width
+    x_pct: 5, y_pct: 8,                          // % of frame WxH
+    max_width_pct: 25,                            // soft-wrap at 25% frame width
     slide_in: "left" | "right" | "none" }
 
+`size` is a PERCENTAGE of the frame's shorter dimension (1080 on both
+short and long form). size: 15 → 162 px — readable but not overwhelming.
 Use `\\n` to break lines manually; use `max_width_pct` for soft wrap.
-Defaults are sensible (Poppins Bold 80px white, 6%/12%, slide-in
-left, max 50% width).
+Keep x_pct ≤ 10 or ≥ 62 and y_pct ≤ 12 or ≥ 72 to stay off the face.
 
 ══════════════════════════════════════════════════════════
 templates — for common shapes
@@ -401,8 +423,11 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
 
   "motion_graphics": [
     { "at": <s>, "duration": <s>,
-      "kind": "count_up"|"fly_in"|"split"|"quote"|"highlight",
-      "text": "<for fly_in / quote>",
+      "kind": "count_up"|"fly_in"|"split"|"quote"|"highlight"|"text_overlay"|"checklist",
+      "text": "<for fly_in / text_overlay / quote>",
+      "size": 15,                              /* text_overlay: % of frame short edge */
+      "x_pct": 5, "y_pct": 8,                 /* text_overlay: stay ≤12 or ≥72 on y */
+      "max_width_pct": 25,                     /* text_overlay: wrap at 25% frame width */
       "from": <number>, "to": <number>,        /* count_up only */
       "left": "<text>", "right": "<text>",     /* split only */
       "lines": ["<word>", "<word>"],           /* quote only */

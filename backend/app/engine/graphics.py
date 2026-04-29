@@ -94,6 +94,26 @@ def _text_size(font: ImageFont.FreeTypeFont, text: str) -> tuple[int, int]:
     return (bbox[2] - bbox[0], bbox[3] - bbox[1])
 
 
+def _wrap_text_to_width(text: str, font: ImageFont.FreeTypeFont, max_px: int) -> list[str]:
+    """Word-wrap `text` so each line fits within max_px. Single words wider
+    than max_px are kept on their own line rather than broken mid-word."""
+    words = (text or "").split()
+    if not words:
+        return [""]
+    lines: list[str] = []
+    cur = ""
+    for w in words:
+        trial = (cur + " " + w).strip()
+        if _text_size(font, trial)[0] <= max_px or not cur:
+            cur = trial
+        else:
+            lines.append(cur)
+            cur = w
+    if cur:
+        lines.append(cur)
+    return lines or [""]
+
+
 # ---------------------------------------------------------------------------
 # Graphic 1 — Lower Third Title
 # ---------------------------------------------------------------------------
@@ -104,25 +124,43 @@ def render_lower_third(
     out_path: Path,
     *,
     width: int = 900,
+    max_text_width: int | None = None,
     accent_hex: str = "#0A84FF",
     font_title: str = "Poppins-Bold",
     font_subtitle: str = "Poppins-SemiBold",
 ) -> Path:
-    """Title with optional accent (coloured) second line, plus a sparkle +
-    subtitle. Matches the 'Building Your / Content Machine' reference.
-    Slide-in is done by ffmpeg overlay; this PNG is the final state."""
-    height = 360 if accent_word else 200
-    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
+    """Title with optional accent (coloured) second line.
+    Text is word-wrapped to max_text_width so it never overflows the frame.
+    Slide-in animation is handled by ffmpeg; this PNG is the final state."""
+    if max_text_width is None:
+        max_text_width = width
 
     title_font = _load_font(font_title, 92)
     accent_color = _hex_to_rgba(accent_hex, PALETTE["blue"])
 
-    y = 0
-    draw.text((0, y), title, font=title_font, fill=PALETTE["white"])
-    if accent_word:
-        y += 110
-        draw.text((0, y), accent_word, font=title_font, fill=accent_color)
+    title_lines = _wrap_text_to_width(title, title_font, max_text_width)
+    accent_lines = (
+        _wrap_text_to_width(accent_word, title_font, max_text_width)
+        if accent_word else []
+    )
+    all_lines = title_lines + accent_lines
+
+    ascent, descent = title_font.getmetrics()
+    line_h = ascent + descent
+    line_gap = 10
+    pad = 8
+
+    height = len(all_lines) * line_h + max(0, len(all_lines) - 1) * line_gap + pad * 2
+    img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    y = pad
+    for ln in title_lines:
+        draw.text((0, y), ln, font=title_font, fill=PALETTE["white"])
+        y += line_h + line_gap
+    for ln in accent_lines:
+        draw.text((0, y), ln, font=title_font, fill=accent_color)
+        y += line_h + line_gap
 
     img.save(out_path, "PNG")
     return out_path
@@ -383,9 +421,12 @@ def render_motion_graphic(
         accent_word = (spec.get("accent_word") or "").strip() or None
         if not title:
             return None
-        render_lower_third(title, accent_word, png, accent_hex=accent_hex)
-        # Slide-in from the left, anchored to lower-left third of the frame.
+        # PNG width = frame width minus left margin and a small right gutter.
         margin_l = int(target_w * 0.06)
+        safe_w = target_w - margin_l - 32
+        render_lower_third(title, accent_word, png,
+                           width=safe_w, max_text_width=safe_w,
+                           accent_hex=accent_hex)
         anchor_y = int(target_h * 0.15)
         x_expr = (
             f"if(lt(t-{at:.3f},0.3),"
@@ -405,9 +446,9 @@ def render_motion_graphic(
             return None
         label = str(spec.get("label") or spec.get("text") or "").strip()
         render_stat_circle(value, label, None, png, accent_hex=accent_hex)
-        # Centred horizontally, slightly above frame middle.
+        # Upper zone — keeps the circle above the speaker's face.
         x_expr = f"(W-w)/2"
-        y_expr = f"(H-h)/2 - {int(target_h * 0.04)}"
+        y_expr = f"H*0.04"
         return RenderedGraphic(
             png=png, at=at, duration=duration,
             x_expr=x_expr, y_expr=y_expr, kind=kind,
@@ -418,19 +459,24 @@ def render_motion_graphic(
         if not text:
             return None
         font = _normalize_font_name(spec.get("font") or "Poppins Bold")
-        font_size = int(spec.get("size") or 80)
+        # size is a percentage of the frame's shorter edge (min of W and H).
+        # size: 15 → 15% of min(target_w, target_h). Keeps text proportional
+        # across portrait and landscape without the agent needing pixel math.
+        size_pct = float(spec.get("size") or 15)
+        font_size = max(14, int(min(target_w, target_h) * size_pct / 100))
         color = spec.get("color") or "#FFFFFF"
         align = (spec.get("align") or "left").lower()
         if align not in {"left", "center", "right"}:
             align = "left"
 
         # Position by percentage of the frame so the agent doesn't have to
-        # know the resolution. Defaults: 6% left, 12% from top.
+        # know the resolution. Defaults: 6% left, 8% from top (upper safe zone).
         x_pct = float(spec.get("x_pct", 6)) / 100.0
-        y_pct = float(spec.get("y_pct", 12)) / 100.0
+        y_pct = float(spec.get("y_pct", 8)) / 100.0
 
-        # Optional soft wrap. Default: 50% of frame width.
-        max_w_pct = float(spec.get("max_width_pct", 50)) / 100.0
+        # Soft wrap at 25% of frame width by default — keeps text blocks
+        # compact and away from the centre of the frame.
+        max_w_pct = float(spec.get("max_width_pct", 25)) / 100.0
         max_width_px = int(target_w * max_w_pct) if max_w_pct > 0 else None
 
         render_text_overlay(
@@ -483,7 +529,7 @@ def render_motion_graphic(
             return None
         render_checklist(items, png)
         x_expr = "(W-w)/2"
-        y_expr = "(H-h)/2"
+        y_expr = "H*0.04"  # upper zone — above the face area
         return RenderedGraphic(
             png=png, at=at, duration=duration,
             x_expr=x_expr, y_expr=y_expr, kind=kind,
