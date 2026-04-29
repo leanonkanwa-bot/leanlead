@@ -142,9 +142,18 @@ def render_lower_third(
     if max_text_width is None:
         max_text_width = width
 
-    title_font = _load_font(font_title, 92)
-    accent_color = _hex_to_rgba(accent_hex, PALETTE["blue"])
+    # Auto-size: reduce from 92px until every word-wrapped line fits within
+    # max_text_width. Without this, long single words clip at the PNG edge.
+    font_size = 92
+    title_font = _load_font(font_title, font_size)
+    while font_size > 28:
+        test_lines = _wrap_text_to_width(title, title_font, max_text_width)
+        if all(_text_size(title_font, ln)[0] <= max_text_width for ln in test_lines):
+            break
+        font_size = max(28, int(font_size * 0.88))
+        title_font = _load_font(font_title, font_size)
 
+    accent_color = _hex_to_rgba(accent_hex, PALETTE["blue"])
     title_lines = _wrap_text_to_width(title, title_font, max_text_width)
     accent_lines = (
         _wrap_text_to_width(accent_word, title_font, max_text_width)
@@ -256,10 +265,20 @@ def render_checklist(
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    text_font = _load_font(font_name, 84)
-
     radius = pill_height // 2
     icon_size = pill_height - 28
+    icon_x = 16
+    text_x_base = icon_x + icon_size + 36
+    text_area_w = width - text_x_base - 20  # 20px right pad
+
+    # Auto-size: reduce from 84px until the longest item text fits inside pill.
+    font_size_t = 84
+    text_font = _load_font(font_name, font_size_t)
+    if items:
+        longest = max((it.text for it in items), key=len)
+        while font_size_t > 24 and _text_size(text_font, longest)[0] > text_area_w:
+            font_size_t = max(24, int(font_size_t * 0.88))
+            text_font = _load_font(font_name, font_size_t)
 
     for i, item in enumerate(items):
         y0 = i * (pill_height + gap)
@@ -276,7 +295,6 @@ def render_checklist(
         )
 
         # Icon — filled circle in red/green with a white X or ✓.
-        icon_x = 16
         icon_y = y0 + (pill_height - icon_size) // 2
         draw.ellipse(
             (icon_x, icon_y, icon_x + icon_size, icon_y + icon_size),
@@ -685,22 +703,44 @@ def render_typography_broll(
     draw = ImageDraw.Draw(img)
     accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
 
-    main_font_size = int(target_h * 0.25)
-    main_font = _load_font("Poppins-Bold", main_font_size)
+    # Cap main word to 28% of frame width (not height). Long words like
+    # CHARACTERISTICS were bleeding off-screen when sized by height.
+    max_word_w = target_w - 80  # 40px padding each side
+    main_font_size = int(target_w * 0.28)
+    main_font = _load_font("Poppins-ExtraBold", main_font_size)
+    while main_font_size > 40:
+        mw, _ = _text_size(main_font, word or "")
+        if mw <= max_word_w:
+            break
+        main_font_size = max(40, int(main_font_size * 0.85))
+        main_font = _load_font("Poppins-ExtraBold", main_font_size)
     mw, mh = _text_size(main_font, word or "")
     draw.text(((target_w - mw) // 2, (target_h - mh) // 2), word or "", font=main_font, fill=accent)
 
-    sup_font = _load_font("Poppins-SemiBold", int(target_h * 0.045))
+    sup_font = _load_font("Poppins-SemiBold", int(target_h * 0.04))
+    # Positions that stay clear of the center (where the main word is) and
+    # avoid the face area (typically center or lower-center of frame).
+    # Only corners and top/bottom zones are used — max 3 orbit words.
     positions = [
-        (0.15, 0.2), (0.75, 0.18), (0.08, 0.6), (0.78, 0.65), (0.4, 0.12), (0.42, 0.82),
+        (0.05, 0.08), (0.72, 0.07), (0.05, 0.78),
+        (0.72, 0.80), (0.40, 0.05), (0.40, 0.88),
     ]
+    rendered_orbit = 0
     for idx, sw_text in enumerate(supporting_words or []):
-        if idx >= len(positions):
+        if rendered_orbit >= 3 or idx >= len(positions):
             break
         px_pct, py_pct = positions[idx]
         sw_w, sw_h = _text_size(sup_font, sw_text)
-        draw.text((int(target_w * px_pct), int(target_h * py_pct)), sw_text, font=sup_font,
-                  fill=(180, 180, 180, 200))
+        # Skip if this orbit word would land inside the main word's bounding box
+        ox = int(target_w * px_pct)
+        oy = int(target_h * py_pct)
+        main_x0 = (target_w - mw) // 2
+        main_y0 = (target_h - mh) // 2
+        if (main_x0 - 40 <= ox <= main_x0 + mw + 40 and
+                main_y0 - 20 <= oy <= main_y0 + mh + 20):
+            continue
+        draw.text((ox, oy), sw_text, font=sup_font, fill=(180, 180, 180, 200))
+        rendered_orbit += 1
 
     img.save(out_path, "PNG")
     return out_path
@@ -781,6 +821,7 @@ def render_motion_graphic(
     target_h: int,
     accent_hex: str = "#0A84FF",
     aesthetic: str = "dark-pro",
+    subject_pos: dict | None = None,
 ) -> RenderedGraphic | None:
     """Render one motion_graphic spec to a PNG + return its placement.
 
@@ -802,6 +843,31 @@ def render_motion_graphic(
     accent_hex = accent_hex or preset_colors["accent"]
     preset_bg = preset_colors["bg"]
     preset_text = preset_colors["text"]
+
+    # Subject-position helpers derived from Claude Vision data.
+    _sp = subject_pos or {}
+    _fl = _sp.get("face_left_pct", 25.0)
+    _fr = _sp.get("face_right_pct", 75.0)
+    _ft = _sp.get("face_top_pct", 15.0)
+    _fb = _sp.get("face_bottom_pct", 65.0)
+    _fcx = (_fl + _fr) / 2   # face center x %
+    _fcy = (_ft + _fb) / 2   # face center y %
+
+    def _safe_x_expr(graphic_w_expr: str = "w") -> str:
+        """Return the x overlay expression that puts the graphic in the
+        horizontal zone opposite to the subject."""
+        if _fcx < 40:    # subject left → graphic right
+            return f"W - {graphic_w_expr} - W*0.04"
+        if _fcx > 60:    # subject right → graphic left
+            return f"W*0.04"
+        return f"(W - {graphic_w_expr}) / 2"  # centered subject → center graphic
+
+    def _safe_y_expr() -> str:
+        """Return the y overlay expression that puts the graphic in the
+        vertical zone opposite to the subject."""
+        if _fcy < 40:    # face in top half → graphic at bottom
+            return "H*0.62"
+        return "H*0.04"  # face in bottom/center → graphic at top
 
     if kind == "lower_third" or kind == "fly_in":
         # fly_in degrades into a lower-third title — same visual, same intent.
@@ -836,9 +902,8 @@ def render_motion_graphic(
             return None
         label = str(spec.get("label") or spec.get("text") or "").strip()
         render_stat_circle(value, label, None, png, accent_hex=accent_hex)
-        # Upper zone — keeps the circle above the speaker's face.
-        x_expr = f"(W-w)/2"
-        y_expr = f"H*0.04"
+        x_expr = _safe_x_expr()
+        y_expr = _safe_y_expr()
         if bg_card:
             _apply_bg_card(png, bg_card)
         return RenderedGraphic(
@@ -921,9 +986,10 @@ def render_motion_graphic(
         items = [it for it in items if it.text]
         if not items:
             return None
-        render_checklist(items, png)
-        x_expr = "(W-w)/2"
-        y_expr = "H*0.04"  # upper zone — above the face area
+        checklist_w = min(int(target_w * 0.92), 1200)
+        render_checklist(items, png, width=checklist_w)
+        x_expr = _safe_x_expr()
+        y_expr = _safe_y_expr()
         if bg_card:
             _apply_bg_card(png, bg_card)
         return RenderedGraphic(
