@@ -36,6 +36,7 @@ const planJson = $("planJson");
     const j = await res.json();
     if (j.required && !j.authed) {
       loginCard.classList.remove("hidden");
+      document.querySelectorAll('a[href="#tool"]').forEach((a) => { a.href = "#login"; });
     } else {
       appCard.classList.remove("hidden");
     }
@@ -60,6 +61,7 @@ loginForm?.addEventListener("submit", async (e) => {
   }
   loginCard.classList.add("hidden");
   appCard.classList.remove("hidden");
+  document.querySelectorAll('a[href="#login"]').forEach((a) => { a.href = "#tool"; });
   appCard.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
@@ -88,12 +90,22 @@ videoInput.addEventListener("change", () => {
     drop.classList.add("dragover");
   })
 );
-["dragleave", "drop"].forEach((ev) =>
-  drop.addEventListener(ev, (e) => {
-    e.preventDefault();
-    drop.classList.remove("dragover");
-  })
-);
+drop.addEventListener("dragleave", (e) => {
+  e.preventDefault();
+  drop.classList.remove("dragover");
+});
+
+drop.addEventListener("drop", (e) => {
+  e.preventDefault();
+  drop.classList.remove("dragover");
+  const files = e.dataTransfer?.files;
+  if (files?.length) {
+    const dt = new DataTransfer();
+    dt.items.add(files[0]);
+    videoInput.files = dt.files;
+    videoInput.dispatchEvent(new Event("change"));
+  }
+});
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
