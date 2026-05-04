@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from app.agent.planner import FormatHint, analyze_subject_position, plan_edit
@@ -26,13 +27,16 @@ def run_job(
     aesthetic: str = "dark-pro",
 ) -> None:
     try:
+        # Run Whisper transcription and Claude Vision concurrently.
+        # Vision (~5s API call) would otherwise sit idle while Whisper runs
+        # for minutes on long videos. They are read-only on `src`, no conflict.
         store.update(job_id, status="transcribing", progress=10,
-                     message="Transcribing audio with Whisper…")
-        transcript = transcribe(src).to_dict()
-
-        store.update(job_id, status="planning", progress=35,
-                     message="Analysing subject position (vision)…")
-        subject_pos = analyze_subject_position(src)
+                     message="Transcribing audio + analysing subject position…")
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_transcript = pool.submit(lambda: transcribe(src).to_dict())
+            f_subject    = pool.submit(lambda: analyze_subject_position(src))
+            transcript  = f_transcript.result()
+            subject_pos = f_subject.result()
 
         store.update(job_id, status="planning", progress=40,
                      message="Asking the agent for an edit plan…")

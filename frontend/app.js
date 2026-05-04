@@ -65,23 +65,14 @@ loginForm?.addEventListener("submit", async (e) => {
   appCard.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
+const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB per chunk
+
 videoInput.addEventListener("change", () => {
   const f = videoInput.files?.[0];
   if (!f) return;
-  dropLabel.textContent = `${f.name} — ${(f.size / (1024 * 1024)).toFixed(1)} MB`;
+  const mb = (f.size / (1024 * 1024)).toFixed(1);
+  dropLabel.textContent = `${f.name} — ${mb} MB`;
   drop.classList.add("has-file");
-  if (f.size > 500 * 1024 * 1024) {
-    const mb = (f.size / (1024 * 1024)).toFixed(0);
-    if (!confirm(
-      `This file is ${mb} MB — over the recommended 500 MB.\n\n` +
-      `Upload alone may take 10+ minutes, then transcription + render ` +
-      `on a shared CPU can take 1–3 hours.\n\nContinue anyway?`
-    )) {
-      videoInput.value = "";
-      dropLabel.textContent = "Click or drop your raw video here";
-      drop.classList.remove("has-file");
-    }
-  }
 });
 
 ["dragenter", "dragover"].forEach((ev) =>
@@ -116,6 +107,73 @@ form.addEventListener("submit", (e) => {
   submitBtn.disabled = true;
   submitBtn.querySelector(".btn-label").textContent = "Working…";
 
+  const file = videoInput.files?.[0];
+  if (!file) return fail("No file selected.");
+
+  if (file.size > 100 * 1024 * 1024) {
+    // Large file → chunked upload (bypasses proxy body-size limits)
+    chunkedUpload(file).catch((err) => fail(String(err)));
+  } else {
+    // Small file → single-request upload with XHR progress
+    directUpload(file);
+  }
+});
+
+async function chunkedUpload(file) {
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  const totalMb = (file.size / (1024 * 1024)).toFixed(0);
+
+  // 1. Init session
+  const initRes = await fetch("/api/upload/init", {
+    method: "POST", credentials: "same-origin",
+  });
+  if (!initRes.ok) throw new Error(`Upload init failed: ${initRes.status}`);
+  const { upload_id } = await initRes.json();
+
+  // 2. Send chunks sequentially
+  for (let i = 0; i < totalChunks; i++) {
+    const chunk = file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+    const sentMb = Math.min((i * CHUNK_SIZE) / (1024 * 1024), file.size / (1024 * 1024)).toFixed(0);
+    const uiPct = Math.round(((i + 1) / totalChunks) * 25);
+    setStatus("queued", `Uploading ${sentMb} / ${totalMb} MB (chunk ${i + 1}/${totalChunks})…`, uiPct);
+    const res = await fetch(`/api/upload/chunk/${upload_id}/${i}`, {
+      method: "PUT", body: chunk, credentials: "same-origin",
+    });
+    if (!res.ok) throw new Error(`Chunk ${i} failed: ${res.status}`);
+  }
+
+  // 3. Assemble
+  setStatus("queued", "Assembling file on server…", 26);
+  const asmRes = await fetch(`/api/upload/assemble/${upload_id}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename: file.name }),
+    credentials: "same-origin",
+  });
+  if (!asmRes.ok) throw new Error(`Assembly failed: ${asmRes.status}`);
+
+  // 4. Start the edit job (no file attachment — use upload_id)
+  setStatus("queued", "Starting AI edit…", 28);
+  const fd = new FormData(form);
+  fd.delete("video");
+  fd.set("upload_id", upload_id);
+  const editRes = await fetch("/api/edit", {
+    method: "POST", body: fd, credentials: "same-origin",
+  });
+  if (editRes.status === 401) {
+    loginCard.classList.remove("hidden");
+    appCard.classList.add("hidden");
+    statusCard.classList.add("hidden");
+    submitBtn.disabled = false;
+    submitBtn.querySelector(".btn-label").textContent = "Edit my video";
+    return;
+  }
+  if (!editRes.ok) throw new Error(`Edit start failed: ${editRes.status} ${await editRes.text()}`);
+  const { job_id } = await editRes.json();
+  poll(job_id);
+}
+
+function directUpload(file) {
   // XMLHttpRequest gives us upload.onprogress; fetch doesn't.
   const xhr = new XMLHttpRequest();
   xhr.open("POST", "/api/edit");
@@ -124,18 +182,12 @@ form.addEventListener("submit", (e) => {
   let lastShown = 0;
   xhr.upload.addEventListener("progress", (ev) => {
     if (!ev.lengthComputable) return;
-    const loadedMb = ev.loaded / (1024 * 1024);
-    const totalMb = ev.total / (1024 * 1024);
-    const pctReal = ev.loaded / ev.total;
-    // Reserve 0–25% of the visual bar for upload (transcribe/plan/render fill the rest).
-    const uiPct = Math.min(25, Math.round(pctReal * 25));
+    const loadedMb = (ev.loaded / (1024 * 1024)).toFixed(0);
+    const totalMb = (ev.total / (1024 * 1024)).toFixed(0);
+    const uiPct = Math.min(25, Math.round((ev.loaded / ev.total) * 25));
     if (uiPct !== lastShown) {
       lastShown = uiPct;
-      setStatus(
-        "queued",
-        `Uploading ${loadedMb.toFixed(0)} / ${totalMb.toFixed(0)} MB`,
-        uiPct,
-      );
+      setStatus("queued", `Uploading ${loadedMb} / ${totalMb} MB`, uiPct);
     }
   });
 
@@ -166,7 +218,7 @@ form.addEventListener("submit", (e) => {
 
   const fd = new FormData(form);
   xhr.send(fd);
-});
+}
 
 async function poll(jobId) {
   let consecutive5xx = 0;
@@ -257,8 +309,18 @@ function showResult(jobId, result) {
   player.src = `/api/download/${jobId}`;
   downloadLink.href = `/api/download/${jobId}`;
   const pkg = result?.packaging || {};
-  pkgTitle.textContent = pkg.title || "—";
-  pkgThumb.textContent = pkg.thumbnail_word || "—";
+  pkgTitle.textContent = pkg.title || result?.titres_ctr?.[0] || "—";
+  pkgThumb.textContent = result?.thumbnail_mot || pkg.thumbnail_word || "—";
   pkgEnd.textContent = pkg.end_caption || "—";
+
+  // Show CTR titles if available
+  const titres = result?.titres_ctr || [];
+  if (titres.length && $("ctrTitles")) {
+    $("ctrTitles").innerHTML = titres.map((t, i) =>
+      `<div class="ctr-title"><span class="ctr-num">${i + 1}</span>${t}</div>`
+    ).join("");
+    $("ctrBlock")?.classList.remove("hidden");
+  }
+
   planJson.textContent = JSON.stringify(result?.plan ?? {}, null, 2);
 }

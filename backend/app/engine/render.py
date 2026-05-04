@@ -567,7 +567,7 @@ def render(
     cmd += [
         "-frames:v", str(total_frames),
         "-c:v", "libx264", "-preset", "superfast", "-crf", "22",
-        "-threads", "1",
+        "-threads", "2",   # Whisper is freed before this point → safe to use 2 cores
         "-x264-params", "rc-lookahead=0:bframes=0",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k",
