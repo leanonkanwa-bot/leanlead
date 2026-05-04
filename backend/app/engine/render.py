@@ -334,6 +334,7 @@ def render(
     cum = 0.0
     remapped_zoom: list[dict[str, Any]] = []
     remapped_words: list[WordTiming] = []
+    remapped_silences: list[dict[str, Any]] = []
 
     for i, seg in enumerate(keep):
         s_raw = float(seg["start"])
@@ -373,6 +374,17 @@ def render(
                         start=cum + (ws - s),
                         end=cum + (we - s),
                     ))
+
+        for sil in (plan.silences or []):
+            try:
+                sil_at = float(sil.get("at", 0))
+            except (TypeError, ValueError):
+                continue
+            if s <= sil_at <= e:
+                remapped_silences.append({
+                    **sil,
+                    "at": cum + (sil_at - s),
+                })
 
         cum += (e - s)
 
@@ -517,6 +529,19 @@ def render(
     for rg in rendered_graphics:
         cmd += ["-i", str(rg.png)]
 
+    # Build audio silence ducks: volume=0 windows before PRINCIPE/PAYOFF lines.
+    audio_duck_parts: list[str] = []
+    for sil in remapped_silences:
+        try:
+            t0 = float(sil.get("at", 0))
+            dur = max(0.1, min(0.5, float(sil.get("duration", 0.3))))
+        except (TypeError, ValueError):
+            continue
+        t1 = t0 + dur
+        audio_duck_parts.append(
+            f"volume=enable='between(t,{t0:.3f},{t1:.3f})':volume=0"
+        )
+
     if rendered_graphics:
         chain_parts: list[str] = [f"[0:v]{base_filter}[v0]"]
         for i, rg in enumerate(rendered_graphics, start=1):
@@ -529,13 +554,15 @@ def render(
             )
         last_label = f"v{len(rendered_graphics)}"
         chain_parts.append(f"[{last_label}]{ass_filter}[final]")
+        if audio_duck_parts:
+            chain_parts.append("[0:a]" + ",".join(audio_duck_parts) + "[a_out]")
         filter_complex = ";".join(chain_parts)
-        cmd += [
-            "-filter_complex", filter_complex,
-            "-map", "[final]", "-map", "0:a",
-        ]
+        cmd += ["-filter_complex", filter_complex, "-map", "[final]"]
+        cmd += ["-map", "[a_out]"] if audio_duck_parts else ["-map", "0:a"]
     else:
         cmd += ["-vf", f"{base_filter},{ass_filter}"]
+        if audio_duck_parts:
+            cmd += ["-af", ",".join(audio_duck_parts)]
 
     cmd += [
         "-frames:v", str(total_frames),

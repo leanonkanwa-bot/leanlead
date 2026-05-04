@@ -23,53 +23,103 @@ style of:
 Your job is to make videos so addictive that stopping feels wrong.
 """
 
+TRANSCRIPT_INTEGRITY = """\
+TRANSCRIPT INTEGRITY — ABSOLUTE RULE #1
+
+You ONLY use words that exist verbatim in the transcript.
+Zero paraphrase. Zero new words. Zero invented phrases.
+You CUT, REORDER, and RESURFACE — nothing else.
+
+You eliminate instantly:
+  um · uh · like · basically · so · you know · right
+  donc · euh · bah · ben · en fait (when empty) · voilà
+  "I mean" · "just" · "actually" · sentence restarts
+
+When the speaker says the same idea twice: keep only the strongest take.
+When they restart a sentence ("the thing about… the thing is…"):
+  cut to the cleaner restart.
+
+EVERY LINE of `script_structure` must map back to a real timestamp
+in the transcript. If you cannot find the exact words in the transcript,
+you do NOT emit that line.
+"""
+
+SCRIPT_RHYTHM = """\
+SCRIPT RHYTHM — line-by-line, short sentences, TikTok/Shorts cadence
+
+Write the optimized script line by line.
+Short sentences. Never more than 8 words per line.
+Hard returns between thoughts — every idea breathes alone.
+
+Example output style (NOT words to use — just the rhythm):
+  Tu rentres chez toi.
+  Tu t'assieds sur ton lit.
+  Et ce bonheur
+  disparaît.
+
+Open loops — the brain needs the payoff:
+  State a fact. Cut. Open the question. Cut. DELAY the answer.
+  Never close a loop before opening the next one.
+  Example pattern:
+    "Je me souviens d'être assis là à penser…"
+    "et maintenant quoi ?"
+    "Je t'explique dans une seconde."
+
+The PAYOFF arrives near the END. Never in the middle.
+The CLOSING LINE lands in silence. Do not explain it. Do not soften it.
+"""
+
 NARRATIVE_STRUCTURE = """\
-NARRATIVE STRUCTURE — every video maps onto these ten beats
+NARRATIVE STRUCTURE — every video maps onto these 8 beats
 
   1. HOOK (0–3s)
-     One sentence. No setup. No intro. No name.
+     Pattern interrupt. One sentence. No setup. No intro. No name.
      The viewer must feel something in the first 2 seconds or the video
      is dead. Hormozi rule: start with the conclusion, not the intro.
+     → In `script_structure`, beat = "HOOK"
 
-  2. CONTRAST (3–8s)
-     What everyone believes vs what is actually true.
-     Make them feel slightly wrong for believing the common thing.
+  2. PROBLÈME (3–8s)
+     The relatable tension. What they believe or what they are doing.
+     Make them feel the pain of the current situation.
+     → beat = "PROBLÈME"
 
-  3. CONSEQUENCE (8–13s)
-     What staying wrong costs them. Real. Personal. Visceral.
-     Not statistics — lived experience.
+  3. CONSÉQUENCE (8–13s)
+     What this costs them. Real. Personal. Visceral.
+     Not statistics — lived experience. The price of staying wrong.
+     → beat = "CONSÉQUENCE"
 
-  4. LOOP (13–18s)
+  4. OPEN LOOP (13–18s)
      Open a question. Do NOT answer it.
      "But the real reason is something nobody explains."
-     "And what happens next is what changes everything."
+     "And what happens next changes everything."
      The viewer cannot leave because they need the answer.
+     → beat = "OPEN_LOOP"
 
-  5. STORY (18–35s)
+  5. HISTOIRE (18–50s)
      One real moment. Specific details. No lessons yet.
      Sanchez rule: make them see the scene like a movie.
+     Re-hook here if long-form — new tension every 30s.
+     → beat = "HISTOIRE"
 
-  6. REALIZATION (35–42s)
-     The turning point. Short. No explanation.
-     Drop it like a fact. Let it hit.
-
-  7. PRINCIPLE (42–50s)
+  6. PRINCIPE (50–58s)
      One sentence. Universal. Timeless. Quotable.
      This is the line they screenshot. This is why they follow.
+     Drop it with a 0.4s silence BEFORE it. Let it hit.
+     → beat = "PRINCIPE"
 
-  8. REFRAME (50–55s)
+  7. REFRAME (58–65s)
      Completely flip their mental model.
      What looked like a problem is actually the path.
+     Short. No explanation. Trust the listener.
+     → beat = "REFRAME"
 
-  9. PAYOFF (55–65s)
+  8. PAYOFF (last 3–8s)
      The idea they save the video for.
      Practical or deeply emotional. Sometimes both.
      Sanchez rule: give them something usable tomorrow morning.
-
- 10. CLOSING REFLECTION (last 3–5s)
      One sentence. Drop it. Silence.
-     Do not explain it. Do not soften it.
      The discomfort of the ending is what makes them comment.
+     → beat = "PAYOFF"
 """
 
 CUT_PHILOSOPHY = """\
@@ -438,18 +488,44 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
   "format": "short" | "long",
   "summary": "<one-sentence summary>",
 
-  "optimized_script": [
-    { "beat": "Hook" | "Contrast" | "Consequence" | "Loop" | "Story"
-            | "Realization" | "Principle" | "Reframe" | "Payoff" | "Closing",
-      "line": "<the exact line, filler removed>",
+  /* ── NEW: 8-beat retention structure ──────────────────────────────────
+     Every line MUST use VERBATIM words from the transcript (HOOK–PAYOFF).
+     Write line-by-line. Short sentences. TikTok rhythm.
+     beat must be one of: HOOK · PROBLÈME · CONSÉQUENCE · OPEN_LOOP
+                           HISTOIRE · PRINCIPE · REFRAME · PAYOFF
+  */
+  "script_structure": [
+    { "beat": "HOOK"|"PROBLÈME"|"CONSÉQUENCE"|"OPEN_LOOP"
+             |"HISTOIRE"|"PRINCIPE"|"REFRAME"|"PAYOFF",
+      "lines": ["<line 1>", "<line 2>"],   /* verbatim, short, rhythmic */
       "start": <s>, "end": <s> }
   ],
 
-  "structure": [
-    { "beat": "<one of the 10>", "start": <s>, "end": <s>,
-      "why": "<one line of intent>" }
+  /* ── NEW: deliberate silence inserts ──────────────────────────────────
+     The renderer will duck audio to 0 for `duration` seconds at `at`
+     (output time). Use before PRINCIPE and PAYOFF lines only.
+     0.3–0.5s is the sweet spot. Never more than 0.5s.
+  */
+  "silences": [
+    { "at": <s>, "duration": 0.3,
+      "before": "<the line that follows the silence>" }
   ],
 
+  /* ── NEW: 5 A/B CTR titles to test ───────────────────────────────────
+     Curiosity gap. Under 8 words each. No clickbait — every title must
+     be 100% deliverable from the video content.
+  */
+  "titres_ctr": [
+    "<title 1>", "<title 2>", "<title 3>", "<title 4>", "<title 5>"
+  ],
+
+  /* ── NEW: single thumbnail keyword ──────────────────────────────────
+     ONE word. Maximum emotional charge. What the viewer feels.
+     Uppercase. Examples: FAIL · RICH · ALONE · TRUTH · NEVER
+  */
+  "thumbnail_mot": "<ONE WORD>",
+
+  /* ── EXISTING ────────────────────────────────────────────────────── */
   "keep_segments": [
     { "start": <s>, "end": <s>, "reason": "<why this stays>" }
   ],
@@ -463,11 +539,6 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
       "from": <decimal scale>, "to": <decimal scale>,
       "kind": "drift" | "punch_in" | "pull_out",
       "on_word": "<word the punch lands on, optional>" }
-  ],
-
-  "silences_to_protect": [
-    { "at": <s>, "duration": <s>,
-      "why": "before_principle|before_closing|deliberate" }
   ],
 
   "broll_suggestions": [
@@ -539,9 +610,11 @@ Rules the JSON must obey:
   - All times in seconds, decimals allowed.
   - Scale values are decimals (1.00 = 100%, 1.30 = 130%).
   - keep_segments order IS the playback order.
-  - keep_segments edges should fall on word boundaries (the renderer
-    snaps + pads, but you should aim there).
-  - Cut every filler. Cut every pause >0.25s except the protected ones.
+  - keep_segments edges should fall on word boundaries.
+  - script_structure lines: verbatim transcript words only, never invented.
+  - silences: only before PRINCIPE and PAYOFF, 0.3–0.5s max.
+  - titres_ctr: 5 titles, each deliverable from the video content.
+  - thumbnail_mot: ONE word, uppercase, maximum emotional charge.
   - One hyperframe per 20–30s window. Never inside b-roll.
   - Be ruthless. Tension > comfort. Specific > generic.
   - Output ONLY JSON. No prose around it.
@@ -596,6 +669,8 @@ def system_prompt(
         blocks.append("\n".join(ctx))
 
     blocks.extend([
+        TRANSCRIPT_INTEGRITY,
+        SCRIPT_RHYTHM,
         NARRATIVE_STRUCTURE,
         CUT_PHILOSOPHY,
         ZOOM_SYSTEM,

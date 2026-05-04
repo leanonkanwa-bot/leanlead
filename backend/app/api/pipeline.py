@@ -82,6 +82,9 @@ def run_job(
                 "format": result["format"],
                 "duration": result["duration"],
                 "plan": result["plan"],
+                "titres_ctr": plan.titres_ctr,
+                "thumbnail_mot": plan.thumbnail_mot,
+                "script_structure": plan.script_structure,
             },
         )
     except Exception as e:
