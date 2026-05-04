@@ -61,6 +61,22 @@ class EditPlan:
     def packaging(self) -> dict[str, Any]:
         return self.raw.get("packaging", {})
 
+    @property
+    def script_structure(self) -> list[dict[str, Any]]:
+        return self.raw.get("script_structure", [])
+
+    @property
+    def silences(self) -> list[dict[str, Any]]:
+        return self.raw.get("silences", [])
+
+    @property
+    def titres_ctr(self) -> list[str]:
+        return self.raw.get("titres_ctr", [])
+
+    @property
+    def thumbnail_mot(self) -> str:
+        return self.raw.get("thumbnail_mot", "")
+
 
 def _decide_format(duration_s: float, hint: FormatHint) -> str:
     if hint in ("short", "long"):
