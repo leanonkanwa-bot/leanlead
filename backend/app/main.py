@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.jobs import store
 from app.api.pipeline import run_job
+from app.api.upload import assembled_path, router as upload_router
 from app.core.config import settings
 
 
@@ -34,6 +35,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(upload_router)
 
 AUTH_COOKIE = "lle_token"
 
@@ -98,7 +101,8 @@ def auth_logout() -> Response:
 async def submit_edit(
     request: Request,
     background: BackgroundTasks,
-    video: UploadFile = File(...),
+    video: UploadFile = File(None),   # optional — omitted when upload_id is used
+    upload_id: str = Form(""),        # set by chunked-upload flow
     instructions: str = Form(""),
     format_hint: Literal["short", "long", "auto"] = Form("auto"),
     caption_font: str = Form("Poppins Bold"),
@@ -114,10 +118,20 @@ async def submit_edit(
 
     job = store.create()
 
-    suffix = Path(video.filename or "input.mp4").suffix or ".mp4"
-    dest = settings.uploads_dir / f"{job.id}{suffix}"
-    with dest.open("wb") as f:
-        shutil.copyfileobj(video.file, f)
+    if upload_id:
+        # Chunked-upload path: file was already assembled by /api/upload/assemble
+        dest = assembled_path(upload_id)
+        if dest is None:
+            raise HTTPException(400, f"No assembled file found for upload_id={upload_id!r}. "
+                                     "Call /api/upload/assemble first.")
+    elif video and video.filename:
+        # Direct upload path (files ≤ ~100 MB)
+        suffix = Path(video.filename).suffix or ".mp4"
+        dest = settings.uploads_dir / f"{job.id}{suffix}"
+        with dest.open("wb") as f:
+            shutil.copyfileobj(video.file, f)
+    else:
+        raise HTTPException(400, "Provide either a video file or an upload_id.")
 
     background.add_task(
         run_job,
