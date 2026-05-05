@@ -25,7 +25,13 @@ from typing import Any
 
 from app.agent.planner import EditPlan
 from app.engine.captions import WordTiming, build_ass
-from app.engine.graphics import AESTHETIC_COLORS, render_motion_graphic
+from app.engine.graphics import (
+    AESTHETIC_COLORS,
+    render_motion_graphic,
+    render_vignette_mask,
+    render_whiteboard_layout,
+    render_slide_layout,
+)
 
 
 SHORT_PAD_S = 0.05   # 50ms — tight, energetic
@@ -414,6 +420,66 @@ def _build_hyperframe_filters(
     return ("," + ",".join(parts)) if parts else ""
 
 
+def _vignette_dims(short_form: bool) -> tuple[int, int, int, int, int]:
+    """Return (vign_w, vign_h, vign_x, vign_y, corner_radius) for the vignette."""
+    if short_form:   # 1080 × 1920
+        vw, vh = 400, 500
+        vx = 1080 - vw - 40   # 640
+        vy = 1920 - vh - 80   # 1340
+        cr = 40
+    else:            # 1920 × 1080
+        vw, vh = 490, 380
+        vx = 1920 - vw - 40   # 1390
+        vy = 1080 - vh - 60   # 640
+        cr = 36
+    return vw, vh, vx, vy, cr
+
+
+def _render_vignette_layouts(
+    moments: list[dict[str, Any]],
+    work_dir: Path,
+    target_w: int,
+    target_h: int,
+    short_form: bool,
+    glow_color: str,
+) -> tuple[list[Path], Path | None]:
+    """Pre-render layout PNGs for each visual_style moment (Styles 2 & 3).
+    Returns (layout_paths, mask_path).  mask_path is None when moments is empty."""
+    if not moments:
+        return [], None
+    vw, vh, vx, vy, cr = _vignette_dims(short_form)
+    vign_dir = work_dir / "vignette"
+    vign_dir.mkdir(parents=True, exist_ok=True)
+
+    mask_path = vign_dir / "mask.png"
+    render_vignette_mask(vw, vh, cr, mask_path)
+
+    layout_paths: list[Path] = []
+    for i, m in enumerate(moments):
+        style = int(m.get("style", 2))
+        lp = vign_dir / f"layout_{i:03d}.png"
+        if style == 3:
+            title = str(m.get("title") or "").strip()
+            bullets = [str(b) for b in (m.get("bullets") or [])]
+            render_slide_layout(
+                title, bullets, lp,
+                target_w=target_w, target_h=target_h,
+                vign_x=vx, vign_y=vy, vign_w=vw, vign_h=vh,
+                glow_color=glow_color,
+            )
+        else:  # style == 2 (default)
+            content = str(m.get("content") or "").strip()
+            render_whiteboard_layout(
+                content, lp,
+                target_w=target_w, target_h=target_h,
+                vign_x=vx, vign_y=vy, vign_w=vw, vign_h=vh,
+                glow_color=glow_color,
+            )
+        layout_paths.append(lp)
+
+    return layout_paths, mask_path
+
+
 def render(
     src: Path,
     transcript: dict[str, Any],
@@ -459,6 +525,7 @@ def render(
     remapped_zoom: list[dict[str, Any]] = []
     remapped_words: list[WordTiming] = []
     remapped_silences: list[dict[str, Any]] = []
+    remapped_vsm: list[dict[str, Any]] = []
 
     for i, seg in enumerate(keep):
         s_raw = float(seg["start"])
@@ -511,6 +578,19 @@ def render(
                 remapped_silences.append({
                     **sil,
                     "at": cum + (sil_at - s),
+                })
+
+        for vm in (plan.visual_style_moments or []):
+            try:
+                vm_at = float(vm.get("at", 0))
+                vm_dur = float(vm.get("duration", 2.0))
+            except (TypeError, ValueError):
+                continue
+            if s <= vm_at <= e:
+                remapped_vsm.append({
+                    **vm,
+                    "at": cum + (vm_at - s),
+                    "duration": vm_dur,
                 })
 
         cum += (e - s)
@@ -643,8 +723,17 @@ def render(
         if rg is not None:
             rendered_graphics.append(rg)
 
-    # Build the final filter chain. With no graphics to overlay, the simple
-    # -vf path is all we need; with overlays we switch to filter_complex.
+    # Pre-render vignette layouts (Styles 2 & 3).
+    # Only moments with style 2 or 3 go through the vignette path.
+    vign_moments = [m for m in remapped_vsm if int(m.get("style", 2)) in (2, 3)]
+    glow_color = brand_color or "#0A84FF"
+    layout_paths, mask_path = _render_vignette_layouts(
+        vign_moments, work_dir, target_w, target_h, short_form, glow_color,
+    )
+    V = len(vign_moments)
+    vw, vh, vx, vy, _cr = _vignette_dims(short_form) if V > 0 else (0, 0, 0, 0, 0)
+
+    # Build the final filter chain.
     base_filter = (
         f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':"
         f"d=1:s={target_w}x{target_h}:fps={fps}"
@@ -652,9 +741,19 @@ def render(
     )
     ass_filter = f"ass={ass_path.as_posix()}"
 
+    # Assemble FFmpeg inputs.
+    # [0] = concat.mp4
+    # [1..M] = motion graphic PNGs
+    # [M+1..M+V] = layout PNGs (vignette moments)
+    # [M+V+1..M+2V] = mask PNGs (one per vignette, all same file)
+    M = len(rendered_graphics)
     cmd: list[str] = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(concat_path)]
     for rg in rendered_graphics:
         cmd += ["-i", str(rg.png)]
+    for lp in layout_paths:
+        cmd += ["-loop", "1", "-i", str(lp)]
+    for _ in vign_moments:
+        cmd += ["-loop", "1", "-i", str(mask_path)]
 
     # Build audio silence ducks: volume=0 windows before PRINCIPE/PAYOFF lines.
     audio_duck_parts: list[str] = []
@@ -669,20 +768,69 @@ def render(
             f"volume=enable='between(t,{t0:.3f},{t1:.3f})':volume=0"
         )
 
-    if rendered_graphics:
-        chain_parts: list[str] = [f"[0:v]{base_filter}[v0]"]
-        for i, rg in enumerate(rendered_graphics, start=1):
+    need_filter_complex = rendered_graphics or vign_moments
+
+    if need_filter_complex:
+        chain_parts: list[str] = []
+
+        # Split [0:v] into main stream + V vignette source streams.
+        if V > 0:
+            split_labels = "[v_main]" + "".join(f"[v_v{i}]" for i in range(V))
+            chain_parts.append(f"[0:v]split={V + 1}{split_labels}")
+            main_src = "v_main"
+        else:
+            main_src = "0:v"
+
+        # Zoompan on main path.
+        chain_parts.append(f"[{main_src}]{base_filter}[zp]")
+
+        # Motion graphics chain.
+        prev = "zp"
+        for i, rg in enumerate(rendered_graphics):
             t0 = rg.at
             t1 = rg.at + rg.duration
+            nxt = f"mg{i}"
             chain_parts.append(
-                f"[v{i-1}][{i}:v]overlay="
+                f"[{prev}][{i + 1}:v]overlay="
                 f"x='{rg.x_expr}':y='{rg.y_expr}':"
-                f"enable='between(t,{t0:.3f},{t1:.3f})'[v{i}]"
+                f"enable='between(t,{t0:.3f},{t1:.3f})'[{nxt}]"
             )
-        last_label = f"v{len(rendered_graphics)}"
-        chain_parts.append(f"[{last_label}]{ass_filter}[final]")
+            prev = nxt
+
+        # Vignette chain (Styles 2 & 3).
+        for i, vm in enumerate(vign_moments):
+            t0 = float(vm["at"])
+            t1 = t0 + float(vm["duration"])
+            layout_idx = M + 1 + i         # layout PNG input index
+            mask_idx   = M + 1 + V + i     # mask PNG input index
+
+            # Scale source video to vignette size + add alpha channel.
+            chain_parts.append(
+                f"[v_v{i}]scale={vw}:{vh},format=yuva420p[sv{i}]"
+            )
+            # Apply rounded-corner mask.
+            chain_parts.append(
+                f"[sv{i}][{mask_idx}:v]alphamerge[rv{i}]"
+            )
+            # Overlay full-frame layout (white + content) on the video stream.
+            nxt_layout = f"vl{i}"
+            chain_parts.append(
+                f"[{prev}][{layout_idx}:v]overlay=0:0"
+                f":enable='between(t,{t0:.3f},{t1:.3f})'[{nxt_layout}]"
+            )
+            # Overlay rounded person vignette at bottom-right.
+            nxt_vign = f"vn{i}"
+            chain_parts.append(
+                f"[{nxt_layout}][rv{i}]overlay={vx}:{vy}"
+                f":enable='between(t,{t0:.3f},{t1:.3f})'[{nxt_vign}]"
+            )
+            prev = nxt_vign
+
+        # Captions last.
+        chain_parts.append(f"[{prev}]{ass_filter}[final]")
         if audio_duck_parts:
             chain_parts.append("[0:a]" + ",".join(audio_duck_parts) + "[a_out]")
+
         filter_complex = ";".join(chain_parts)
         cmd += ["-filter_complex", filter_complex, "-map", "[final]"]
         cmd += ["-map", "[a_out]"] if audio_duck_parts else ["-map", "0:a"]
@@ -716,4 +864,5 @@ def render(
             {"kind": rg.kind, "at": rg.at, "duration": rg.duration}
             for rg in rendered_graphics
         ],
+        "vignette_moments": len(vign_moments),
     }

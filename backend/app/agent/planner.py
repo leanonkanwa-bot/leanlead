@@ -77,6 +77,10 @@ class EditPlan:
     def thumbnail_mot(self) -> str:
         return self.raw.get("thumbnail_mot", "")
 
+    @property
+    def visual_style_moments(self) -> list[dict[str, Any]]:
+        return self.raw.get("visual_style_moments", [])
+
 
 def _decide_format(duration_s: float, hint: FormatHint) -> str:
     if hint in ("short", "long"):

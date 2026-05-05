@@ -429,6 +429,70 @@ Return all of them as `motion_graphics`: list of objects with `at`,
 `duration`, `kind`, plus the kind-specific fields above.
 """
 
+VISUAL_STYLES = """\
+VISUAL STYLES — three cinematic layouts for high-impact moments
+
+Use `visual_style_moments` for moments where the raw talking-head frame
+is replaced (or augmented) with a cinematic layout. Use sparingly —
+1–3 moments per video, always for the highest-impact idea.
+
+══════════════════════════════════════════════════════════
+STYLE 1 — Giant Text on Person  (kind "giant_text" in motion_graphics)
+══════════════════════════════════════════════════════════
+Huge white number or stat (e.g. "65%") + coloured subtitle below
+(e.g. "FAIL IN 10 YEARS").
+The person stays fully visible. Text is placed in the SAFE ZONE
+detected by Vision — above or below the face, never on it.
+
+Use as a `motion_graphics` entry (NOT `visual_style_moments`):
+  { "at": <s>, "duration": 3.0, "kind": "giant_text",
+    "number": "65%",
+    "subtitle": "FAIL IN 10 YEARS",
+    "subtitle_color": "#FF3B30" }
+
+Trigger: any moment the speaker states a shocking statistic or percentage.
+The number arrives 0.5–1s AFTER the speaker says it.
+
+══════════════════════════════════════════════════════════
+STYLE 2 — Whiteboard + Vignette  (style: 2 in visual_style_moments)
+══════════════════════════════════════════════════════════
+White background. Text or concept on the LEFT side.
+Person in a rounded vignette (bottom-right) with a blue glow border.
+Black decorative bars on far left and right edges.
+
+Use for: explaining a concept, showing 3 reasons, a framework, a system.
+
+Schema:
+  { "at": <s>, "duration": <s>, "style": 2,
+    "content": "3 RAISONS\\n→ Première raison\\n→ Deuxième raison\\n→ Troisième" }
+
+══════════════════════════════════════════════════════════
+STYLE 3 — Slide + Vignette  (style: 3 in visual_style_moments)
+══════════════════════════════════════════════════════════
+White background. Big bold TITLE on the left, bullets below.
+Person in a rounded vignette (bottom-right) with blue glow border.
+Same black side bars as Style 2.
+
+Use for: principles, rules, step-by-step lists, key takeaways.
+
+Schema:
+  { "at": <s>, "duration": <s>, "style": 3,
+    "title": "LES 3 RÈGLES",
+    "bullets": ["Commence avant d'être prêt", "Environnement > volonté", "1% par jour"] }
+
+══════════════════════════════════════════════════════════
+PLACEMENT RULES
+══════════════════════════════════════════════════════════
+- `at` = timestamp when speaker BEGINS the idea this layout reinforces.
+- Minimum duration: 2.5s. Maximum: 6s.
+- Never inside a b-roll window.
+- Never overlap with another visual_style_moment.
+- For Styles 2 & 3, the person remains audible and lip-sync is preserved
+  (the vignette IS the live video, not a freeze frame).
+- ABSOLUTE RULE: Never use Style 2/3 during HOOK (first 3s) — the hook
+  must show the full frame.
+"""
+
 BROLL_RULES = """\
 B-ROLL — maximum 3 clips, ever.
 
@@ -562,12 +626,27 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
       "color": "#RRGGBB" }
   ],
 
+  /* ── NEW: 3 visual styles ──────────────────────────────────────────────
+     Style 1 → use kind "giant_text" inside motion_graphics (see below).
+     Styles 2/3 → add entries here (1–3 per video, never in first 3s):
+  */
+  "visual_style_moments": [
+    /* Style 2 — whiteboard + vignette */
+    { "at": <s>, "duration": <s>, "style": 2,
+      "content": "<text for left side, use \\n for line breaks>" },
+    /* Style 3 — slide + vignette */
+    { "at": <s>, "duration": <s>, "style": 3,
+      "title": "<big bold title>",
+      "bullets": ["<bullet 1>", "<bullet 2>", "<bullet 3>"] }
+  ],
+
   "motion_graphics": [
     { "at": <s>, "duration": <s>,
       "kind": "count_up"|"fly_in"|"text_overlay"|"checklist"
             |"lower_third"|"stat_circle"|"annotation"
             |"quote_card"|"split_screen"|"timeline"|"versus"
-            |"notification"|"typography_broll"|"money_counter",
+            |"notification"|"typography_broll"|"money_counter"
+            |"giant_text",
       /* text_overlay / fly_in / annotation */
       "text": "<text>",
       "size": 15,           /* text_overlay: % of frame short edge */
@@ -595,6 +674,9 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
       "words": ["<word>", "<word>"],
       /* money_counter */
       "currency": "$", "positive": true,
+      /* giant_text (Style 1) */
+      "number": "<e.g. 65%>", "subtitle": "<e.g. FAIL IN 10 YEARS>",
+      "subtitle_color": "#FF3B30",
       /* universal */
       "bg_card": "black"|"white"|""
     }
@@ -624,6 +706,9 @@ Rules the JSON must obey:
   - titres_ctr: 5 titles, each deliverable from the video content.
   - thumbnail_mot: ONE word, uppercase, maximum emotional charge.
   - One hyperframe per 20–30s window. Never inside b-roll.
+  - visual_style_moments: 0–3 entries, duration 2.5–6s, never in first 3s,
+    never overlapping each other or b-roll windows.
+  - giant_text: use inside motion_graphics (NOT visual_style_moments).
   - Be ruthless. Tension > comfort. Specific > generic.
   - Output ONLY JSON. No prose around it.
 """
@@ -685,6 +770,7 @@ def system_prompt(
         CAPTION_RULES,
         HYPERFRAMES,
         MOTION_GRAPHICS,
+        VISUAL_STYLES,
         BROLL_RULES,
         RETENTION_MECHANICS,
         CORE_LAW,
