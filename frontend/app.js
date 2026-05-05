@@ -256,7 +256,7 @@ async function poll(jobId) {
     const job = await res.json();
     setStatus(job.status, job.message || "", job.progress || 0);
     if (job.status === "done") return showResult(jobId, job.result);
-    if (job.status === "error") return fail(job.error || "Unknown error");
+    if (job.status === "error") return fail(job.error || "Unknown error", jobId);
   }
 }
 
@@ -295,11 +295,45 @@ function setStatus(status, message, progress) {
   }
 }
 
-function fail(msg) {
+let _retryJobId = null;
+
+function fail(msg, jobId) {
   submitBtn.disabled = false;
   submitBtn.querySelector(".btn-label").textContent = "Edit my video";
   setStatus("error", msg, 100);
+
+  // Show Retry button when the server restarted mid-job (video still on disk).
+  const retryBlock = $("retryBlock");
+  if (retryBlock) {
+    const canRetry = jobId && msg && msg.includes("Server restarted");
+    retryBlock.classList.toggle("hidden", !canRetry);
+    if (canRetry) _retryJobId = jobId;
+  }
 }
+
+$("retryBtn")?.addEventListener("click", async () => {
+  if (!_retryJobId) return;
+  $("retryBlock")?.classList.add("hidden");
+  statusCard.classList.remove("hidden");
+  setStatus("queued", "Retrying with existing file…", 5);
+  submitBtn.disabled = true;
+  submitBtn.querySelector(".btn-label").textContent = "Working…";
+  try {
+    const res = await fetch(`/api/retry/${_retryJobId}`, {
+      method: "POST", credentials: "same-origin",
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      return fail(txt.includes("no longer on disk")
+        ? "Source video was deleted — please re-upload."
+        : `Retry failed: ${res.status}`);
+    }
+    const { job_id } = await res.json();
+    poll(job_id);
+  } catch (err) {
+    fail(`Retry error: ${err.message}`);
+  }
+});
 
 function showResult(jobId, result) {
   submitBtn.disabled = false;

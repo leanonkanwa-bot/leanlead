@@ -133,12 +133,11 @@ async def submit_edit(
     else:
         raise HTTPException(400, "Provide either a video file or an upload_id.")
 
-    background.add_task(
-        run_job,
-        job.id,
-        dest,
-        instructions,
-        format_hint,
+    # Persist source path + run params so the job can be retried after a
+    # server restart without the user having to re-upload the video.
+    run_params = dict(
+        instructions=instructions,
+        format_hint=format_hint,
         caption_font=caption_font,
         caption_color=caption_color,
         caption_position=caption_position,
@@ -146,6 +145,9 @@ async def submit_edit(
         brand_color=brand_color or None,
         aesthetic=theme,
     )
+    store.update(job.id, source_path=str(dest), params=run_params)
+
+    background.add_task(run_job, job.id, dest, **run_params)
     return JSONResponse({"job_id": job.id, "status": job.status})
 
 
@@ -155,6 +157,31 @@ def get_job(job_id: str, request: Request, _: None = Depends(_check_auth)) -> di
     if not job:
         raise HTTPException(404, "Job not found")
     return job.to_dict()
+
+
+@app.post("/api/retry/{job_id}")
+async def retry_job(
+    job_id: str,
+    background: BackgroundTasks,
+    request: Request,
+    _: None = Depends(_check_auth),
+) -> JSONResponse:
+    """Re-run a failed job using the source video that is still on disk.
+    Returns a NEW job_id — the frontend polls that one."""
+    original = store.get(job_id)
+    if not original:
+        raise HTTPException(404, "Original job not found")
+    if not original.source_path:
+        raise HTTPException(400, "No source file stored for this job — please re-upload")
+    src = Path(original.source_path)
+    if not src.exists():
+        raise HTTPException(400, "Source video is no longer on disk — please re-upload")
+
+    new_job = store.create()
+    run_params = original.params or {}
+    store.update(new_job.id, source_path=str(src), params=run_params)
+    background.add_task(run_job, new_job.id, src, **run_params)
+    return JSONResponse({"job_id": new_job.id})
 
 
 @app.get("/api/download/{job_id}")

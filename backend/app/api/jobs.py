@@ -42,6 +42,8 @@ class Job:
     created_at: float = field(default_factory=time.time)
     result: dict[str, Any] | None = None
     error: str | None = None
+    source_path: str | None = None          # absolute path to source video on disk
+    params: dict[str, Any] = field(default_factory=dict)  # run_job kwargs for retry
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
