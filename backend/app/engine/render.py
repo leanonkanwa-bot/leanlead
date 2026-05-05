@@ -73,6 +73,117 @@ def _probe_duration(path: Path) -> float:
     return float(out.strip())
 
 
+def _probe_video_info(path: Path) -> dict[str, Any]:
+    """Return {width, height, codec_name} for the first video stream."""
+    try:
+        out = subprocess.check_output(
+            [
+                "ffprobe", "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=width,height,codec_name",
+                "-of", "csv=p=0",
+                str(path),
+            ],
+            text=True,
+        ).strip()
+        parts = out.split(",")
+        return {
+            "width":  int(parts[0]) if len(parts) > 0 else 0,
+            "height": int(parts[1]) if len(parts) > 1 else 0,
+            "codec":  parts[2].strip() if len(parts) > 2 else "unknown",
+        }
+    except Exception:
+        return {"width": 0, "height": 0, "codec": "unknown"}
+
+
+def _needs_proxy(info: dict[str, Any], target_w: int, target_h: int) -> bool:
+    """True when the source needs a pre-transcode proxy.
+
+    Proxying is triggered when:
+    - Codec is ProRes, HEVC/H.265, or other heavy-decode format
+      (these hold large reference-frame buffers during decode), OR
+    - Source resolution is larger than the target (4K→1080p decode is expensive).
+    """
+    heavy_codecs = {"prores", "hevc", "vp9", "av1", "dnxhd", "dnxhr",
+                    "mjpeg", "mpeg2video", "cfhd"}
+    codec = info.get("codec", "").lower()
+    w, h = info.get("width", 0), info.get("height", 0)
+    if codec in heavy_codecs:
+        return True
+    if w > target_w or h > target_h:
+        return True
+    return False
+
+
+def _create_proxy(
+    src: Path,
+    dst: Path,
+    target_w: int,
+    target_h: int,
+    fps: int,
+) -> None:
+    """Pre-transcode source to target-resolution H.264 with short keyframes.
+
+    Why: heavy-decode codecs (ProRes, HEVC, 4K) keep large reference-frame
+    buffers alive for every segment cut. Decoding them once here and writing
+    a cheap H.264 proxy means all subsequent _cut_proxy_segment calls use
+    stream-copy — zero decode memory, near-zero CPU.
+
+    Keyframe every 2 s (60 frames at 30 fps) so stream-copy cuts have ≤ 2 s
+    of alignment error (acceptable — the final re-encode corrects it).
+    """
+    vf = (
+        f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase"
+        f":flags=fast_bilinear,"
+        f"crop={target_w}:{target_h},fps={fps}"
+    )
+    _run([
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-threads", "1",                    # global: limit decoder threads
+        "-i", str(src),
+        "-vf", vf,
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-x264-params", (
+            "rc-lookahead=0:bframes=0:ref=1:no-mbtree=1:"
+            f"keyint=60:keyint_min=60"      # keyframe every 2 s
+        ),
+        "-threads", "1",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+        str(dst),
+    ])
+
+
+def _cut_proxy_segment(
+    proxy: Path,
+    start: float,
+    end: float,
+    dst: Path,
+) -> None:
+    """Cut a segment from the H.264 proxy using stream-copy for video.
+
+    Stream-copy means zero decode memory — we just copy the H.264 bitstream
+    bytes. Cuts snap to the nearest keyframe (≤ 2 s error), which the final
+    zoompan re-encode corrects. Audio is re-encoded to apply the 30 ms fades.
+    """
+    duration = max(0.1, end - start)
+    fade_out_start = max(0.0, duration - AUDIO_FADE_S)
+    af = (
+        f"afade=t=in:st=0:d={AUDIO_FADE_S},"
+        f"afade=t=out:st={fade_out_start:.3f}:d={AUDIO_FADE_S}"
+    )
+    _run([
+        "ffmpeg", "-y", "-loglevel", "error",
+        "-threads", "1",
+        "-ss", f"{start:.3f}", "-i", str(proxy),
+        "-t", f"{duration:.3f}",
+        "-af", af,
+        "-c:v", "copy",                     # zero decode/encode memory
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+        str(dst),
+    ])
+
+
 def _flat_words(transcript: dict[str, Any]) -> list[tuple[float, float]]:
     out: list[tuple[float, float]] = []
     for seg in transcript.get("segments", []):
@@ -140,6 +251,7 @@ def _cut_segment(
     # entire mdat, doubling peak RSS on large videos → SIGKILL on small dynos).
     _run([
         "ffmpeg", "-y", "-loglevel", "error",
+        "-threads", "1",        # global: limits decoder threads too, not just encoder
         "-ss", f"{start:.3f}", "-i", str(src),
         "-t", f"{duration:.3f}",
         "-vf", vf,
@@ -330,6 +442,18 @@ def render(
     words = _flat_words(transcript)
     src_duration = float(transcript.get("duration", 0.0)) or _probe_duration(src)
 
+    # Proxy: if the source is a heavy-decode format (ProRes, HEVC) or larger
+    # than the target resolution, pre-transcode it once to a target-res H.264.
+    # All segment cuts then use stream-copy on the proxy → zero decode RAM.
+    video_info = _probe_video_info(src)
+    use_proxy = _needs_proxy(video_info, target_w, target_h)
+    if use_proxy:
+        proxy_path = work_dir / "proxy.mp4"
+        _create_proxy(src, proxy_path, target_w, target_h, fps)
+        cut_src = proxy_path
+    else:
+        cut_src = src
+
     parts: list[Path] = []
     cum = 0.0
     remapped_zoom: list[dict[str, Any]] = []
@@ -351,7 +475,10 @@ def render(
             continue
 
         part = work_dir / f"part_{i:04d}.mp4"
-        _cut_segment(src, s, e, part, target_w, target_h, fps)
+        if use_proxy:
+            _cut_proxy_segment(cut_src, s, e, part)
+        else:
+            _cut_segment(cut_src, s, e, part, target_w, target_h, fps)
         parts.append(part)
 
         for zp in plan.zoom_plan:

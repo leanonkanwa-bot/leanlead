@@ -121,6 +121,7 @@ def transcribe(video_path: Path) -> Transcript:
             word_timestamps=True,
             beam_size=1,        # save RAM + CPU vs the default beam_size=5
             vad_filter=False,   # silero-VAD adds ~60MB onnxruntime overhead on tight dynos
+            language=None,      # auto-detect: French, English, Spanish, Arabic, etc.
         )
 
         segments: list[Segment] = []
@@ -147,8 +148,9 @@ def transcribe(video_path: Path) -> Transcript:
 
     full_text = " ".join(s.text for s in segments).strip()
 
+    detected_lang = getattr(info, "language", None) or "en"
     return Transcript(
-        language=getattr(info, "language", "en") or "en",
+        language=detected_lang,
         duration=last_end,
         text=full_text,
         segments=segments,
