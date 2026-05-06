@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../lib/api";
 
-const STEPS = ["Your niche", "Your offer", "Integrations"];
+const STEPS = ["Votre créneau", "Votre offre", "Intégrations"];
 
 function Step({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) {
   return (
@@ -38,14 +38,14 @@ export default function Onboarding() {
       await authApi.onboard(form);
       nav("/dashboard", { replace: true });
     } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to save. Try again.");
+      setError(err?.response?.data?.detail || "Échec de l'enregistrement. Réessayez.");
     } finally { setSaving(false); }
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 py-12">
       <div className="w-full max-w-lg">
-        {/* Progress */}
+        {/* Progression */}
         <div className="flex items-center justify-center gap-3 mb-8">
           {STEPS.map((label, i) => (
             <div key={label} className="flex items-center gap-3">
@@ -58,70 +58,70 @@ export default function Onboarding() {
         </div>
 
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 animate-fade-in">
-          {/* ── Step 0: Niche ── */}
+          {/* ── Étape 0 : Créneau ── */}
           {step === 0 && (
             <>
-              <h1 className="text-lg font-semibold mb-1">What do you coach?</h1>
-              <p className="text-xs text-slate-500 mb-6">The AI uses this to score leads and personalize every message.</p>
+              <h1 className="text-lg font-semibold mb-1">Dans quoi êtes-vous coach ?</h1>
+              <p className="text-xs text-slate-500 mb-6">L'IA utilise ces informations pour noter les leads et personnaliser chaque message.</p>
               <div className="space-y-5">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Your coaching niche *</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Votre créneau de coaching *</label>
                   <input value={form.niche} onChange={set("niche")}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
-                    placeholder="e.g. Business coaching for online entrepreneurs" />
+                    placeholder="ex. Coaching business pour entrepreneurs en ligne" />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Who is your ideal client? *</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Quel est votre client idéal ? *</label>
                   <textarea value={form.target_audience} onChange={set("target_audience")} rows={3}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
-                    placeholder="e.g. Online coaches who want to land 5 premium clients in 90 days without paid ads…" />
+                    placeholder="ex. Coachs en ligne souhaitant décrocher 5 clients premium en 90 jours sans publicité payante…" />
                 </div>
               </div>
               <button onClick={() => setStep(1)} disabled={!form.niche || !form.target_audience}
                 className="mt-6 w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
-                Continue →
+                Continuer →
               </button>
             </>
           )}
 
-          {/* ── Step 1: Offer ── */}
+          {/* ── Étape 1 : Offre ── */}
           {step === 1 && (
             <>
-              <h1 className="text-lg font-semibold mb-1">Describe your offer</h1>
-              <p className="text-xs text-slate-500 mb-6">The AI writes DMs that speak directly to this transformation.</p>
+              <h1 className="text-lg font-semibold mb-1">Décrivez votre offre</h1>
+              <p className="text-xs text-slate-500 mb-6">L'IA rédige des DMs ciblant directement cette transformation.</p>
               <div className="space-y-5">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">What transformation do you deliver? *</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Quelle transformation apportez-vous ? *</label>
                   <textarea value={form.offer_description} onChange={set("offer_description")} rows={4}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
-                    placeholder="e.g. I help online coaches land their first 5 premium clients in 90 days through a proven DM strategy, without paid ads." />
+                    placeholder="ex. J'aide les coachs en ligne à décrocher leurs 5 premiers clients premium en 90 jours grâce à une stratégie de DM éprouvée, sans publicité payante." />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Calendly / booking link</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Lien Calendly / réservation</label>
                   <input value={form.calendly_link} onChange={set("calendly_link")}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="https://calendly.com/yourname/30min" />
-                  <p className="text-xs text-slate-600 mt-1">Used when the AI suggests booking a call with a lead.</p>
+                  <p className="text-xs text-slate-600 mt-1">Utilisé quand l'IA suggère de réserver un appel avec un lead.</p>
                 </div>
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(0)}
                   className="flex-1 py-2.5 border border-slate-700 hover:border-slate-600 rounded-xl text-sm transition-colors">
-                  ← Back
+                  ← Retour
                 </button>
                 <button onClick={() => setStep(2)} disabled={!form.offer_description}
                   className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
-                  Continue →
+                  Continuer →
                 </button>
               </div>
             </>
           )}
 
-          {/* ── Step 2: Integrations ── */}
+          {/* ── Étape 2 : Intégrations ── */}
           {step === 2 && (
             <>
-              <h1 className="text-lg font-semibold mb-1">Connect your tools</h1>
-              <p className="text-xs text-slate-500 mb-6">Optional — you can add these later in Settings.</p>
+              <h1 className="text-lg font-semibold mb-1">Connectez vos outils</h1>
+              <p className="text-xs text-slate-500 mb-6">Facultatif — vous pouvez les ajouter plus tard dans les Paramètres.</p>
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Airtable Base ID</label>
@@ -130,14 +130,14 @@ export default function Onboarding() {
                     placeholder="appfdB2W41J5sVZ2U" />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Airtable Personal Access Token</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Jeton d'accès personnel Airtable</label>
                   <input type="password" value={form.airtable_api_key} onChange={set("airtable_api_key")}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="pat••••••••••••••••" />
-                  <p className="text-xs text-slate-600 mt-1">airtable.com/create/tokens — needs data.records:read + write scope</p>
+                  <p className="text-xs text-slate-600 mt-1">airtable.com/create/tokens — nécessite la portée data.records:read + write</p>
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Apify API Key <span className="text-slate-600">(for Instagram/TikTok scraping)</span></label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Clé API Apify <span className="text-slate-600">(pour le scraping Instagram/TikTok)</span></label>
                   <input type="password" value={form.apify_api_key} onChange={set("apify_api_key")}
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="apify_api_••••••••" />
@@ -147,15 +147,15 @@ export default function Onboarding() {
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(1)}
                   className="flex-1 py-2.5 border border-slate-700 hover:border-slate-600 rounded-xl text-sm transition-colors">
-                  ← Back
+                  ← Retour
                 </button>
                 <button onClick={finish} disabled={saving}
                   className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-50 rounded-xl text-sm font-semibold transition-colors">
-                  {saving ? "Saving…" : "Launch dashboard →"}
+                  {saving ? "Enregistrement…" : "Accéder au tableau de bord →"}
                 </button>
               </div>
               <button onClick={finish} className="w-full text-center text-xs text-slate-600 hover:text-slate-400 mt-3 transition-colors">
-                Skip for now
+                Passer pour l'instant
               </button>
             </>
           )}

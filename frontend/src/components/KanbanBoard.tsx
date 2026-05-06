@@ -16,7 +16,6 @@ import { leadsApi } from "../lib/api";
 import LeadCard from "./LeadCard";
 import LeadModal from "./LeadModal";
 
-/* ── Stage config ── */
 const STAGES: {
   id: Stage;
   label: string;
@@ -24,14 +23,13 @@ const STAGES: {
   dot: string;
   description: string;
 }[] = [
-  { id: "new",       label: "New",       border: "border-slate-700",   dot: "bg-slate-500",   description: "Just added, not yet contacted" },
-  { id: "contacted", label: "Contacted", border: "border-brand-800",     dot: "bg-brand-500",     description: "DM sent, waiting for reply" },
-  { id: "replied",   label: "Replied",   border: "border-brand-800",  dot: "bg-brand-500",  description: "Lead has responded" },
-  { id: "booked",    label: "Booked",    border: "border-emerald-800", dot: "bg-emerald-500", description: "Call booked on Calendly" },
-  { id: "closed",    label: "Closed",    border: "border-rose-900",    dot: "bg-rose-600",    description: "Deal won or lost" },
+  { id: "new",       label: "Nouveau",  border: "border-slate-700",   dot: "bg-slate-500",   description: "Ajouté, pas encore contacté" },
+  { id: "contacted", label: "Contacté", border: "border-brand-800",   dot: "bg-brand-500",   description: "DM envoyé, en attente de réponse" },
+  { id: "replied",   label: "Répondu",  border: "border-brand-800",   dot: "bg-brand-400",   description: "Le lead a répondu" },
+  { id: "booked",    label: "Réservé",  border: "border-emerald-800", dot: "bg-emerald-500", description: "Appel réservé sur Calendly" },
+  { id: "closed",    label: "Clôturé",  border: "border-rose-900",    dot: "bg-rose-600",    description: "Affaire gagnée ou perdue" },
 ];
 
-/* ── Column ── */
 function Column({
   stage, leads, onCardClick,
 }: {
@@ -47,7 +45,6 @@ function Column({
 
   return (
     <div className={`flex flex-col rounded-2xl border ${stage.border} bg-slate-900/50 min-w-[250px] w-[250px] flex-shrink-0`}>
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${stage.dot}`} />
@@ -55,13 +52,12 @@ function Column({
         </div>
         <div className="flex items-center gap-2">
           {avgScore && (
-            <span className="text-[10px] text-slate-600 font-mono">{avgScore} avg</span>
+            <span className="text-[10px] text-slate-600 font-mono">{avgScore} moy</span>
           )}
           <span className="text-xs bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full">{leads.length}</span>
         </div>
       </div>
 
-      {/* Drop zone */}
       <div
         ref={setNodeRef}
         className={`flex-1 p-3 space-y-2 min-h-[120px] rounded-b-2xl transition-colors ${
@@ -83,7 +79,6 @@ function Column({
   );
 }
 
-/* ── Board ── */
 export default function KanbanBoard({ leads }: { leads: Lead[] }) {
   const qc = useQueryClient();
   const [activeId, setActiveId] = useState<number | null>(null);

@@ -1,32 +1,30 @@
 import { Link } from "react-router-dom";
 
-/* ── Tiny atoms ── */
 const Chip = ({ children }: { children: React.ReactNode }) => (
   <span className="inline-flex items-center gap-1.5 text-xs bg-brand-950 border border-brand-800/60 text-brand-400 px-3 py-1 rounded-full font-medium">
     {children}
   </span>
 );
 
-/* ── Animated kanban preview ── */
 function KanbanPreview() {
   const cols = [
-    { label: "NEW", color: "border-slate-600", count: 47 },
-    { label: "CONTACTED", color: "border-brand-700", count: 28 },
-    { label: "REPLIED", color: "border-brand-700", count: 11 },
-    { label: "BOOKED", color: "border-emerald-700", count: 6 },
-    { label: "CLOSED", color: "border-rose-800", count: 3 },
+    { label: "NOUVEAU",   color: "border-slate-600",   count: 47 },
+    { label: "CONTACTÉ",  color: "border-brand-700",   count: 28 },
+    { label: "RÉPONDU",   color: "border-brand-700",   count: 11 },
+    { label: "RÉSERVÉ",   color: "border-emerald-700", count: 6  },
+    { label: "CLÔTURÉ",   color: "border-rose-800",    count: 3  },
   ];
   const cards = [
-    { name: "Sarah M.", handle: "sarahmfitness", score: 9.1, tag: "weight loss", color: "text-emerald-400" },
-    { name: "Jake T.", handle: "jakethomas_biz", score: 7.8, tag: "business", color: "text-amber-400" },
-    { name: "Priya K.", handle: "priyak_life", score: 8.5, tag: "mindset", color: "text-emerald-400" },
+    { name: "Sarah M.", handle: "sarahmfitness",   score: 9.1, tag: "perte de poids",  color: "text-emerald-400" },
+    { name: "Jake T.",  handle: "jakethomas_biz",  score: 7.8, tag: "business",        color: "text-amber-400"   },
+    { name: "Priya K.", handle: "priyak_life",     score: 8.5, tag: "développement",   color: "text-emerald-400" },
   ];
 
   return (
     <div className="relative mx-auto max-w-5xl mt-14 select-none">
       <div className="absolute inset-x-0 top-0 h-40 bg-brand-500/5 blur-3xl rounded-full pointer-events-none" />
       <div className="relative rounded-2xl border border-slate-800 bg-slate-900/80 overflow-hidden shadow-2xl backdrop-blur-sm">
-        {/* Window chrome */}
+        {/* Barre de fenêtre */}
         <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800 bg-slate-950/50">
           <div className="flex gap-1.5">
             <div className="w-3 h-3 rounded-full bg-red-500/50" />
@@ -35,19 +33,19 @@ function KanbanPreview() {
           </div>
           <span className="ml-2 text-xs text-slate-600 font-mono">leanlead.app/dashboard</span>
         </div>
-        {/* Fake nav */}
+        {/* Fausse nav */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-800/50">
           <span className="font-bold text-sm text-brand-400">LeanLead</span>
           <div className="flex gap-5 text-xs">
             <span className="text-brand-400 border-b border-brand-500 pb-0.5">Pipeline</span>
-            <span className="text-slate-500 hover:text-slate-300">Prospects</span>
-            <span className="text-slate-500 hover:text-slate-300">Follow-ups</span>
+            <span className="text-slate-500">Prospection</span>
+            <span className="text-slate-500">Relances</span>
           </div>
-          <div className="text-xs bg-brand-500 text-white px-3 py-1 rounded-lg">+ Add lead</div>
+          <div className="text-xs bg-brand-500 text-white px-3 py-1 rounded-lg">+ Ajouter</div>
         </div>
         {/* Stats */}
         <div className="flex gap-8 px-5 py-3 border-b border-slate-800/30">
-          {[["95", "Total"], ["28", "Contacted"], ["11", "Replied"], ["6", "Booked"], ["6.3%", "Conversion"]].map(([v, l]) => (
+          {[["95","Total"],["28","Contactés"],["11","Répondus"],["6","Réservés"],["6.3%","Conversion"]].map(([v,l]) => (
             <div key={l}>
               <p className="text-xs text-slate-600">{l}</p>
               <p className="text-base font-bold text-white">{v}</p>
@@ -76,7 +74,7 @@ function KanbanPreview() {
                   </div>
                 )) : (
                   <div className="h-14 rounded-lg border border-dashed border-slate-800/80 flex items-center justify-center">
-                    <span className="text-[9px] text-slate-700">drop leads here</span>
+                    <span className="text-[9px] text-slate-700">déposer des leads ici</span>
                   </div>
                 )}
               </div>
@@ -88,7 +86,6 @@ function KanbanPreview() {
   );
 }
 
-/* ── Feature card ── */
 const Feature = ({ icon, title, desc }: { icon: string; title: string; desc: string }) => (
   <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 hover:border-brand-900/60 transition-colors">
     <div className="w-10 h-10 bg-brand-950 rounded-xl flex items-center justify-center text-xl mb-4">{icon}</div>
@@ -97,18 +94,17 @@ const Feature = ({ icon, title, desc }: { icon: string; title: string; desc: str
   </div>
 );
 
-/* ── Pricing card ── */
 const Pricing = ({
   name, price, sub, features, hot, cta,
 }: {
   name: string; price: string; sub?: string; features: string[]; hot?: boolean; cta: string;
 }) => (
   <div className={`relative rounded-2xl p-8 border flex flex-col ${hot ? "bg-brand-600 border-brand-500 shadow-2xl shadow-brand-900/40" : "bg-slate-900 border-slate-800"}`}>
-    {hot && <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-900 text-[10px] font-bold px-3 py-1 rounded-full tracking-wide">MOST POPULAR</span>}
+    {hot && <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-400 text-slate-900 text-[10px] font-bold px-3 py-1 rounded-full tracking-wide">LE PLUS POPULAIRE</span>}
     <p className={`text-xs font-semibold mb-1 ${hot ? "text-brand-100" : "text-slate-400"}`}>{name}</p>
     <div className="flex items-baseline gap-1 mb-1">
       <span className="text-4xl font-black text-white">{price}</span>
-      {price !== "Free" && <span className={`text-sm ${hot ? "text-brand-200" : "text-slate-500"}`}>/mo</span>}
+      {price !== "Gratuit" && <span className={`text-sm ${hot ? "text-brand-200" : "text-slate-500"}`}>/mois</span>}
     </div>
     {sub && <p className={`text-xs mb-6 ${hot ? "text-brand-100" : "text-slate-500"}`}>{sub}</p>}
     <ul className="space-y-3 flex-1 mb-8">
@@ -125,63 +121,62 @@ const Pricing = ({
   </div>
 );
 
-/* ── Main ── */
 export default function Landing() {
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden">
-      {/* Nav */}
+      {/* Navigation */}
       <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-slate-900 bg-slate-950/90 backdrop-blur-md">
         <span className="font-extrabold text-lg">Lean<span className="text-brand-400">Lead</span></span>
         <div className="hidden sm:flex gap-7 text-sm text-slate-400">
-          {[["#features","Features"],["#how","How it works"],["#pricing","Pricing"]].map(([h,l]) => (
+          {[["#features","Fonctionnalités"],["#how","Comment ça marche"],["#pricing","Tarifs"]].map(([h,l]) => (
             <a key={h} href={h} className="hover:text-white transition-colors">{l}</a>
           ))}
         </div>
         <div className="flex gap-3 items-center">
-          <Link to="/login" className="text-sm text-slate-400 hover:text-white transition-colors px-2 py-1.5">Log in</Link>
-          <Link to="/register" className="text-sm bg-brand-500 hover:bg-brand-400 px-4 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-brand-900/30">Start free</Link>
+          <Link to="/login" className="text-sm text-slate-400 hover:text-white transition-colors px-2 py-1.5">Connexion</Link>
+          <Link to="/register" className="text-sm bg-brand-500 hover:bg-brand-400 px-4 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-brand-900/30">Commencer</Link>
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* Héro */}
       <section className="relative px-6 pt-20 pb-8 text-center overflow-hidden">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] bg-brand-600/8 blur-3xl rounded-full pointer-events-none" />
-        <Chip>✦ AI-powered outreach for online coaches</Chip>
+        <Chip>✦ Prospection IA pour les coachs en ligne</Chip>
         <h1 className="mt-6 text-5xl sm:text-6xl font-black leading-[1.1] tracking-tight max-w-3xl mx-auto">
-          Fill your calendar with<br />
+          Remplissez votre agenda<br />
           <span className="bg-gradient-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent">
-            qualified calls
+            d'appels qualifiés
           </span>{" "}
-          — on autopilot.
+          — en automatique.
         </h1>
         <p className="mt-5 text-lg text-slate-400 max-w-xl mx-auto leading-relaxed">
-          LeanLead finds your ideal clients on Instagram and TikTok, writes
-          personalized DMs, handles D+2/4/7 follow-ups, and books them into
-          your Calendly. No VA needed.
+          LeanLead trouve vos clients idéaux sur Instagram et TikTok, rédige des DMs
+          personnalisés, gère les relances J+2/4/7 et les inscrit dans votre Calendly.
+          Sans assistant virtuel.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
           <Link to="/register" className="px-8 py-3.5 bg-brand-500 hover:bg-brand-400 rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-brand-900/40">
-            Start for free →
+            Commencer gratuitement →
           </Link>
           <a href="#how" className="px-6 py-3.5 border border-slate-700 hover:border-slate-500 text-slate-300 rounded-xl text-sm transition-colors">
-            See how it works
+            Voir comment ça marche
           </a>
         </div>
-        <p className="mt-3 text-xs text-slate-600">No credit card · Free plan · Cancel anytime</p>
+        <p className="mt-3 text-xs text-slate-600">Sans carte bancaire · Plan gratuit · Annulable à tout moment</p>
         <KanbanPreview />
       </section>
 
-      {/* How it works */}
+      {/* Comment ça marche */}
       <section id="how" className="py-24 px-6">
         <div className="max-w-3xl mx-auto">
-          <p className="text-center text-brand-400 text-xs uppercase tracking-widest font-semibold mb-3">How it works</p>
-          <h2 className="text-3xl font-black text-center mb-16">From cold profile to booked call in 4 steps</h2>
+          <p className="text-center text-brand-400 text-xs uppercase tracking-widest font-semibold mb-3">Comment ça marche</p>
+          <h2 className="text-3xl font-black text-center mb-16">Du profil froid à l'appel réservé en 4 étapes</h2>
           <div className="space-y-0">
             {[
-              { n:"01", t:"Tell the AI your niche", d:"Enter your coaching niche, ideal client, and Calendly link. Takes 2 minutes.", detail:"The AI uses this to score every lead and write every message in your voice." },
-              { n:"02", t:"AI prospects Instagram & TikTok", d:"Pick a platform and hashtags. LeanLead scrapes matching profiles, scores each one 1-10.", detail:"Only leads scoring 7+ land in your pipeline. No more time wasted on wrong-fit prospects." },
-              { n:"03", t:"One-click personalized DMs", d:"Claude writes a custom outreach DM per lead using their actual bio and pain points.", detail:"Under 80 words. Sounds handwritten. Converts at 8-15% reply rate." },
-              { n:"04", t:"D+2 / D+4 / D+7 follow-up sequences", d:"No reply? Three AI-written follow-ups with different tones — bump, value-add, final close.", detail:"When they reply you get an instant AI response that moves them toward a booking." },
+              { n:"01", t:"Indiquez votre créneau à l'IA", d:"Entrez votre créneau de coaching, votre client idéal et votre lien Calendly. 2 minutes suffisent.", detail:"L'IA s'en sert pour noter chaque lead et rédiger chaque message dans votre style." },
+              { n:"02", t:"L'IA prospecte Instagram & TikTok", d:"Choisissez une plateforme et des hashtags. LeanLead scrape les profils correspondants et les note de 1 à 10.", detail:"Seuls les leads notés 7+ arrivent dans votre pipeline. Plus de temps perdu sur de mauvais prospects." },
+              { n:"03", t:"DMs personnalisés en un clic", d:"Claude rédige un DM de prospection sur mesure par lead, basé sur leur vraie bio et leurs points de douleur.", detail:"Moins de 80 mots. Sonne authentique. Taux de réponse de 8 à 15 %." },
+              { n:"04", t:"Séquences de relance J+2 / J+4 / J+7", d:"Pas de réponse ? Trois relances rédigées par l'IA avec des tons différents — rappel, valeur ajoutée, dernière tentative.", detail:"Quand ils répondent, vous obtenez instantanément une réponse IA qui guide la conversation vers une réservation." },
             ].map((s, i, arr) => (
               <div key={s.n} className="flex gap-6 pb-12 relative">
                 {i < arr.length - 1 && <div className="absolute left-5 top-12 bottom-0 w-px bg-slate-800" />}
@@ -199,37 +194,37 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Features */}
+      {/* Fonctionnalités */}
       <section id="features" className="py-24 px-6 bg-slate-950/60">
         <div className="max-w-5xl mx-auto">
-          <p className="text-center text-brand-400 text-xs uppercase tracking-widest font-semibold mb-3">Features</p>
-          <h2 className="text-3xl font-black text-center mb-14">Everything you need to close more clients</h2>
+          <p className="text-center text-brand-400 text-xs uppercase tracking-widest font-semibold mb-3">Fonctionnalités</p>
+          <h2 className="text-3xl font-black text-center mb-14">Tout ce qu'il vous faut pour conclure plus de clients</h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
-              { icon:"🔍", t:"AI Lead Discovery", d:"Scrapes Instagram and TikTok by hashtag. Returns qualified, niche-matched profiles automatically." },
-              { icon:"🎯", t:"1-10 Qualification Score", d:"Claude scores every lead against your niche, offer, and ideal-client description." },
-              { icon:"✍️", t:"Personalized DM Writer", d:"Each message references the lead's actual bio. Under 80 words. No templates." },
-              { icon:"🔁", t:"D+2 / D+4 / D+7 Follow-ups", d:"Three touches with bump, value-add, and final-close tones. Fully AI-written." },
-              { icon:"💬", t:"Reply Handler", d:"Paste a reply, get an instant AI response that moves the conversation toward a booking." },
-              { icon:"📊", t:"Kanban Pipeline", d:"Visual board: New → Contacted → Replied → Booked → Closed. Drag and drop." },
-              { icon:"📋", t:"Airtable CRM Sync", d:"One-click sync. All lead data, scores, and messages go into your existing CRM." },
-              { icon:"📅", t:"Calendly Integration", d:"Your booking link gets inserted naturally when a lead shows intent." },
-              { icon:"🔒", t:"Multi-Coach Accounts", d:"Each coach sees only their own pipeline. Perfect for agencies too." },
+              { icon:"🔍", t:"Découverte de leads par IA", d:"Scrape Instagram et TikTok par hashtag. Retourne automatiquement des profils qualifiés correspondant à votre créneau." },
+              { icon:"🎯", t:"Score de qualification 1-10", d:"Claude note chaque lead par rapport à votre créneau, offre et description du client idéal." },
+              { icon:"✍️", t:"Rédacteur de DM personnalisé", d:"Chaque message fait référence à la vraie bio du lead. Moins de 80 mots. Zéro template." },
+              { icon:"🔁", t:"Relances J+2 / J+4 / J+7", d:"Trois contacts avec des tons rappel, valeur ajoutée et dernière tentative. Entièrement rédigés par l'IA." },
+              { icon:"💬", t:"Gestionnaire de réponses", d:"Collez une réponse, obtenez instantanément une réponse IA qui oriente la conversation vers une réservation." },
+              { icon:"📊", t:"Pipeline Kanban", d:"Tableau visuel : Nouveau → Contacté → Répondu → Réservé → Clôturé. Glisser-déposer." },
+              { icon:"📋", t:"Synchronisation CRM Airtable", d:"Synchronisation en un clic. Toutes les données, scores et messages vers votre CRM existant." },
+              { icon:"📅", t:"Intégration Calendly", d:"Votre lien de réservation est inséré naturellement quand un lead montre de l'intérêt." },
+              { icon:"🔒", t:"Comptes multi-coachs", d:"Chaque coach ne voit que son propre pipeline. Parfait pour les agences." },
             ].map(f => <Feature key={f.t} icon={f.icon} title={f.t} desc={f.d} />)}
           </div>
         </div>
       </section>
 
-      {/* Testimonials */}
+      {/* Témoignages */}
       <section className="py-24 px-6">
         <div className="max-w-4xl mx-auto">
-          <p className="text-center text-brand-400 text-xs uppercase tracking-widest font-semibold mb-3">Results</p>
-          <h2 className="text-3xl font-black text-center mb-14">Real coaches, real bookings</h2>
+          <p className="text-center text-brand-400 text-xs uppercase tracking-widest font-semibold mb-3">Résultats</p>
+          <h2 className="text-3xl font-black text-center mb-14">De vrais coachs, de vraies réservations</h2>
           <div className="grid sm:grid-cols-3 gap-5">
             {[
-              { q:"I was spending 3 hours a day on Instagram outreach. Now LeanLead runs it while I coach. Booked 4 calls in week one.", name:"Marcus L.", role:"Business Coach", result:"4 calls / week 1" },
-              { q:"The DMs sound nothing like templates. One prospect said it was the most thoughtful cold DM they'd ever received.", name:"Jasmine R.", role:"Life Coach", result:"12% reply rate" },
-              { q:"The D+7 follow-up converted a lead who'd ghosted me for a week. That booking paid for 6 months of the tool.", name:"Tom A.", role:"Fitness Coach", result:"$3,200 from 1 DM" },
+              { q:"Je passais 3 heures par jour sur la prospection Instagram. Maintenant LeanLead le fait pendant que je coache. 4 appels réservés dès la première semaine.", name:"Marcus L.", role:"Coach Business", result:"4 appels / semaine 1" },
+              { q:"Les DMs ne ressemblent pas du tout à des templates. Un prospect a dit que c'était le DM à froid le plus réfléchi qu'il ait jamais reçu.", name:"Jasmine R.", role:"Coach de Vie", result:"12 % de taux de réponse" },
+              { q:"La relance J+7 a converti un lead qui m'avait ghosté pendant une semaine. Cette réservation a payé 6 mois d'abonnement.", name:"Tom A.", role:"Coach Fitness", result:"3 200 $ pour 1 DM" },
             ].map(t => (
               <div key={t.name} className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
                 <p className="text-sm text-slate-300 leading-relaxed mb-5">"{t.q}"</p>
@@ -248,16 +243,16 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* Tarifs */}
       <section id="pricing" className="py-24 px-6 bg-slate-950/60">
         <div className="max-w-4xl mx-auto">
-          <p className="text-center text-brand-400 text-xs uppercase tracking-widest font-semibold mb-3">Pricing</p>
-          <h2 className="text-3xl font-black text-center mb-3">Simple, transparent pricing</h2>
-          <p className="text-center text-slate-400 text-sm mb-14">Start free. Upgrade when you're closing.</p>
+          <p className="text-center text-brand-400 text-xs uppercase tracking-widest font-semibold mb-3">Tarifs</p>
+          <h2 className="text-3xl font-black text-center mb-3">Tarifs simples et transparents</h2>
+          <p className="text-center text-slate-400 text-sm mb-14">Commencez gratuitement. Passez à la version supérieure quand vous concluez.</p>
           <div className="grid sm:grid-cols-3 gap-6 items-start">
-            <Pricing name="Starter" price="Free" sub="Try it with no commitment." features={["20 leads / month","AI qualification","DM writer","Manual follow-ups"]} cta="Get started free" />
-            <Pricing name="Growth" price="$49" sub="For coaches actively prospecting." features={["200 leads / month","Instagram + TikTok scraping","D+2/4/7 follow-ups","Reply handler","Airtable sync","Priority support"]} hot cta="Start Growth plan" />
-            <Pricing name="Agency" price="$129" sub="Manage multiple coaches." features={["Unlimited leads","Multi-coach accounts","All Growth features","Bulk prospecting","Custom AI prompts","Slack support"]} cta="Start Agency plan" />
+            <Pricing name="Démarrage" price="Gratuit" sub="Essayez sans engagement." features={["20 leads / mois","Qualification IA","Rédacteur de DM","Relances manuelles"]} cta="Commencer gratuitement" />
+            <Pricing name="Croissance" price="49 $" sub="Pour les coachs en prospection active." features={["200 leads / mois","Scraping Instagram + TikTok","Relances J+2/4/7","Gestionnaire de réponses","Sync Airtable","Support prioritaire"]} hot cta="Démarrer le plan Croissance" />
+            <Pricing name="Agence" price="129 $" sub="Gérez plusieurs coachs." features={["Leads illimités","Comptes multi-coachs","Toutes les fonctionnalités Croissance","Prospection en masse","Prompts IA personnalisés","Support Slack"]} cta="Démarrer le plan Agence" />
           </div>
         </div>
       </section>
@@ -265,14 +260,14 @@ export default function Landing() {
       {/* FAQ */}
       <section className="py-24 px-6">
         <div className="max-w-2xl mx-auto">
-          <h2 className="text-2xl font-black text-center mb-12">Frequently asked questions</h2>
+          <h2 className="text-2xl font-black text-center mb-12">Questions fréquentes</h2>
           <div className="space-y-6">
             {[
-              { q:"Does it actually sound human?", a:"Yes. Claude references the lead's exact bio and posts. Coaches see 8-15% reply rates vs the industry average of 1-3%." },
-              { q:"Do I need an Instagram account?", a:"No. LeanLead uses Apify to scrape public profiles by hashtag. Your account is never involved." },
-              { q:"Can I use my own Airtable?", a:"Yes — add your Airtable Base ID and personal access token in onboarding. One click syncs every lead." },
-              { q:"What happens when a lead replies?", a:"Paste their reply in the dashboard, get an AI response in seconds. You review before sending anything." },
-              { q:"Is my data private?", a:"Completely. Each coach account is isolated — you only ever see your own leads and pipeline." },
+              { q:"Ça sonne vraiment humain ?", a:"Oui. Claude fait référence à la vraie bio et aux publications du lead. Les coachs obtiennent 8 à 15 % de taux de réponse contre 1 à 3 % en moyenne dans le secteur." },
+              { q:"Ai-je besoin d'un compte Instagram ?", a:"Non. LeanLead utilise Apify pour scraper les profils publics par hashtag. Votre compte n'est jamais impliqué." },
+              { q:"Puis-je utiliser mon propre Airtable ?", a:"Oui — ajoutez votre Base ID Airtable et votre jeton d'accès dans l'onboarding. Un clic synchronise chaque lead." },
+              { q:"Que se passe-t-il quand un lead répond ?", a:"Collez leur réponse dans le tableau de bord, obtenez une réponse IA en quelques secondes. Vous relisez avant d'envoyer quoi que ce soit." },
+              { q:"Mes données sont-elles privées ?", a:"Complètement. Chaque compte coach est isolé — vous ne voyez que vos propres leads et pipeline." },
             ].map(({ q, a }) => (
               <div key={q} className="border-b border-slate-800 pb-5">
                 <p className="text-sm font-semibold text-white mb-2">{q}</p>
@@ -283,25 +278,25 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Final CTA */}
+      {/* CTA final */}
       <section className="py-24 px-6 text-center">
-        <h2 className="text-4xl font-black mb-4">Ready to fill your calendar?</h2>
-        <p className="text-slate-400 text-sm mb-8 max-w-xs mx-auto">Set up in 5 minutes. First leads qualified in 10.</p>
+        <h2 className="text-4xl font-black mb-4">Prêt à remplir votre agenda ?</h2>
+        <p className="text-slate-400 text-sm mb-8 max-w-xs mx-auto">Configuration en 5 minutes. Premiers leads qualifiés en 10.</p>
         <Link to="/register" className="inline-block px-10 py-4 bg-brand-500 hover:bg-brand-400 rounded-xl font-bold text-base transition-colors shadow-xl shadow-brand-900/40">
-          Start for free today →
+          Commencer gratuitement aujourd'hui →
         </Link>
-        <p className="text-xs text-slate-700 mt-3">No credit card · Cancel anytime</p>
+        <p className="text-xs text-slate-700 mt-3">Sans carte bancaire · Annulable à tout moment</p>
       </section>
 
-      {/* Footer */}
+      {/* Pied de page */}
       <footer className="border-t border-slate-900 py-8 px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-600">
         <span className="font-bold text-slate-500">Lean<span className="text-brand-600">Lead</span></span>
         <div className="flex gap-5">
-          <a href="#pricing">Pricing</a>
-          <Link to="/login">Login</Link>
-          <Link to="/register">Register</Link>
+          <a href="#pricing">Tarifs</a>
+          <Link to="/login">Connexion</Link>
+          <Link to="/register">S'inscrire</Link>
         </div>
-        <p>© {new Date().getFullYear()} LeanLead. Built for coaches who close.</p>
+        <p>© {new Date().getFullYear()} LeanLead. Conçu pour les coachs qui concluent.</p>
       </footer>
     </div>
   );

@@ -8,7 +8,7 @@ import {
 import KanbanBoard from "../components/KanbanBoard";
 
 /* ════════════════════════════════════════════════════════════════════
-   ADD LEAD MODAL
+   MODAL AJOUT DE LEAD
 ════════════════════════════════════════════════════════════════════ */
 function AddLeadModal({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
@@ -34,20 +34,20 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
       <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl animate-fade-in"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-slate-800">
-          <h2 className="font-semibold text-white">Add a lead</h2>
+          <h2 className="font-semibold text-white">Ajouter un lead</h2>
           <button onClick={onClose} className="text-slate-500 hover:text-white text-2xl leading-none">×</button>
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto max-h-[68vh]">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Full name</label>
+              <label className="text-xs text-slate-400 mb-1 block">Nom complet</label>
               <input value={f.name} onChange={set("name")}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                 placeholder="Jane Smith" />
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Handle *</label>
+              <label className="text-xs text-slate-400 mb-1 block">Identifiant *</label>
               <div className="flex">
                 <span className="bg-slate-700 border border-slate-600 border-r-0 rounded-l-xl px-2.5 text-slate-400 text-sm flex items-center">@</span>
                 <input value={f.handle} onChange={set("handle")} required
@@ -59,7 +59,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Platform</label>
+              <label className="text-xs text-slate-400 mb-1 block">Plateforme</label>
               <select value={f.platform} onChange={set("platform")}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500">
                 <option value="instagram">📸 Instagram</option>
@@ -69,7 +69,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Followers</label>
+              <label className="text-xs text-slate-400 mb-1 block">Abonnés</label>
               <input type="number" value={f.followers} onChange={set("followers")}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                 placeholder="0" />
@@ -77,35 +77,35 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <label className="text-xs text-slate-400 mb-1 block">Profile URL</label>
+            <label className="text-xs text-slate-400 mb-1 block">URL du profil</label>
             <input value={f.profile_url} onChange={set("profile_url")}
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
               placeholder="https://instagram.com/janesmith" />
           </div>
 
           <div>
-            <label className="text-xs text-slate-400 mb-1 block">Bio <span className="text-slate-600">(paste their full bio for best AI results)</span></label>
+            <label className="text-xs text-slate-400 mb-1 block">Bio <span className="text-slate-600">(collez la bio complète pour de meilleurs résultats IA)</span></label>
             <textarea value={f.bio} onChange={set("bio")} rows={3}
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
-              placeholder="Helping moms lose 20 lbs in 12 weeks | DM for my free guide…" />
+              placeholder="J'aide les mamans à perdre 10 kg en 12 semaines | DM pour mon guide gratuit…" />
           </div>
 
           <div>
-            <label className="text-xs text-slate-400 mb-1 block">Recent posts / content notes <span className="text-slate-600">(optional)</span></label>
+            <label className="text-xs text-slate-400 mb-1 block">Notes sur les publications récentes <span className="text-slate-600">(facultatif)</span></label>
             <textarea value={f.posts_summary} onChange={set("posts_summary")} rows={2}
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
-              placeholder="Posts about meal prep, 3x/week. Latest caption: 'why I stopped counting calories'…" />
+              placeholder="Publications sur la préparation des repas, 3x/semaine. Dernière légende : 'pourquoi j'ai arrêté de compter les calories'…" />
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer">
             <input type="checkbox" checked={autoQualify} onChange={e => setAutoQualify(e.target.checked)}
               className="w-4 h-4 accent-brand-500" />
-            <span className="text-sm text-slate-300">Auto-qualify with AI after adding</span>
+            <span className="text-sm text-slate-300">Qualifier automatiquement avec l'IA après l'ajout</span>
           </label>
 
           {add.isError && (
             <p className="text-red-400 text-xs bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2">
-              {(add.error as any)?.response?.data?.detail || "Failed to add lead."}
+              {(add.error as any)?.response?.data?.detail || "Échec de l'ajout du lead."}
             </p>
           )}
         </div>
@@ -114,8 +114,8 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
           <button onClick={() => add.mutate()} disabled={add.isPending || !f.handle}
             className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
             {add.isPending
-              ? (autoQualify ? "Adding & qualifying…" : "Adding…")
-              : "Add lead"}
+              ? (autoQualify ? "Ajout et qualification…" : "Ajout…")
+              : "Ajouter le lead"}
           </button>
         </div>
       </div>
@@ -124,7 +124,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   PROSPECTS TAB
+   ONGLET PROSPECTION
 ════════════════════════════════════════════════════════════════════ */
 function ProspectsTab() {
   const qc = useQueryClient();
@@ -161,16 +161,19 @@ function ProspectsTab() {
   const statusColors: Record<string, string> = {
     pending: "text-amber-400", running: "text-brand-400", done: "text-emerald-400", error: "text-red-400",
   };
+  const statusLabels: Record<string, string> = {
+    pending: "en attente", running: "en cours", done: "terminé", error: "erreur",
+  };
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-        <h2 className="font-semibold text-white mb-1">Find new leads</h2>
-        <p className="text-xs text-slate-500 mb-5">Scrape public profiles by hashtag and auto-qualify them.</p>
+        <h2 className="font-semibold text-white mb-1">Trouver de nouveaux leads</h2>
+        <p className="text-xs text-slate-500 mb-5">Scraper des profils publics par hashtag et les qualifier automatiquement.</p>
 
-        {/* Platform */}
+        {/* Plateforme */}
         <div className="mb-5">
-          <label className="text-xs text-slate-400 mb-2 block">Platform</label>
+          <label className="text-xs text-slate-400 mb-2 block">Plateforme</label>
           <div className="grid grid-cols-2 gap-3">
             {[["instagram","📸 Instagram"],["tiktok","🎵 TikTok"]].map(([v,l]) => (
               <button key={v} onClick={() => setPlatform(v)}
@@ -190,7 +193,7 @@ function ProspectsTab() {
             <label className="text-xs text-slate-400">Hashtags *</label>
             <button onClick={() => suggest.mutate()} disabled={suggest.isPending}
               className="text-[10px] text-brand-400 hover:text-brand-300 transition-colors">
-              {suggest.isPending ? "Generating…" : "✦ AI suggest for my niche"}
+              {suggest.isPending ? "Génération…" : "✦ Suggestions IA pour mon créneau"}
             </button>
           </div>
           <div className="flex gap-2 mb-2">
@@ -199,10 +202,10 @@ function ProspectsTab() {
               <input value={tagInput} onChange={e => setTagInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addTag())}
                 className="flex-1 bg-transparent px-2 py-2.5 text-sm focus:outline-none"
-                placeholder="businesscoach" />
+                placeholder="coachbusiness" />
             </div>
             <button onClick={addTag}
-              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-colors">Add</button>
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-colors">Ajouter</button>
           </div>
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
@@ -219,41 +222,41 @@ function ProspectsTab() {
         {/* Options */}
         <div className="flex gap-4 items-end mb-5">
           <div className="flex-1">
-            <label className="text-xs text-slate-400 mb-1 block">Max profiles</label>
+            <label className="text-xs text-slate-400 mb-1 block">Profils max</label>
             <select value={maxResults} onChange={e => setMaxResults(Number(e.target.value))}
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500">
-              {[10,20,50,100].map(n => <option key={n} value={n}>{n} profiles</option>)}
+              {[10,20,50,100].map(n => <option key={n} value={n}>{n} profils</option>)}
             </select>
           </div>
           <label className="flex items-center gap-2 cursor-pointer pb-1">
             <input type="checkbox" checked={autoQualify} onChange={e => setAutoQualify(e.target.checked)}
               className="w-4 h-4 accent-brand-500" />
-            <span className="text-sm text-slate-300 whitespace-nowrap">Auto-qualify</span>
+            <span className="text-sm text-slate-300 whitespace-nowrap">Auto-qualifier</span>
           </label>
         </div>
 
         {run.isError && (
           <p className="text-red-400 text-xs mb-3 bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2">
-            {(run.error as any)?.response?.data?.detail || "Failed to start job."}
+            {(run.error as any)?.response?.data?.detail || "Échec du démarrage de la tâche."}
           </p>
         )}
 
         <button onClick={() => run.mutate()} disabled={run.isPending || !tags.length || running}
           className="w-full py-3 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
-          {run.isPending ? "Starting…" : running ? "Job in progress…" : `🔍 Find leads on ${platform}`}
+          {run.isPending ? "Démarrage…" : running ? "Tâche en cours…" : `🔍 Trouver des leads sur ${platform}`}
         </button>
         {running && (
           <p className="text-center text-xs text-amber-400 mt-2">
-            Scraping in background — leads appear in your pipeline when done.
+            Scraping en arrière-plan — les leads apparaîtront dans votre pipeline une fois terminé.
           </p>
         )}
       </div>
 
-      {/* Job history */}
+      {/* Historique des tâches */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-        <h3 className="font-medium text-white mb-4 text-sm">Recent jobs</h3>
+        <h3 className="font-medium text-white mb-4 text-sm">Tâches récentes</h3>
         {jobs.length === 0 ? (
-          <p className="text-xs text-slate-600 text-center py-6">No jobs yet — run a search above.</p>
+          <p className="text-xs text-slate-600 text-center py-6">Aucune tâche — lancez une recherche ci-dessus.</p>
         ) : (
           <div className="space-y-3">
             {jobs.map(j => (
@@ -261,7 +264,7 @@ function ProspectsTab() {
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-[10px] font-bold uppercase ${statusColors[j.status]}`}>
-                      {j.status === "running" ? "⟳ running" : j.status}
+                      {j.status === "running" ? "⟳ en cours" : statusLabels[j.status] || j.status}
                     </span>
                     <span className="text-xs text-slate-600 capitalize">{j.platform}</span>
                   </div>
@@ -286,10 +289,10 @@ function ProspectsTab() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   FOLLOW-UPS TAB
+   ONGLET RELANCES
 ════════════════════════════════════════════════════════════════════ */
 function dayLabel(day: number) {
-  return day === 2 ? "D+2 · Light bump" : day === 4 ? "D+4 · Value-add" : "D+7 · Final close";
+  return day === 2 ? "J+2 · Rappel léger" : day === 4 ? "J+4 · Valeur ajoutée" : "J+7 · Dernière relance";
 }
 
 function dayClasses(day: number) {
@@ -304,7 +307,7 @@ function msgKey(day: number): keyof FollowupDue {
 
 function daysSince(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  return d === 1 ? "1 day ago" : `${d} days ago`;
+  return d === 1 ? "il y a 1 jour" : `il y a ${d} jours`;
 }
 
 function FollowupRow({ item }: { item: FollowupDue }) {
@@ -313,8 +316,8 @@ function FollowupRow({ item }: { item: FollowupDue }) {
   const [copied, setCopied] = useState(false);
   const refresh = () => { qc.invalidateQueries({ queryKey: ["followups"] }); qc.invalidateQueries({ queryKey: ["leads"] }); };
 
-  const generate  = useMutation({ mutationFn: () => followupsApi.generate(item.lead_id, item.due_day), onSuccess: refresh });
-  const markSent  = useMutation({ mutationFn: () => followupsApi.markSent(item.lead_id, item.due_day), onSuccess: refresh });
+  const generate = useMutation({ mutationFn: () => followupsApi.generate(item.lead_id, item.due_day), onSuccess: refresh });
+  const markSent = useMutation({ mutationFn: () => followupsApi.markSent(item.lead_id, item.due_day), onSuccess: refresh });
 
   const message = item[msgKey(item.due_day)] as string | undefined;
 
@@ -334,7 +337,7 @@ function FollowupRow({ item }: { item: FollowupDue }) {
           </span>
           <div className="min-w-0">
             <p className="text-sm font-medium text-white truncate">{item.name || `@${item.handle}`}</p>
-            <p className="text-xs text-slate-500">@{item.handle} · messaged {daysSince(item.messaged_at)}</p>
+            <p className="text-xs text-slate-500">@{item.handle} · contacté {daysSince(item.messaged_at)}</p>
           </div>
         </div>
         <span className="text-slate-600 ml-3 flex-shrink-0">{open ? "▲" : "▼"}</span>
@@ -344,7 +347,7 @@ function FollowupRow({ item }: { item: FollowupDue }) {
         <div className="px-5 pb-5 border-t border-slate-800 space-y-4">
           {item.outreach_message && (
             <div className="mt-4">
-              <p className="text-xs text-slate-500 mb-1">Original DM</p>
+              <p className="text-xs text-slate-500 mb-1">DM original</p>
               <p className="text-xs text-slate-400 bg-slate-800/60 rounded-xl p-3 leading-relaxed line-clamp-3">
                 {item.outreach_message}
               </p>
@@ -353,36 +356,36 @@ function FollowupRow({ item }: { item: FollowupDue }) {
 
           {message ? (
             <div>
-              <p className="text-xs text-slate-500 mb-2">Follow-up message</p>
+              <p className="text-xs text-slate-500 mb-2">Message de relance</p>
               <div className="bg-slate-800 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
                 {message}
               </div>
               <div className="flex gap-4 mt-2">
                 <button onClick={copy} className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
-                  {copied ? "Copied!" : "📋 Copy"}
+                  {copied ? "Copié !" : "📋 Copier"}
                 </button>
                 <button onClick={() => generate.mutate()} disabled={generate.isPending}
                   className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
-                  {generate.isPending ? "Rewriting…" : "↻ Regenerate"}
+                  {generate.isPending ? "Réécriture…" : "↻ Régénérer"}
                 </button>
               </div>
             </div>
           ) : (
             <button onClick={() => generate.mutate()} disabled={generate.isPending}
               className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-xl text-sm text-slate-300 transition-colors">
-              {generate.isPending ? "Writing…" : `✍️ Generate ${dayLabel(item.due_day)} message`}
+              {generate.isPending ? "Rédaction…" : `✍️ Générer le message ${dayLabel(item.due_day)}`}
             </button>
           )}
 
           <div className="flex gap-3">
             <button onClick={() => markSent.mutate()} disabled={markSent.isPending || !message}
               className="flex-1 py-2.5 bg-emerald-900 hover:bg-emerald-800 disabled:opacity-40 text-emerald-300 rounded-xl text-sm font-medium transition-colors">
-              {markSent.isPending ? "Marking…" : "✓ Mark as sent"}
+              {markSent.isPending ? "Marquage…" : "✓ Marquer comme envoyé"}
             </button>
             <button onClick={() => markSent.mutate()}
               className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-500 rounded-xl text-sm transition-colors"
-              title="Skip this follow-up">
-              Skip
+              title="Ignorer cette relance">
+              Ignorer
             </button>
           </div>
 
@@ -408,27 +411,27 @@ function FollowupsTab() {
     <div className="max-w-2xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-semibold text-white">Follow-up queue</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Leads needing a D+2, D+4, or D+7 touch today</p>
+          <h2 className="font-semibold text-white">File de relances</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Leads nécessitant une relance J+2, J+4 ou J+7 aujourd'hui</p>
         </div>
-        <button onClick={() => refetch()} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">↻ Refresh</button>
+        <button onClick={() => refetch()} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">↻ Actualiser</button>
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-slate-600 text-center py-12">Loading…</p>
+        <p className="text-sm text-slate-600 text-center py-12">Chargement…</p>
       ) : items.length === 0 ? (
         <div className="text-center py-16 bg-slate-900 border border-slate-800 rounded-2xl">
           <p className="text-2xl mb-2">🎉</p>
-          <p className="text-sm font-medium text-white mb-1">Queue is clear</p>
-          <p className="text-xs text-slate-500">No follow-ups due. Check back tomorrow.</p>
+          <p className="text-sm font-medium text-white mb-1">File vide</p>
+          <p className="text-xs text-slate-500">Aucune relance en attente. Revenez demain.</p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-3 gap-3">
             {[
-              { day: 2, label: "D+2 due", cls: "text-amber-400" },
-              { day: 4, label: "D+4 due", cls: "text-brand-400" },
-              { day: 7, label: "D+7 due", cls: "text-rose-400" },
+              { day: 2, label: "J+2 à faire", cls: "text-amber-400" },
+              { day: 4, label: "J+4 à faire", cls: "text-brand-400" },
+              { day: 7, label: "J+7 à faire", cls: "text-rose-400" },
             ].map(({ day, label, cls }) => (
               <div key={day} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-center">
                 <p className={`text-xl font-black ${cls}`}>{byDay(day).length}</p>
@@ -437,7 +440,6 @@ function FollowupsTab() {
             ))}
           </div>
           <div className="space-y-3">
-            {/* D+7 first — most urgent */}
             {[7, 4, 2].flatMap(day => byDay(day)).map(item => (
               <FollowupRow key={`${item.lead_id}-${item.due_day}`} item={item} />
             ))}
@@ -449,7 +451,7 @@ function FollowupsTab() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
-   DASHBOARD SHELL
+   TABLEAU DE BORD
 ════════════════════════════════════════════════════════════════════ */
 type Tab = "pipeline" | "prospects" | "followups";
 
@@ -499,15 +501,15 @@ export default function Dashboard() {
 
   const TABS: { id: Tab; label: string; badge?: number }[] = [
     { id: "pipeline",  label: "Pipeline" },
-    { id: "prospects", label: "Prospects" },
-    { id: "followups", label: "Follow-ups", badge: followups.length || undefined },
+    { id: "prospects", label: "Prospection" },
+    { id: "followups", label: "Relances", badge: followups.length || undefined },
   ];
 
   const initials = (coach?.name ?? "?")[0].toUpperCase();
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
-      {/* ── Navbar ── */}
+      {/* ── Barre de navigation ── */}
       <nav className="sticky top-0 z-40 flex items-center justify-between gap-4 px-5 py-3
                       border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
         <div className="flex items-center gap-4 min-w-0">
@@ -515,7 +517,7 @@ export default function Dashboard() {
             Lean<span className="text-brand-400">Lead</span>
           </span>
 
-          {/* Tab switcher */}
+          {/* Sélecteur d'onglets */}
           <div className="hidden sm:flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
@@ -535,16 +537,16 @@ export default function Dashboard() {
 
         <div className="flex items-center gap-3">
           {tab === "pipeline" && (
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…"
               className="hidden sm:block bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5
                          text-sm focus:outline-none focus:border-brand-500 w-36 transition-colors" />
           )}
           <button onClick={() => setShowAdd(true)}
             className="px-3.5 py-1.5 bg-brand-500 hover:bg-brand-400 rounded-xl text-sm font-semibold transition-colors">
-            + Add lead
+            + Ajouter un lead
           </button>
 
-          {/* Account menu */}
+          {/* Menu compte */}
           <div className="relative group">
             <button className="w-8 h-8 rounded-full bg-brand-900 border border-brand-800 flex items-center justify-center
                                text-xs font-bold text-brand-300 hover:border-brand-600 transition-colors">
@@ -558,28 +560,28 @@ export default function Dashboard() {
               </div>
               <button onClick={() => nav("/onboarding")}
                 className="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-slate-700 transition-colors">
-                Settings
+                Paramètres
               </button>
               <button onClick={logout}
                 className="w-full text-left px-4 py-2.5 text-xs text-red-400 hover:bg-slate-700 transition-colors">
-                Log out
+                Déconnexion
               </button>
             </div>
           </div>
         </div>
       </nav>
 
-      {/* ── Stats bar (pipeline only) ── */}
+      {/* ── Barre de stats (pipeline uniquement) ── */}
       {tab === "pipeline" && (
         <div className="flex gap-6 px-6 py-3 border-b border-slate-900">
           {[
-            { label: "Total",     value: stats.total,     color: "text-white" },
-            { label: "Contacted", value: stats.contacted, color: "text-brand-400" },
-            { label: "Replied",   value: stats.replied,   color: "text-brand-400" },
-            { label: "Booked",    value: stats.booked,    color: "text-emerald-400" },
+            { label: "Total",      value: stats.total,     color: "text-white" },
+            { label: "Contactés",  value: stats.contacted, color: "text-brand-400" },
+            { label: "Répondus",   value: stats.replied,   color: "text-brand-400" },
+            { label: "Réservés",   value: stats.booked,    color: "text-emerald-400" },
             {
-              label: "Conv. rate",
-              value: stats.total ? `${Math.round((stats.booked / stats.total) * 100)}%` : "—",
+              label: "Taux conv.",
+              value: stats.total ? `${Math.round((stats.booked / stats.total) * 100)} %` : "—",
               color: "text-amber-400",
             },
           ].map(s => (
@@ -591,22 +593,22 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Tab content ── */}
+      {/* ── Contenu des onglets ── */}
       <div className="flex-1 min-h-0">
         {tab === "pipeline" && (
           <div className="h-full px-5 py-4 overflow-auto">
             {isLoading ? (
               <div className="flex items-center justify-center h-64 text-slate-600 text-sm">
-                Loading pipeline…
+                Chargement du pipeline…
               </div>
             ) : leads.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center">
                 <p className="text-4xl mb-3">📭</p>
-                <p className="text-sm font-semibold text-white mb-1">No leads yet</p>
-                <p className="text-xs text-slate-500 mb-4">Add leads manually or use the Prospects tab to scrape Instagram/TikTok.</p>
+                <p className="text-sm font-semibold text-white mb-1">Aucun lead pour l'instant</p>
+                <p className="text-xs text-slate-500 mb-4">Ajoutez des leads manuellement ou utilisez l'onglet Prospection pour scraper Instagram/TikTok.</p>
                 <button onClick={() => setShowAdd(true)}
                   className="px-4 py-2 bg-brand-500 hover:bg-brand-400 rounded-xl text-sm font-medium transition-colors">
-                  + Add your first lead
+                  + Ajouter votre premier lead
                 </button>
               </div>
             ) : (
@@ -628,7 +630,7 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ── Mobile bottom tabs ── */}
+      {/* ── Navigation mobile bas ── */}
       <div className="sm:hidden flex border-t border-slate-800 bg-slate-950">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}

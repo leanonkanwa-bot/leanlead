@@ -13,13 +13,13 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
 
   const refetch = () => qc.invalidateQueries({ queryKey: ["leads"] });
 
-  const qualify = useMutation({ mutationFn: () => pipelineApi.qualify(lead.id), onSuccess: refetch });
-  const write   = useMutation({ mutationFn: () => pipelineApi.write(lead.id), onSuccess: refetch });
-  const reply   = useMutation({
+  const qualify  = useMutation({ mutationFn: () => pipelineApi.qualify(lead.id), onSuccess: refetch });
+  const write    = useMutation({ mutationFn: () => pipelineApi.write(lead.id), onSuccess: refetch });
+  const reply    = useMutation({
     mutationFn: () => pipelineApi.reply(lead.id, { lead_reply: replyText, conversation_history: convHistory }),
     onSuccess: refetch,
   });
-  const syncCrm = useMutation({ mutationFn: () => pipelineApi.syncCrm(lead.id), onSuccess: refetch });
+  const syncCrm  = useMutation({ mutationFn: () => pipelineApi.syncCrm(lead.id), onSuccess: refetch });
   const saveNotes = useMutation({ mutationFn: () => leadsApi.update(lead.id, { notes }), onSuccess: refetch });
   const del = useMutation({ mutationFn: () => leadsApi.delete(lead.id), onSuccess: () => { refetch(); onClose(); } });
 
@@ -43,7 +43,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl animate-fade-in"
         onClick={e => e.stopPropagation()}>
-        {/* Header */}
+        {/* En-tête */}
         <div className="flex items-start justify-between p-5 border-b border-slate-800">
           <div>
             <h2 className="font-semibold text-white">{lead.name}</h2>
@@ -52,20 +52,20 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
           <button onClick={onClose} className="text-slate-500 hover:text-white text-2xl leading-none">×</button>
         </div>
 
-        {/* Tabs */}
+        {/* Onglets */}
         <div className="flex border-b border-slate-800">
           {(["info", "dm", "reply"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-2.5 text-xs font-medium capitalize transition-colors border-b-2 ${
                 tab === t ? "text-brand-400 border-brand-500" : "text-slate-500 border-transparent hover:text-slate-300"}`}>
-              {t === "info" ? "Profile" : t === "dm" ? "DM Draft" : "Reply"}
+              {t === "info" ? "Profil" : t === "dm" ? "Brouillon DM" : "Réponse"}
             </button>
           ))}
         </div>
 
-        {/* Content */}
+        {/* Contenu */}
         <div className="p-5 overflow-y-auto max-h-[58vh] space-y-4">
-          {/* Info */}
+          {/* Profil */}
           {tab === "info" && (
             <>
               {lead.bio && (
@@ -77,7 +77,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
               {lead.qualification_score > 0 && (
                 <div className="bg-slate-800 rounded-xl p-4">
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="text-xs text-slate-500">AI score</span>
+                    <span className="text-xs text-slate-500">Score IA</span>
                     <span className="text-2xl font-black text-brand-400">{lead.qualification_score}/10</span>
                   </div>
                   {lead.qualification_reason && (
@@ -98,19 +98,19 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500" />
                 <button onClick={() => saveNotes.mutate()}
                   className="text-xs text-brand-400 hover:text-brand-300 mt-1 transition-colors">
-                  {saveNotes.isPending ? "Saving…" : "Save notes"}
+                  {saveNotes.isPending ? "Enregistrement…" : "Enregistrer les notes"}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
-                <Btn label="🎯 Re-qualify" pending={qualify.isPending} pendingLabel="Qualifying…"
+                <Btn label="🎯 Re-qualifier" pending={qualify.isPending} pendingLabel="Qualification…"
                   onClick={() => qualify.mutate()}
                   className="bg-brand-950 hover:bg-brand-900 text-brand-300" />
-                <Btn label="↗ Sync to Airtable" pending={syncCrm.isPending} pendingLabel="Syncing…"
+                <Btn label="↗ Sync Airtable" pending={syncCrm.isPending} pendingLabel="Synchronisation…"
                   onClick={() => syncCrm.mutate()}
                   className="bg-slate-700 hover:bg-slate-600 text-slate-300" />
-                <button onClick={() => { if (confirm("Delete this lead?")) del.mutate(); }}
+                <button onClick={() => { if (confirm("Supprimer ce lead ?")) del.mutate(); }}
                   className="ml-auto px-3 py-2 bg-red-950 hover:bg-red-900 text-red-400 rounded-lg text-xs transition-colors">
-                  Delete
+                  Supprimer
                 </button>
               </div>
               {(qualify.isError || syncCrm.isError) && (
@@ -126,25 +126,25 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
             <>
               {lead.outreach_message ? (
                 <div>
-                  <p className="text-xs text-slate-500 mb-2">Generated DM</p>
+                  <p className="text-xs text-slate-500 mb-2">DM généré</p>
                   <div className="bg-slate-800 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
                     {lead.outreach_message}
                   </div>
                   <button onClick={() => copy(lead.outreach_message!)}
                     className="text-xs text-brand-400 hover:text-brand-300 mt-2 transition-colors">
-                    {copied ? "Copied!" : "📋 Copy to clipboard"}
+                    {copied ? "Copié !" : "📋 Copier dans le presse-papiers"}
                   </button>
                 </div>
               ) : (
                 <div className="text-center py-8">
                   <p className="text-sm text-slate-500 mb-4">
-                    {!lead.qualification_reason ? "Qualify this lead first to generate a DM." : "No DM generated yet."}
+                    {!lead.qualification_reason ? "Qualifiez d'abord ce lead pour générer un DM." : "Aucun DM généré pour l'instant."}
                   </p>
                 </div>
               )}
               <button onClick={() => write.mutate()} disabled={busy || !lead.qualification_reason}
                 className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
-                {write.isPending ? "Writing DM…" : lead.outreach_message ? "↻ Regenerate DM" : "✍️ Generate DM"}
+                {write.isPending ? "Rédaction du DM…" : lead.outreach_message ? "↻ Régénérer le DM" : "✍️ Générer un DM"}
               </button>
               {write.isError && (
                 <p className="text-red-400 text-xs">{(write.error as any)?.response?.data?.detail}</p>
@@ -152,36 +152,36 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
             </>
           )}
 
-          {/* Reply */}
+          {/* Réponse */}
           {tab === "reply" && (
             <>
               <div>
-                <label className="text-xs text-slate-500 mb-1 block">Their reply</label>
+                <label className="text-xs text-slate-500 mb-1 block">Sa réponse</label>
                 <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={3}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500"
-                  placeholder="Paste their message here…" />
+                  placeholder="Collez leur message ici…" />
               </div>
               <div>
-                <label className="text-xs text-slate-500 mb-1 block">Conversation history <span className="text-slate-700">(optional)</span></label>
+                <label className="text-xs text-slate-500 mb-1 block">Historique de la conversation <span className="text-slate-700">(facultatif)</span></label>
                 <textarea value={convHistory} onChange={e => setConvHistory(e.target.value)} rows={3}
                   className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500"
-                  placeholder={"You: [your DM]\nThem: [first reply]\n…"} />
+                  placeholder={"Vous : [votre DM]\nEux : [première réponse]\n…"} />
               </div>
               {lead.suggested_reply && (
                 <div>
-                  <p className="text-xs text-slate-500 mb-2">Suggested reply</p>
+                  <p className="text-xs text-slate-500 mb-2">Réponse suggérée</p>
                   <div className="bg-slate-800 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
                     {lead.suggested_reply}
                   </div>
                   <button onClick={() => copy(lead.suggested_reply!)}
                     className="text-xs text-brand-400 hover:text-brand-300 mt-2 transition-colors">
-                    {copied ? "Copied!" : "📋 Copy"}
+                    {copied ? "Copié !" : "📋 Copier"}
                   </button>
                 </div>
               )}
               <button onClick={() => reply.mutate()} disabled={busy || !replyText}
                 className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
-                {reply.isPending ? "Generating…" : "🤖 Generate reply"}
+                {reply.isPending ? "Génération…" : "🤖 Générer une réponse"}
               </button>
               {reply.isError && (
                 <p className="text-red-400 text-xs">{(reply.error as any)?.response?.data?.detail}</p>

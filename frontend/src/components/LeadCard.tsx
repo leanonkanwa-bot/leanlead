@@ -31,7 +31,6 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
       onClick={onClick}
       className="bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl p-3.5 cursor-pointer select-none transition-all"
     >
-      {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-white truncate">{lead.name || `@${lead.handle}`}</p>
@@ -42,12 +41,10 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
         <Score v={lead.qualification_score} />
       </div>
 
-      {/* Bio */}
       {lead.bio && (
         <p className="text-[11px] text-slate-400 line-clamp-2 mb-2.5 leading-relaxed">{lead.bio}</p>
       )}
 
-      {/* Pain point tags */}
       {lead.pain_points?.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2.5">
           {lead.pain_points.slice(0, 2).map(p => (
@@ -56,14 +53,13 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
         </div>
       )}
 
-      {/* Footer */}
       <div className="flex items-center justify-between mt-0.5">
         <span className="text-[10px] text-slate-600">
-          {lead.followers > 0 ? `${lead.followers.toLocaleString()} followers` : ""}
+          {lead.followers > 0 ? `${lead.followers.toLocaleString()} abonnés` : ""}
         </span>
         <div className="flex gap-2 items-center">
           {followupDue && (
-            <span className="text-[9px] bg-amber-950 text-amber-400 border border-amber-900/60 px-1.5 py-0.5 rounded-full">follow-up due</span>
+            <span className="text-[9px] bg-amber-950 text-amber-400 border border-amber-900/60 px-1.5 py-0.5 rounded-full">relance due</span>
           )}
           {lead.airtable_record_id && <span className="text-[9px] text-emerald-700">✦</span>}
         </div>
