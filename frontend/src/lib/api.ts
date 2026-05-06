@@ -76,7 +76,6 @@ export const pipelineApi = {
   write:   (id: number) => api.post(`/pipeline/${id}/write`),
   reply:   (id: number, d: { lead_reply: string; conversation_history?: string }) =>
     api.post(`/pipeline/${id}/reply`, d),
-  syncCrm: (id: number) => api.post(`/pipeline/${id}/sync-crm`),
 };
 
 /* ── Follow-ups ── */

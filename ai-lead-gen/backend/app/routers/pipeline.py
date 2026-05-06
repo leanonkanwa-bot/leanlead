@@ -3,11 +3,9 @@ Pipeline router – runs agents on a lead and updates the DB.
 POST /api/pipeline/{lead_id}/qualify   → qualifier_agent
 POST /api/pipeline/{lead_id}/write     → writer_agent (sets stage=contacted + messaged_at)
 POST /api/pipeline/{lead_id}/reply     → reply_agent  (sets stage=replied)
-POST /api/pipeline/{lead_id}/sync-crm  → crm_agent (Airtable)
 PATCH /api/pipeline/{lead_id}/stage   → manual stage override
 """
 import json
-import os
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,7 +15,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_coach
 from ..database import get_db
 from .. import models
-from ..agents import qualifier_agent, writer_agent, reply_agent, crm_agent
+from ..agents import qualifier_agent, writer_agent, reply_agent
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
@@ -126,57 +124,6 @@ def reply(
     db.commit()
 
     return {"ok": True, "suggested_reply": suggested}
-
-
-@router.post("/{lead_id}/sync-crm")
-def sync_crm(
-    lead_id: int,
-    coach: models.Coach = Depends(get_current_coach),
-    db: Session = Depends(get_db),
-):
-    lead = _get_lead_or_404(lead_id, coach, db)
-
-    base_id = coach.airtable_base_id or os.getenv("AIRTABLE_BASE_ID", "appfdB2W41J5sVZ2U")
-    api_key = coach.airtable_api_key or os.getenv("AIRTABLE_API_KEY", "")
-    if not api_key:
-        raise HTTPException(status_code=400, detail="No Airtable API key configured")
-
-    pain_points_str = ""
-    if lead.pain_points:
-        try:
-            pain_points_str = ", ".join(json.loads(lead.pain_points))
-        except Exception:
-            pain_points_str = lead.pain_points
-
-    lead_data = {
-        "name": lead.name,
-        "handle": lead.handle,
-        "platform": lead.platform,
-        "profile_url": lead.profile_url or "",
-        "bio": lead.bio or "",
-        "followers": lead.followers,
-        "qualification_score": lead.qualification_score,
-        "qualification_reason": (lead.qualification_reason or "")
-            + (f"\nPain points: {pain_points_str}" if pain_points_str else ""),
-        "stage": lead.stage,
-        "outreach_message": lead.outreach_message or "",
-        "notes": lead.notes or "",
-    }
-
-    try:
-        record_id = crm_agent.sync_lead(
-            lead_data=lead_data,
-            airtable_base_id=base_id,
-            airtable_api_key=api_key,
-            record_id=lead.airtable_record_id,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Airtable sync failed: {e}")
-
-    lead.airtable_record_id = record_id
-    db.commit()
-
-    return {"ok": True, "airtable_record_id": record_id}
 
 
 class StageRequest(BaseModel):

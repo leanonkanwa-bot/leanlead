@@ -19,7 +19,6 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
     mutationFn: () => pipelineApi.reply(lead.id, { lead_reply: replyText, conversation_history: convHistory }),
     onSuccess: refetch,
   });
-  const syncCrm  = useMutation({ mutationFn: () => pipelineApi.syncCrm(lead.id), onSuccess: refetch });
   const saveNotes = useMutation({ mutationFn: () => leadsApi.update(lead.id, { notes }), onSuccess: refetch });
   const del = useMutation({ mutationFn: () => leadsApi.delete(lead.id), onSuccess: () => { refetch(); onClose(); } });
 
@@ -28,7 +27,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
     setCopied(true); setTimeout(() => setCopied(false), 1500);
   }
 
-  const busy = qualify.isPending || write.isPending || reply.isPending || syncCrm.isPending;
+  const busy = qualify.isPending || write.isPending || reply.isPending;
 
   const Btn = ({ label, pending, pendingLabel, onClick, className = "" }: {
     label: string; pending: boolean; pendingLabel: string; onClick: () => void; className?: string;
@@ -105,17 +104,14 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                 <Btn label="🎯 Re-qualifier" pending={qualify.isPending} pendingLabel="Qualification…"
                   onClick={() => qualify.mutate()}
                   className="bg-brand-950 hover:bg-brand-900 text-brand-300" />
-                <Btn label="↗ Sync Airtable" pending={syncCrm.isPending} pendingLabel="Synchronisation…"
-                  onClick={() => syncCrm.mutate()}
-                  className="bg-slate-700 hover:bg-slate-600 text-slate-300" />
                 <button onClick={() => { if (confirm("Supprimer ce lead ?")) del.mutate(); }}
                   className="ml-auto px-3 py-2 bg-red-950 hover:bg-red-900 text-red-400 rounded-lg text-xs transition-colors">
                   Supprimer
                 </button>
               </div>
-              {(qualify.isError || syncCrm.isError) && (
+              {qualify.isError && (
                 <p className="text-red-400 text-xs">
-                  {((qualify.error || syncCrm.error) as any)?.response?.data?.detail}
+                  {(qualify.error as any)?.response?.data?.detail}
                 </p>
               )}
             </>

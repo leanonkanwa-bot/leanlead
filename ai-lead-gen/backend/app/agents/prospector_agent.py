@@ -11,10 +11,10 @@ import httpx
 
 APIFY_BASE = "https://api.apify.com/v2"
 
-# Apify actor IDs
+# Apify actor IDs — use ~ separator (not /) in REST API paths
 ACTORS = {
-    "instagram": "apify/instagram-scraper",
-    "tiktok": "clockworks/tiktok-scraper",
+    "instagram": "apify~instagram-scraper",
+    "tiktok": "clockworks~tiktok-scraper",
 }
 
 
