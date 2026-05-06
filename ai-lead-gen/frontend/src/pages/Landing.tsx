@@ -291,7 +291,7 @@ export default function Landing() {
                 n: "03",
                 title: "One-click personalized DMs",
                 desc: "For each qualified lead, Claude writes a custom outreach message using their actual bio and pain points.",
-                detail: "Every message sounds handwritten. No templates. No "Hey I love your content" spam.",
+                detail: "Every message sounds handwritten. No templates. No generic openers.",
               },
               {
                 n: "04",

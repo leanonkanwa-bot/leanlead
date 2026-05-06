@@ -44,3 +44,7 @@ logs/
 # Models cache
 .cache/
 models/
+leanlead.db
+node_modules/
+__pycache__/
+*.pyc
