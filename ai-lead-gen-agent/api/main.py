@@ -5,6 +5,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+import asyncio
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -93,7 +94,7 @@ async def qualify_endpoint(body: QualifyRequest):
     If score >= 70, syncs the lead to Airtable automatically.
     """
     try:
-        result = await qualify_lead(body.profile_url)
+        result = await asyncio.to_thread(qualify_lead, body.profile_url)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Qualification failed: {exc}")
 
@@ -112,11 +113,10 @@ async def qualify_endpoint(body: QualifyRequest):
                 record = await crm_agent.sync_qualified_lead(result, dm_sequence)
                 airtable_record_id = record.get("id")
             except Exception as exc:
-                # Non-blocking: log but don't fail the request
                 print(f"[CRM] Airtable sync failed: {exc}")
 
     return QualifyResponse(
-        profile_url=result["profile_url"],
+        profile_url=result["url"],
         platform=result["platform"],
         username=result["username"],
         score=result["score"],
@@ -206,7 +206,7 @@ async def webhook_endpoint(body: WebhookEvent, background_tasks: BackgroundTasks
 
 async def _process_new_lead(profile_url: str):
     try:
-        result = await qualify_lead(profile_url)
+        result = await asyncio.to_thread(qualify_lead, profile_url)
         if result["passed_threshold"]:
             dm_sequence = await write_dm_sequence(result)
             await crm_agent.sync_qualified_lead(result, dm_sequence)

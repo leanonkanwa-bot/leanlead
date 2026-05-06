@@ -38,9 +38,8 @@ async def sync_qualified_lead(qualify_result: dict, dm_sequence: dict) -> dict:
 
     Returns the Airtable record dict.
     """
-    existing = await asyncio.to_thread(
-        airtable.get_lead_by_url, qualify_result["profile_url"]
-    )
+    profile_url = qualify_result.get("url") or qualify_result.get("profile_url", "")
+    existing = await asyncio.to_thread(airtable.get_lead_by_url, profile_url)
 
     next_action = f"Envoyer opener : {dm_sequence['opener'][:120]}..."
 
@@ -50,7 +49,7 @@ async def sync_qualified_lead(qualify_result: dict, dm_sequence: dict) -> dict:
             record_id=existing["id"],
             name=qualify_result.get("username", ""),
             platform=qualify_result.get("platform", ""),
-            profile_url=qualify_result["profile_url"],
+            profile_url=profile_url,
             niche=qualify_result.get("niche", ""),
             score=qualify_result.get("score", 0),
             stage="CONTACTED",
@@ -63,7 +62,7 @@ async def sync_qualified_lead(qualify_result: dict, dm_sequence: dict) -> dict:
             airtable.upsert_lead,
             name=qualify_result.get("username", ""),
             platform=qualify_result.get("platform", ""),
-            profile_url=qualify_result["profile_url"],
+            profile_url=profile_url,
             niche=qualify_result.get("niche", ""),
             score=qualify_result.get("score", 0),
             stage="CONTACTED",
