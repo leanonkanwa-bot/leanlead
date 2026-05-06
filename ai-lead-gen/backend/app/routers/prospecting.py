@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_coach
 from ..database import get_db
 from .. import models
-from ..agents import prospector_agent, qualifier_agent
+from ..agents import prospector_agent, qualifier_agent, writer_agent
+from .leads import _serialize
 
 router = APIRouter(prefix="/api/prospecting", tags=["prospecting"])
 
@@ -169,6 +170,93 @@ def list_jobs(
         }
         for j in jobs
     ]
+
+
+class FromUrlRequest(BaseModel):
+    profile_url: str
+    auto_write: bool = True
+
+
+@router.post("/from-url")
+def prospect_from_url(
+    req: FromUrlRequest,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    """Synchronously scrape a single profile URL, qualify + write DM, save lead."""
+    profile = prospector_agent.prospect_by_url(
+        profile_url=req.profile_url,
+        apify_api_key=coach.apify_api_key or None,
+    )
+
+    handle = (profile.get("handle") or "").strip().lower()
+    if not handle:
+        raise HTTPException(status_code=400, detail="Impossible d'extraire l'identifiant depuis l'URL.")
+
+    existing = db.query(models.Lead).filter(
+        models.Lead.coach_id == coach.id,
+        models.Lead.handle == handle,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail=f"Ce lead (@{handle}) est déjà dans votre pipeline.")
+
+    lead = models.Lead(
+        coach_id=coach.id,
+        name=profile.get("name", handle),
+        handle=handle,
+        platform=profile.get("platform", "unknown"),
+        profile_url=profile.get("profile_url", req.profile_url),
+        bio=profile.get("bio", ""),
+        followers=profile.get("followers", 0),
+        posts_summary=profile.get("posts_summary", ""),
+        stage="new",
+    )
+    db.add(lead)
+    db.flush()
+
+    if coach.niche and coach.offer_description:
+        try:
+            result = qualifier_agent.qualify_lead(
+                lead_data={
+                    "name": lead.name, "handle": lead.handle, "platform": lead.platform,
+                    "bio": lead.bio or "", "followers": lead.followers,
+                    "posts_summary": lead.posts_summary or "",
+                },
+                coach_niche=coach.niche,
+                coach_offer=coach.offer_description,
+            )
+            lead.qualification_score = result.get("score", 0)
+            lead.qualification_reason = result.get("reason", "")
+            lead.pain_points = json.dumps(result.get("pain_points", []))
+            lead.recommended_angle = result.get("recommended_angle", "")
+        except Exception:
+            pass
+
+        if req.auto_write:
+            try:
+                dm = writer_agent.write_outreach_message(
+                    lead_data={
+                        "name": lead.name, "handle": lead.handle, "platform": lead.platform,
+                        "bio": lead.bio or "", "followers": lead.followers,
+                        "posts_summary": lead.posts_summary or "",
+                    },
+                    coach_name=coach.name,
+                    coach_niche=coach.niche,
+                    coach_offer=coach.offer_description,
+                    qualification={
+                        "score": lead.qualification_score,
+                        "reason": lead.qualification_reason or "",
+                        "pain_points": json.loads(lead.pain_points or "[]"),
+                        "recommended_angle": lead.recommended_angle or "",
+                    },
+                )
+                lead.outreach_message = dm
+            except Exception:
+                pass
+
+    db.commit()
+    db.refresh(lead)
+    return _serialize(lead)
 
 
 @router.get("/suggest-hashtags")

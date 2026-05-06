@@ -147,6 +147,78 @@ def prospect(
     return profiles
 
 
+def prospect_by_url(profile_url: str, apify_api_key: str | None = None) -> dict:
+    """
+    Extract a normalized profile dict from a single TikTok or Instagram URL.
+    Tries Apify first; falls back to URL-only parsing if no key or Apify fails.
+    """
+    url = profile_url.strip().rstrip("/")
+
+    if "tiktok.com" in url:
+        platform = "tiktok"
+        handle = url.split("@")[-1].split("?")[0] if "@" in url else url.split("/")[-1]
+    elif "instagram.com" in url:
+        platform = "instagram"
+        handle = url.split("instagram.com/")[-1].split("/")[0].split("?")[0]
+    else:
+        # Generic fallback
+        platform = "unknown"
+        handle = url.split("/")[-1].split("?")[0].lstrip("@")
+
+    base_profile = {
+        "platform": platform,
+        "handle": handle.lower(),
+        "name": handle,
+        "profile_url": url,
+        "bio": "",
+        "followers": 0,
+        "posts_summary": "",
+    }
+
+    if not apify_api_key:
+        try:
+            apify_api_key = _api_key()
+        except ValueError:
+            return base_profile
+
+    try:
+        if platform == "tiktok":
+            input_data = {"profiles": [f"https://www.tiktok.com/@{handle}"], "resultsPerPage": 5}
+            actor = "clockworks/tiktok-scraper"
+            run_id = _start_run(actor, input_data, apify_api_key)
+            dataset_id = _wait_for_run(run_id, apify_api_key, timeout=120)
+            items = _fetch_dataset(dataset_id, apify_api_key, limit=5)
+            if items:
+                item = items[0]
+                meta = item.get("authorMeta", {})
+                base_profile.update({
+                    "name": meta.get("name") or handle,
+                    "bio": meta.get("signature") or "",
+                    "followers": meta.get("fans") or 0,
+                    "posts_summary": " | ".join(
+                        i.get("text", "")[:120] for i in items[:3] if i.get("text")
+                    ),
+                })
+        elif platform == "instagram":
+            input_data = {"usernames": [handle], "resultsLimit": 1}
+            actor = "apify/instagram-scraper"
+            run_id = _start_run(actor, input_data, apify_api_key)
+            dataset_id = _wait_for_run(run_id, apify_api_key, timeout=120)
+            items = _fetch_dataset(dataset_id, apify_api_key, limit=1)
+            if items:
+                item = items[0]
+                base_profile.update({
+                    "name": item.get("fullName") or handle,
+                    "bio": item.get("biography") or "",
+                    "followers": item.get("followersCount") or 0,
+                    "posts_summary": _first_captions(item.get("latestPosts") or []),
+                })
+    except Exception:
+        pass  # return what we have
+
+    return base_profile
+
+
 def suggest_hashtags(niche: str, target_audience: str) -> list[str]:
     """Use Claude to generate relevant hashtags for prospecting."""
     import anthropic

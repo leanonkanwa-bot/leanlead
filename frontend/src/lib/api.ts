@@ -97,4 +97,6 @@ export const prospectingApi = {
     leads_found: number; error_message?: string; started_at?: string;
   }[]>("/prospecting/jobs"),
   suggestHashtags: () => api.get<{ hashtags: string[] }>("/prospecting/suggest-hashtags"),
+  fromUrl: (d: { profile_url: string; auto_write: boolean }) =>
+    api.post<Lead>("/prospecting/from-url", d),
 };

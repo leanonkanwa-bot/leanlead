@@ -128,6 +128,20 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 ════════════════════════════════════════════════════════════════════ */
 function ProspectsTab() {
   const qc = useQueryClient();
+  const [profileUrl, setProfileUrl] = useState("");
+  const [autoWrite, setAutoWrite] = useState(true);
+  const [urlSuccess, setUrlSuccess] = useState<string | null>(null);
+
+  const fromUrl = useMutation({
+    mutationFn: () => prospectingApi.fromUrl({ profile_url: profileUrl, auto_write: autoWrite }).then(r => r.data),
+    onSuccess: (lead) => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      setUrlSuccess(`@${lead.handle} ajouté au pipeline${lead.outreach_message ? " avec DM généré" : ""} !`);
+      setProfileUrl("");
+      setTimeout(() => setUrlSuccess(null), 6000);
+    },
+  });
+
   const [platform, setPlatform] = useState("instagram");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
@@ -167,6 +181,48 @@ function ProspectsTab() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
+      {/* ── Prospection par URL ── */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <h2 className="font-semibold text-white mb-1">🚀 Lancer la prospection</h2>
+        <p className="text-xs text-slate-500 mb-5">Collez l'URL d'un profil TikTok ou Instagram — l'IA le qualifie et rédige le DM automatiquement.</p>
+
+        <div className="mb-4">
+          <label className="text-xs text-slate-400 mb-1.5 block">URL du profil</label>
+          <input
+            value={profileUrl}
+            onChange={e => { setProfileUrl(e.target.value); setUrlSuccess(null); fromUrl.reset(); }}
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors"
+            placeholder="https://tiktok.com/@nomduprofil ou https://instagram.com/nomduprofil"
+          />
+        </div>
+
+        <label className="flex items-center gap-2 cursor-pointer mb-5">
+          <input type="checkbox" checked={autoWrite} onChange={e => setAutoWrite(e.target.checked)}
+            className="w-4 h-4 accent-brand-500" />
+          <span className="text-sm text-slate-300">Générer le DM automatiquement</span>
+        </label>
+
+        {fromUrl.isError && (
+          <p className="text-red-400 text-xs mb-3 bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2">
+            {(fromUrl.error as any)?.response?.data?.detail || "Échec de la prospection."}
+          </p>
+        )}
+        {urlSuccess && (
+          <p className="text-emerald-400 text-xs mb-3 bg-emerald-950/40 border border-emerald-900/40 rounded-lg px-3 py-2">
+            ✓ {urlSuccess}
+          </p>
+        )}
+
+        <button
+          onClick={() => fromUrl.mutate()}
+          disabled={fromUrl.isPending || !profileUrl.trim()}
+          className="w-full py-3 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+          {fromUrl.isPending
+            ? (autoWrite ? "Qualification + rédaction du DM…" : "Qualification en cours…")
+            : "🚀 Lancer la prospection"}
+        </button>
+      </div>
+
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
         <h2 className="font-semibold text-white mb-1">Trouver de nouveaux leads</h2>
         <p className="text-xs text-slate-500 mb-5">Scraper des profils publics par hashtag et les qualifier automatiquement.</p>
