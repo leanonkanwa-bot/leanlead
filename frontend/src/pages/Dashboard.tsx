@@ -614,7 +614,7 @@ export default function Dashboard() {
                 <p className="text-xs font-semibold text-white truncate">{coach?.name}</p>
                 <p className="text-[10px] text-slate-500 truncate">{coach?.email}</p>
               </div>
-              <button onClick={() => nav("/onboarding")}
+              <button onClick={() => nav("/settings")}
                 className="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-slate-700 transition-colors">
                 Paramètres
               </button>

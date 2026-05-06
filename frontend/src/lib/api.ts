@@ -13,7 +13,7 @@ export interface Coach {
   id: number; email: string; name: string;
   niche?: string; offer_description?: string;
   target_audience?: string; calendly_link?: string;
-  onboarded: boolean;
+  onboarded: boolean; has_apify_key?: boolean;
 }
 
 export type Stage = "new" | "contacted" | "replied" | "booked" | "closed";
@@ -54,6 +54,11 @@ export const authApi = {
   },
 
   me: () => api.get<Coach>("/auth/me"),
+
+  updateSettings: (d: {
+    niche?: string; offer_description?: string; target_audience?: string;
+    calendly_link?: string; apify_api_key?: string;
+  }) => api.patch("/auth/settings", d),
 
   onboard: (d: {
     niche: string; offer_description: string; target_audience: string;

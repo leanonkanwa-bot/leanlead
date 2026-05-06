@@ -61,6 +61,34 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     )
 
 
+class SettingsRequest(BaseModel):
+    niche: str | None = None
+    offer_description: str | None = None
+    target_audience: str | None = None
+    calendly_link: str | None = None
+    apify_api_key: str | None = None
+
+
+@router.patch("/settings")
+def update_settings(
+    req: SettingsRequest,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    if req.niche is not None:
+        coach.niche = req.niche
+    if req.offer_description is not None:
+        coach.offer_description = req.offer_description
+    if req.target_audience is not None:
+        coach.target_audience = req.target_audience
+    if req.calendly_link is not None:
+        coach.calendly_link = req.calendly_link
+    if req.apify_api_key is not None:
+        coach.apify_api_key = req.apify_api_key or None
+    db.commit()
+    return {"ok": True}
+
+
 @router.get("/me")
 def me(coach: models.Coach = Depends(get_current_coach)):
     return {
@@ -72,6 +100,7 @@ def me(coach: models.Coach = Depends(get_current_coach)):
         "target_audience": coach.target_audience,
         "calendly_link": coach.calendly_link,
         "onboarded": coach.onboarded,
+        "has_apify_key": bool(coach.apify_api_key),
     }
 
 
