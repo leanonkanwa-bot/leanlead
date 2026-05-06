@@ -11,7 +11,7 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 from agents.qualifier_agent import qualify_lead
 from agents.writer_agent import write_dm_sequence
@@ -23,7 +23,7 @@ from agents import crm_agent
 
 class QualifyRequest(BaseModel):
     profile_url: str
-    auto_write_dm: bool = True  # also run writer_agent if lead passes threshold
+    auto_write_dm: bool = True
 
 
 class QualifyResponse(BaseModel):
@@ -40,7 +40,7 @@ class QualifyResponse(BaseModel):
 
 
 class ReplyRequest(BaseModel):
-    record_id: str  # Airtable record ID
+    record_id: str
     incoming_message: str
     conversation_history: list[dict] = []
     exchange_count: int = 1
@@ -55,8 +55,7 @@ class ReplyResponse(BaseModel):
 
 
 class WebhookEvent(BaseModel):
-    event_type: str  # e.g. "new_dm", "new_lead"
-    platform: Optional[str] = None
+    event_type: str
     profile_url: Optional[str] = None
     record_id: Optional[str] = None
     message: Optional[str] = None
@@ -69,7 +68,7 @@ class WebhookEvent(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield  # startup / shutdown hooks go here
+    yield
 
 
 app = FastAPI(
@@ -89,10 +88,6 @@ async def health():
 
 @app.post("/qualify", response_model=QualifyResponse)
 async def qualify_endpoint(body: QualifyRequest):
-    """
-    Scrape a social profile, qualify it with Claude, and optionally write the DM sequence.
-    If score >= 70, syncs the lead to Airtable automatically.
-    """
     try:
         result = await asyncio.to_thread(qualify_lead, body.profile_url)
     except Exception as exc:
@@ -110,7 +105,7 @@ async def qualify_endpoint(body: QualifyRequest):
 
         if dm_sequence:
             try:
-                record = await crm_agent.sync_qualified_lead(result, dm_sequence)
+                record = await asyncio.to_thread(crm_agent.sync_qualified_lead, result, dm_sequence)
                 airtable_record_id = record.get("id")
             except Exception as exc:
                 print(f"[CRM] Airtable sync failed: {exc}")
@@ -131,22 +126,19 @@ async def qualify_endpoint(body: QualifyRequest):
 
 @app.post("/reply", response_model=ReplyResponse)
 async def reply_endpoint(body: ReplyRequest):
-    """
-    Classify an incoming DM reply and generate a contextual response.
-    Updates the Airtable record in the background.
-    """
     try:
-        result = await handle_reply(
-            incoming_message=body.incoming_message,
-            conversation_history=body.conversation_history,
-            exchange_count=body.exchange_count,
+        result = await asyncio.to_thread(
+            handle_reply,
+            body.incoming_message,
+            body.conversation_history,
+            body.exchange_count,
         )
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Reply generation failed: {exc}")
 
     airtable_updated = False
     try:
-        await crm_agent.sync_reply_event(body.record_id, result, body.exchange_count)
+        await asyncio.to_thread(crm_agent.sync_reply_event, body.record_id, result, body.exchange_count)
         airtable_updated = True
     except Exception as exc:
         print(f"[CRM] Airtable reply sync failed: {exc}")
@@ -162,9 +154,8 @@ async def reply_endpoint(body: ReplyRequest):
 
 @app.get("/pipeline")
 async def pipeline_endpoint():
-    """Return current pipeline stats from Airtable."""
     try:
-        stats = await crm_agent.get_pipeline()
+        stats = await asyncio.to_thread(crm_agent.get_pipeline)
         return JSONResponse(content=stats)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Airtable fetch failed: {exc}")
@@ -172,10 +163,6 @@ async def pipeline_endpoint():
 
 @app.post("/webhook")
 async def webhook_endpoint(body: WebhookEvent, background_tasks: BackgroundTasks):
-    """
-    Receive events from ManyChat, Instagram automation, or other sources.
-    Routes to the appropriate agent based on event_type.
-    """
     event = body.event_type
 
     if event == "new_lead" and body.profile_url:
@@ -209,7 +196,7 @@ async def _process_new_lead(profile_url: str):
         result = await asyncio.to_thread(qualify_lead, profile_url)
         if result["passed_threshold"]:
             dm_sequence = await asyncio.to_thread(write_dm_sequence, result)
-            await crm_agent.sync_qualified_lead(result, dm_sequence)
+            await asyncio.to_thread(crm_agent.sync_qualified_lead, result, dm_sequence)
     except Exception as exc:
         print(f"[webhook/_process_new_lead] Error: {exc}")
 
@@ -221,7 +208,7 @@ async def _process_incoming_dm(
     exchange_count: int,
 ):
     try:
-        result = await handle_reply(message, history, exchange_count)
-        await crm_agent.sync_reply_event(record_id, result, exchange_count)
+        result = await asyncio.to_thread(handle_reply, message, history, exchange_count)
+        await asyncio.to_thread(crm_agent.sync_reply_event, record_id, result, exchange_count)
     except Exception as exc:
         print(f"[webhook/_process_incoming_dm] Error: {exc}")
