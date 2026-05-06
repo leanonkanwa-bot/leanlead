@@ -104,7 +104,7 @@ async def qualify_endpoint(body: QualifyRequest):
     if result["passed_threshold"]:
         if body.auto_write_dm:
             try:
-                dm_sequence = await write_dm_sequence(result)
+                dm_sequence = await asyncio.to_thread(write_dm_sequence, result)
             except Exception as exc:
                 raise HTTPException(status_code=502, detail=f"DM writing failed: {exc}")
 
@@ -208,7 +208,7 @@ async def _process_new_lead(profile_url: str):
     try:
         result = await asyncio.to_thread(qualify_lead, profile_url)
         if result["passed_threshold"]:
-            dm_sequence = await write_dm_sequence(result)
+            dm_sequence = await asyncio.to_thread(write_dm_sequence, result)
             await crm_agent.sync_qualified_lead(result, dm_sequence)
     except Exception as exc:
         print(f"[webhook/_process_new_lead] Error: {exc}")
