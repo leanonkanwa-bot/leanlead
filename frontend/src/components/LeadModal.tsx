@@ -57,7 +57,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
           {(["info", "dm", "reply"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-2.5 text-xs font-medium capitalize transition-colors border-b-2 ${
-                tab === t ? "text-sky-400 border-sky-500" : "text-slate-500 border-transparent hover:text-slate-300"}`}>
+                tab === t ? "text-brand-400 border-brand-500" : "text-slate-500 border-transparent hover:text-slate-300"}`}>
               {t === "info" ? "Profile" : t === "dm" ? "DM Draft" : "Reply"}
             </button>
           ))}
@@ -78,7 +78,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                 <div className="bg-slate-800 rounded-xl p-4">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-xs text-slate-500">AI score</span>
-                    <span className="text-2xl font-black text-sky-400">{lead.qualification_score}/10</span>
+                    <span className="text-2xl font-black text-brand-400">{lead.qualification_score}/10</span>
                   </div>
                   {lead.qualification_reason && (
                     <p className="text-xs text-slate-400 mb-3 leading-relaxed">{lead.qualification_reason}</p>
@@ -86,7 +86,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                   {lead.pain_points?.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {lead.pain_points.map(p => (
-                        <span key={p} className="text-[10px] bg-sky-950 text-sky-400 border border-sky-900/60 px-2 py-0.5 rounded-full">{p}</span>
+                        <span key={p} className="text-[10px] bg-brand-950 text-brand-400 border border-brand-900/60 px-2 py-0.5 rounded-full">{p}</span>
                       ))}
                     </div>
                   )}
@@ -95,16 +95,16 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Notes</label>
                 <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-sky-500" />
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500" />
                 <button onClick={() => saveNotes.mutate()}
-                  className="text-xs text-sky-400 hover:text-sky-300 mt-1 transition-colors">
+                  className="text-xs text-brand-400 hover:text-brand-300 mt-1 transition-colors">
                   {saveNotes.isPending ? "Saving…" : "Save notes"}
                 </button>
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 <Btn label="🎯 Re-qualify" pending={qualify.isPending} pendingLabel="Qualifying…"
                   onClick={() => qualify.mutate()}
-                  className="bg-sky-950 hover:bg-sky-900 text-sky-300" />
+                  className="bg-brand-950 hover:bg-brand-900 text-brand-300" />
                 <Btn label="↗ Sync to Airtable" pending={syncCrm.isPending} pendingLabel="Syncing…"
                   onClick={() => syncCrm.mutate()}
                   className="bg-slate-700 hover:bg-slate-600 text-slate-300" />
@@ -131,7 +131,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                     {lead.outreach_message}
                   </div>
                   <button onClick={() => copy(lead.outreach_message!)}
-                    className="text-xs text-sky-400 hover:text-sky-300 mt-2 transition-colors">
+                    className="text-xs text-brand-400 hover:text-brand-300 mt-2 transition-colors">
                     {copied ? "Copied!" : "📋 Copy to clipboard"}
                   </button>
                 </div>
@@ -143,7 +143,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                 </div>
               )}
               <button onClick={() => write.mutate()} disabled={busy || !lead.qualification_reason}
-                className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+                className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
                 {write.isPending ? "Writing DM…" : lead.outreach_message ? "↻ Regenerate DM" : "✍️ Generate DM"}
               </button>
               {write.isError && (
@@ -158,13 +158,13 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Their reply</label>
                 <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500"
                   placeholder="Paste their message here…" />
               </div>
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Conversation history <span className="text-slate-700">(optional)</span></label>
                 <textarea value={convHistory} onChange={e => setConvHistory(e.target.value)} rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-sky-500"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500"
                   placeholder={"You: [your DM]\nThem: [first reply]\n…"} />
               </div>
               {lead.suggested_reply && (
@@ -174,13 +174,13 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                     {lead.suggested_reply}
                   </div>
                   <button onClick={() => copy(lead.suggested_reply!)}
-                    className="text-xs text-sky-400 hover:text-sky-300 mt-2 transition-colors">
+                    className="text-xs text-brand-400 hover:text-brand-300 mt-2 transition-colors">
                     {copied ? "Copied!" : "📋 Copy"}
                   </button>
                 </div>
               )}
               <button onClick={() => reply.mutate()} disabled={busy || !replyText}
-                className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+                className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
                 {reply.isPending ? "Generating…" : "🤖 Generate reply"}
               </button>
               {reply.isError && (

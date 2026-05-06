@@ -8,8 +8,8 @@ function Step({ n, label, active, done }: { n: number; label: string; active: bo
   return (
     <div className="flex items-center gap-2">
       <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-all ${
-        done ? "bg-sky-500 border-sky-500 text-white"
-        : active ? "border-sky-500 text-sky-400"
+        done ? "bg-brand-500 border-brand-500 text-white"
+        : active ? "border-brand-500 text-brand-400"
         : "border-slate-700 text-slate-600"}`}>
         {done ? "✓" : n}
       </div>
@@ -51,7 +51,7 @@ export default function Onboarding() {
             <div key={label} className="flex items-center gap-3">
               <Step n={i + 1} label={label} active={i === step} done={i < step} />
               {i < STEPS.length - 1 && (
-                <div className={`w-12 h-px transition-all ${i < step ? "bg-sky-500" : "bg-slate-800"}`} />
+                <div className={`w-12 h-px transition-all ${i < step ? "bg-brand-500" : "bg-slate-800"}`} />
               )}
             </div>
           ))}
@@ -67,18 +67,18 @@ export default function Onboarding() {
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Your coaching niche *</label>
                   <input value={form.niche} onChange={set("niche")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="e.g. Business coaching for online entrepreneurs" />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Who is your ideal client? *</label>
                   <textarea value={form.target_audience} onChange={set("target_audience")} rows={3}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500 resize-none"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
                     placeholder="e.g. Online coaches who want to land 5 premium clients in 90 days without paid ads…" />
                 </div>
               </div>
               <button onClick={() => setStep(1)} disabled={!form.niche || !form.target_audience}
-                className="mt-6 w-full py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+                className="mt-6 w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
                 Continue →
               </button>
             </>
@@ -93,13 +93,13 @@ export default function Onboarding() {
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">What transformation do you deliver? *</label>
                   <textarea value={form.offer_description} onChange={set("offer_description")} rows={4}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500 resize-none"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
                     placeholder="e.g. I help online coaches land their first 5 premium clients in 90 days through a proven DM strategy, without paid ads." />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Calendly / booking link</label>
                   <input value={form.calendly_link} onChange={set("calendly_link")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="https://calendly.com/yourname/30min" />
                   <p className="text-xs text-slate-600 mt-1">Used when the AI suggests booking a call with a lead.</p>
                 </div>
@@ -110,7 +110,7 @@ export default function Onboarding() {
                   ← Back
                 </button>
                 <button onClick={() => setStep(2)} disabled={!form.offer_description}
-                  className="flex-1 py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+                  className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
                   Continue →
                 </button>
               </div>
@@ -126,20 +126,20 @@ export default function Onboarding() {
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Airtable Base ID</label>
                   <input value={form.airtable_base_id} onChange={set("airtable_base_id")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-sky-500"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-brand-500"
                     placeholder="appfdB2W41J5sVZ2U" />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Airtable Personal Access Token</label>
                   <input type="password" value={form.airtable_api_key} onChange={set("airtable_api_key")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="pat••••••••••••••••" />
                   <p className="text-xs text-slate-600 mt-1">airtable.com/create/tokens — needs data.records:read + write scope</p>
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Apify API Key <span className="text-slate-600">(for Instagram/TikTok scraping)</span></label>
                   <input type="password" value={form.apify_api_key} onChange={set("apify_api_key")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="apify_api_••••••••" />
                 </div>
               </div>
@@ -150,7 +150,7 @@ export default function Onboarding() {
                   ← Back
                 </button>
                 <button onClick={finish} disabled={saving}
-                  className="flex-1 py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 rounded-xl text-sm font-semibold transition-colors">
+                  className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-50 rounded-xl text-sm font-semibold transition-colors">
                   {saving ? "Saving…" : "Launch dashboard →"}
                 </button>
               </div>

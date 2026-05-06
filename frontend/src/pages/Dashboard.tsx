@@ -43,7 +43,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Full name</label>
               <input value={f.name} onChange={set("name")}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                 placeholder="Jane Smith" />
             </div>
             <div>
@@ -51,7 +51,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
               <div className="flex">
                 <span className="bg-slate-700 border border-slate-600 border-r-0 rounded-l-xl px-2.5 text-slate-400 text-sm flex items-center">@</span>
                 <input value={f.handle} onChange={set("handle")} required
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded-r-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500"
+                  className="flex-1 bg-slate-800 border border-slate-700 rounded-r-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                   placeholder="janesmith" />
               </div>
             </div>
@@ -61,7 +61,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Platform</label>
               <select value={f.platform} onChange={set("platform")}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500">
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500">
                 <option value="instagram">📸 Instagram</option>
                 <option value="tiktok">🎵 TikTok</option>
                 <option value="twitter">𝕏 Twitter / X</option>
@@ -71,7 +71,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Followers</label>
               <input type="number" value={f.followers} onChange={set("followers")}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                 placeholder="0" />
             </div>
           </div>
@@ -79,27 +79,27 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
           <div>
             <label className="text-xs text-slate-400 mb-1 block">Profile URL</label>
             <input value={f.profile_url} onChange={set("profile_url")}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
               placeholder="https://instagram.com/janesmith" />
           </div>
 
           <div>
             <label className="text-xs text-slate-400 mb-1 block">Bio <span className="text-slate-600">(paste their full bio for best AI results)</span></label>
             <textarea value={f.bio} onChange={set("bio")} rows={3}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500 resize-none"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
               placeholder="Helping moms lose 20 lbs in 12 weeks | DM for my free guide…" />
           </div>
 
           <div>
             <label className="text-xs text-slate-400 mb-1 block">Recent posts / content notes <span className="text-slate-600">(optional)</span></label>
             <textarea value={f.posts_summary} onChange={set("posts_summary")} rows={2}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500 resize-none"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
               placeholder="Posts about meal prep, 3x/week. Latest caption: 'why I stopped counting calories'…" />
           </div>
 
           <label className="flex items-center gap-3 cursor-pointer">
             <input type="checkbox" checked={autoQualify} onChange={e => setAutoQualify(e.target.checked)}
-              className="w-4 h-4 accent-sky-500" />
+              className="w-4 h-4 accent-brand-500" />
             <span className="text-sm text-slate-300">Auto-qualify with AI after adding</span>
           </label>
 
@@ -112,7 +112,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 
         <div className="p-5 border-t border-slate-800">
           <button onClick={() => add.mutate()} disabled={add.isPending || !f.handle}
-            className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+            className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
             {add.isPending
               ? (autoQualify ? "Adding & qualifying…" : "Adding…")
               : "Add lead"}
@@ -159,7 +159,7 @@ function ProspectsTab() {
   const running = jobs.some(j => j.status === "running" || j.status === "pending");
 
   const statusColors: Record<string, string> = {
-    pending: "text-amber-400", running: "text-sky-400", done: "text-emerald-400", error: "text-red-400",
+    pending: "text-amber-400", running: "text-brand-400", done: "text-emerald-400", error: "text-red-400",
   };
 
   return (
@@ -176,7 +176,7 @@ function ProspectsTab() {
               <button key={v} onClick={() => setPlatform(v)}
                 className={`py-2.5 rounded-xl border text-sm font-medium transition-all ${
                   platform === v
-                    ? "bg-sky-900/40 border-sky-600 text-sky-300"
+                    ? "bg-brand-900/40 border-brand-600 text-brand-300"
                     : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"}`}>
                 {l}
               </button>
@@ -189,12 +189,12 @@ function ProspectsTab() {
           <div className="flex justify-between mb-2">
             <label className="text-xs text-slate-400">Hashtags *</label>
             <button onClick={() => suggest.mutate()} disabled={suggest.isPending}
-              className="text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
+              className="text-[10px] text-brand-400 hover:text-brand-300 transition-colors">
               {suggest.isPending ? "Generating…" : "✦ AI suggest for my niche"}
             </button>
           </div>
           <div className="flex gap-2 mb-2">
-            <div className="flex flex-1 items-center bg-slate-800 border border-slate-700 rounded-xl overflow-hidden focus-within:border-sky-500 transition-colors">
+            <div className="flex flex-1 items-center bg-slate-800 border border-slate-700 rounded-xl overflow-hidden focus-within:border-brand-500 transition-colors">
               <span className="pl-3 text-slate-500 text-sm">#</span>
               <input value={tagInput} onChange={e => setTagInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addTag())}
@@ -207,9 +207,9 @@ function ProspectsTab() {
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {tags.map(t => (
-                <span key={t} className="flex items-center gap-1 bg-sky-950 border border-sky-900 text-sky-300 text-xs px-2.5 py-1 rounded-full">
+                <span key={t} className="flex items-center gap-1 bg-brand-950 border border-brand-900 text-brand-300 text-xs px-2.5 py-1 rounded-full">
                   #{t}
-                  <button onClick={() => setTags(p => p.filter(x => x !== t))} className="text-sky-500 hover:text-white">×</button>
+                  <button onClick={() => setTags(p => p.filter(x => x !== t))} className="text-brand-500 hover:text-white">×</button>
                 </span>
               ))}
             </div>
@@ -221,13 +221,13 @@ function ProspectsTab() {
           <div className="flex-1">
             <label className="text-xs text-slate-400 mb-1 block">Max profiles</label>
             <select value={maxResults} onChange={e => setMaxResults(Number(e.target.value))}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-sky-500">
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500">
               {[10,20,50,100].map(n => <option key={n} value={n}>{n} profiles</option>)}
             </select>
           </div>
           <label className="flex items-center gap-2 cursor-pointer pb-1">
             <input type="checkbox" checked={autoQualify} onChange={e => setAutoQualify(e.target.checked)}
-              className="w-4 h-4 accent-sky-500" />
+              className="w-4 h-4 accent-brand-500" />
             <span className="text-sm text-slate-300 whitespace-nowrap">Auto-qualify</span>
           </label>
         </div>
@@ -239,7 +239,7 @@ function ProspectsTab() {
         )}
 
         <button onClick={() => run.mutate()} disabled={run.isPending || !tags.length || running}
-          className="w-full py-3 bg-sky-500 hover:bg-sky-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+          className="w-full py-3 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
           {run.isPending ? "Starting…" : running ? "Job in progress…" : `🔍 Find leads on ${platform}`}
         </button>
         {running && (
@@ -294,7 +294,7 @@ function dayLabel(day: number) {
 
 function dayClasses(day: number) {
   return day === 2 ? "bg-amber-950 border-amber-800 text-amber-400"
-       : day === 4 ? "bg-sky-950 border-sky-800 text-sky-400"
+       : day === 4 ? "bg-brand-950 border-brand-800 text-brand-400"
        : "bg-rose-950 border-rose-900 text-rose-400";
 }
 
@@ -358,7 +358,7 @@ function FollowupRow({ item }: { item: FollowupDue }) {
                 {message}
               </div>
               <div className="flex gap-4 mt-2">
-                <button onClick={copy} className="text-xs text-sky-400 hover:text-sky-300 transition-colors">
+                <button onClick={copy} className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
                   {copied ? "Copied!" : "📋 Copy"}
                 </button>
                 <button onClick={() => generate.mutate()} disabled={generate.isPending}
@@ -427,7 +427,7 @@ function FollowupsTab() {
           <div className="grid grid-cols-3 gap-3">
             {[
               { day: 2, label: "D+2 due", cls: "text-amber-400" },
-              { day: 4, label: "D+4 due", cls: "text-sky-400" },
+              { day: 4, label: "D+4 due", cls: "text-brand-400" },
               { day: 7, label: "D+7 due", cls: "text-rose-400" },
             ].map(({ day, label, cls }) => (
               <div key={day} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-center">
@@ -512,7 +512,7 @@ export default function Dashboard() {
                       border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
         <div className="flex items-center gap-4 min-w-0">
           <span className="font-extrabold text-lg flex-shrink-0">
-            Lean<span className="text-sky-400">Lead</span>
+            Lean<span className="text-brand-400">Lead</span>
           </span>
 
           {/* Tab switcher */}
@@ -537,17 +537,17 @@ export default function Dashboard() {
           {tab === "pipeline" && (
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
               className="hidden sm:block bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5
-                         text-sm focus:outline-none focus:border-sky-500 w-36 transition-colors" />
+                         text-sm focus:outline-none focus:border-brand-500 w-36 transition-colors" />
           )}
           <button onClick={() => setShowAdd(true)}
-            className="px-3.5 py-1.5 bg-sky-500 hover:bg-sky-400 rounded-xl text-sm font-semibold transition-colors">
+            className="px-3.5 py-1.5 bg-brand-500 hover:bg-brand-400 rounded-xl text-sm font-semibold transition-colors">
             + Add lead
           </button>
 
           {/* Account menu */}
           <div className="relative group">
-            <button className="w-8 h-8 rounded-full bg-sky-900 border border-sky-800 flex items-center justify-center
-                               text-xs font-bold text-sky-300 hover:border-sky-600 transition-colors">
+            <button className="w-8 h-8 rounded-full bg-brand-900 border border-brand-800 flex items-center justify-center
+                               text-xs font-bold text-brand-300 hover:border-brand-600 transition-colors">
               {initials}
             </button>
             <div className="absolute right-0 mt-2 w-44 bg-slate-800 border border-slate-700 rounded-xl overflow-hidden
@@ -574,8 +574,8 @@ export default function Dashboard() {
         <div className="flex gap-6 px-6 py-3 border-b border-slate-900">
           {[
             { label: "Total",     value: stats.total,     color: "text-white" },
-            { label: "Contacted", value: stats.contacted, color: "text-sky-400" },
-            { label: "Replied",   value: stats.replied,   color: "text-violet-400" },
+            { label: "Contacted", value: stats.contacted, color: "text-brand-400" },
+            { label: "Replied",   value: stats.replied,   color: "text-brand-400" },
             { label: "Booked",    value: stats.booked,    color: "text-emerald-400" },
             {
               label: "Conv. rate",
@@ -605,7 +605,7 @@ export default function Dashboard() {
                 <p className="text-sm font-semibold text-white mb-1">No leads yet</p>
                 <p className="text-xs text-slate-500 mb-4">Add leads manually or use the Prospects tab to scrape Instagram/TikTok.</p>
                 <button onClick={() => setShowAdd(true)}
-                  className="px-4 py-2 bg-sky-500 hover:bg-sky-400 rounded-xl text-sm font-medium transition-colors">
+                  className="px-4 py-2 bg-brand-500 hover:bg-brand-400 rounded-xl text-sm font-medium transition-colors">
                   + Add your first lead
                 </button>
               </div>
@@ -633,7 +633,7 @@ export default function Dashboard() {
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`relative flex-1 py-3 text-xs font-medium transition-colors ${
-              tab === t.id ? "text-sky-400" : "text-slate-600 hover:text-slate-400"}`}>
+              tab === t.id ? "text-brand-400" : "text-slate-600 hover:text-slate-400"}`}>
             {t.label}
             {t.badge ? (
               <span className="absolute top-2 right-1/4 w-3.5 h-3.5 flex items-center justify-center

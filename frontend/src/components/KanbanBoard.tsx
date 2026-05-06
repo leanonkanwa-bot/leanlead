@@ -25,8 +25,8 @@ const STAGES: {
   description: string;
 }[] = [
   { id: "new",       label: "New",       border: "border-slate-700",   dot: "bg-slate-500",   description: "Just added, not yet contacted" },
-  { id: "contacted", label: "Contacted", border: "border-sky-800",     dot: "bg-sky-500",     description: "DM sent, waiting for reply" },
-  { id: "replied",   label: "Replied",   border: "border-violet-800",  dot: "bg-violet-500",  description: "Lead has responded" },
+  { id: "contacted", label: "Contacted", border: "border-brand-800",     dot: "bg-brand-500",     description: "DM sent, waiting for reply" },
+  { id: "replied",   label: "Replied",   border: "border-brand-800",  dot: "bg-brand-500",  description: "Lead has responded" },
   { id: "booked",    label: "Booked",    border: "border-emerald-800", dot: "bg-emerald-500", description: "Call booked on Calendly" },
   { id: "closed",    label: "Closed",    border: "border-rose-900",    dot: "bg-rose-600",    description: "Deal won or lost" },
 ];
@@ -65,7 +65,7 @@ function Column({
       <div
         ref={setNodeRef}
         className={`flex-1 p-3 space-y-2 min-h-[120px] rounded-b-2xl transition-colors ${
-          isOver ? "bg-slate-800/40 ring-1 ring-inset ring-sky-800/40" : ""
+          isOver ? "bg-slate-800/40 ring-1 ring-inset ring-brand-800/40" : ""
         }`}
       >
         <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>

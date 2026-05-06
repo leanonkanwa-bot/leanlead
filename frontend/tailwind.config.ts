@@ -5,7 +5,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        brand: { 400: "#38bdf8", 500: "#0ea5e9", 600: "#0284c7" },
+        brand: {
+          50:  "#fff4ee",
+          100: "#ffe2cc",
+          200: "#ffc59a",
+          300: "#ffaa70",
+          400: "#ff8c47",
+          500: "#ff751f",
+          600: "#e5600e",
+          700: "#b84a08",
+          800: "#8a3606",
+          900: "#5c2404",
+          950: "#3d1602",
+        },
       },
       animation: {
         "fade-in": "fadeIn .15s ease-out",
