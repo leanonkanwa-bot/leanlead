@@ -1,12 +1,14 @@
 """
 Pipeline router – runs agents on a lead and updates the DB.
 POST /api/pipeline/{lead_id}/qualify   → qualifier_agent
-POST /api/pipeline/{lead_id}/write     → writer_agent
-POST /api/pipeline/{lead_id}/reply     → reply_agent
+POST /api/pipeline/{lead_id}/write     → writer_agent (sets stage=contacted + messaged_at)
+POST /api/pipeline/{lead_id}/reply     → reply_agent  (sets stage=replied)
 POST /api/pipeline/{lead_id}/sync-crm  → crm_agent (Airtable)
+PATCH /api/pipeline/{lead_id}/stage   → manual stage override
 """
 import json
 import os
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -18,6 +20,8 @@ from .. import models
 from ..agents import qualifier_agent, writer_agent, reply_agent, crm_agent
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
+
+VALID_STAGES = ["new", "contacted", "replied", "booked", "closed"]
 
 
 def _get_lead_or_404(lead_id: int, coach: models.Coach, db: Session) -> models.Lead:
@@ -56,7 +60,6 @@ def qualify(
     lead.qualification_reason = result.get("reason", "")
     lead.pain_points = json.dumps(result.get("pain_points", []))
     lead.recommended_angle = result.get("recommended_angle", "")
-    lead.stage = "qualified"
     db.commit()
     db.refresh(lead)
 
@@ -87,7 +90,8 @@ def write(
         qualification=qualification,
     )
     lead.outreach_message = message
-    lead.stage = "messaged"
+    lead.stage = "contacted"
+    lead.messaged_at = datetime.utcnow()
     db.commit()
 
     return {"ok": True, "message": message}
@@ -116,6 +120,7 @@ def reply(
         calendly_link=calendly,
     )
     lead.reply_received = req.lead_reply
+    lead.reply_received_at = datetime.utcnow()
     lead.suggested_reply = suggested
     lead.stage = "replied"
     db.commit()
@@ -151,7 +156,8 @@ def sync_crm(
         "bio": lead.bio or "",
         "followers": lead.followers,
         "qualification_score": lead.qualification_score,
-        "qualification_reason": (lead.qualification_reason or "") + (f"\nPain points: {pain_points_str}" if pain_points_str else ""),
+        "qualification_reason": (lead.qualification_reason or "")
+            + (f"\nPain points: {pain_points_str}" if pain_points_str else ""),
         "stage": lead.stage,
         "outreach_message": lead.outreach_message or "",
         "notes": lead.notes or "",
@@ -171,3 +177,24 @@ def sync_crm(
     db.commit()
 
     return {"ok": True, "airtable_record_id": record_id}
+
+
+class StageRequest(BaseModel):
+    stage: str
+
+
+@router.patch("/{lead_id}/stage")
+def set_stage(
+    lead_id: int,
+    req: StageRequest,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    if req.stage not in VALID_STAGES:
+        raise HTTPException(status_code=400, detail=f"Stage must be one of {VALID_STAGES}")
+    lead = _get_lead_or_404(lead_id, coach, db)
+    lead.stage = req.stage
+    if req.stage == "contacted" and not lead.messaged_at:
+        lead.messaged_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True, "stage": req.stage}

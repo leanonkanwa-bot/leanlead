@@ -1,5 +1,5 @@
 import json
-from typing import Literal
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -11,7 +11,7 @@ from .. import models
 
 router = APIRouter(prefix="/api/leads", tags=["leads"])
 
-STAGES = ["new", "qualified", "messaged", "replied", "booked", "closed"]
+STAGES = ["new", "contacted", "replied", "booked", "closed"]
 
 
 class LeadCreate(BaseModel):
@@ -55,6 +55,13 @@ def _serialize(lead: models.Lead) -> dict:
         "recommended_angle": lead.recommended_angle,
         "stage": lead.stage,
         "outreach_message": lead.outreach_message,
+        "messaged_at": lead.messaged_at.isoformat() if lead.messaged_at else None,
+        "followup_d2_message": lead.followup_d2_message,
+        "followup_d2_sent_at": lead.followup_d2_sent_at.isoformat() if lead.followup_d2_sent_at else None,
+        "followup_d4_message": lead.followup_d4_message,
+        "followup_d4_sent_at": lead.followup_d4_sent_at.isoformat() if lead.followup_d4_sent_at else None,
+        "followup_d7_message": lead.followup_d7_message,
+        "followup_d7_sent_at": lead.followup_d7_sent_at.isoformat() if lead.followup_d7_sent_at else None,
         "reply_received": lead.reply_received,
         "suggested_reply": lead.suggested_reply,
         "notes": lead.notes,
@@ -120,6 +127,8 @@ def update_lead(
         if req.stage not in STAGES:
             raise HTTPException(status_code=400, detail=f"Invalid stage. Must be one of {STAGES}")
         lead.stage = req.stage
+        if req.stage == "contacted" and not lead.messaged_at:
+            lead.messaged_at = datetime.utcnow()
     if req.notes is not None:
         lead.notes = req.notes
     if req.reply_received is not None:

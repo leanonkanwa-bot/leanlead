@@ -16,13 +16,12 @@ import { leadsApi } from "../lib/api";
 import LeadCard from "./LeadCard";
 import LeadModal from "./LeadModal";
 
-const STAGES: { id: Stage; label: string; color: string }[] = [
-  { id: "new", label: "New Lead", color: "border-slate-700" },
-  { id: "qualified", label: "Qualified", color: "border-sky-800" },
-  { id: "messaged", label: "Messaged", color: "border-violet-800" },
-  { id: "replied", label: "Replied", color: "border-amber-800" },
-  { id: "booked", label: "Booked", color: "border-emerald-800" },
-  { id: "closed", label: "Closed", color: "border-rose-900" },
+const STAGES: { id: Stage; label: string; color: string; dot: string }[] = [
+  { id: "new",       label: "New",       color: "border-slate-700", dot: "bg-slate-500" },
+  { id: "contacted", label: "Contacted", color: "border-sky-800",   dot: "bg-sky-500" },
+  { id: "replied",   label: "Replied",   color: "border-violet-800",dot: "bg-violet-500" },
+  { id: "booked",    label: "Booked",    color: "border-emerald-800",dot: "bg-emerald-500" },
+  { id: "closed",    label: "Closed",    color: "border-rose-900",  dot: "bg-rose-600" },
 ];
 
 function Column({
@@ -35,16 +34,31 @@ function Column({
   onCardClick: (lead: Lead) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
+  const total = leads.length;
+  const avgScore = total
+    ? (leads.reduce((s, l) => s + (l.qualification_score || 0), 0) / total).toFixed(1)
+    : null;
 
   return (
-    <div className={`flex flex-col rounded-2xl border ${stage.color} bg-slate-900/60 min-w-[260px] w-[260px] flex-shrink-0`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
-        <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">{stage.label}</span>
-        <span className="text-xs text-slate-600 bg-slate-800 px-2 py-0.5 rounded-full">{leads.length}</span>
+    <div className={`flex flex-col rounded-2xl border ${stage.color} bg-slate-900/50 min-w-[255px] w-[255px] flex-shrink-0`}>
+      {/* Column header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${stage.dot}`} />
+          <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">{stage.label}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {avgScore && <span className="text-[10px] text-slate-600 font-mono">{avgScore} avg</span>}
+          <span className="text-xs text-slate-600 bg-slate-800 px-2 py-0.5 rounded-full">{total}</span>
+        </div>
       </div>
+
+      {/* Drop zone */}
       <div
         ref={setNodeRef}
-        className={`flex-1 p-3 space-y-2 min-h-[120px] transition-colors ${isOver ? "bg-slate-800/40" : ""}`}
+        className={`flex-1 p-3 space-y-2 min-h-[140px] transition-colors rounded-b-2xl ${
+          isOver ? "bg-slate-800/40 ring-1 ring-inset ring-sky-800/50" : ""
+        }`}
       >
         <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
           {leads.map((lead) => (
@@ -52,7 +66,9 @@ function Column({
           ))}
         </SortableContext>
         {leads.length === 0 && (
-          <p className="text-center text-xs text-slate-700 py-6">Drop leads here</p>
+          <div className="h-20 rounded-xl border border-dashed border-slate-800 flex items-center justify-center">
+            <p className="text-[10px] text-slate-700">Drop leads here</p>
+          </div>
         )}
       </div>
     </div>
@@ -83,13 +99,11 @@ export default function KanbanBoard({ leads }: Props) {
       );
       return { prev };
     },
-    onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) qc.setQueryData(["leads"], ctx.prev);
-    },
+    onError: (_e, _v, ctx) => ctx?.prev && qc.setQueryData(["leads"], ctx.prev),
     onSettled: () => qc.invalidateQueries({ queryKey: ["leads"] }),
   });
 
-  const activeLead = activeId ? leads.find((l) => l.id === activeId) : null;
+  const activeLead = activeId ? leads.find((l) => l.id === activeId) ?? null : null;
 
   function handleDragStart(e: DragStartEvent) {
     setActiveId(e.active.id as number);
@@ -101,9 +115,9 @@ export default function KanbanBoard({ leads }: Props) {
     if (!over) return;
     const lead = leads.find((l) => l.id === active.id);
     if (!lead) return;
-    // Over could be a column id (Stage) or another card id
-    const newStage = STAGES.find((s) => s.id === over.id)?.id
-      ?? leads.find((l) => l.id === over.id)?.stage;
+    const newStage =
+      STAGES.find((s) => s.id === over.id)?.id ??
+      leads.find((l) => l.id === over.id)?.stage;
     if (newStage && newStage !== lead.stage) {
       updateStage.mutate({ id: lead.id, stage: newStage });
     }
@@ -114,7 +128,7 @@ export default function KanbanBoard({ leads }: Props) {
   return (
     <>
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin">
+        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin h-full">
           {STAGES.map((stage) => (
             <Column
               key={stage.id}
@@ -124,9 +138,9 @@ export default function KanbanBoard({ leads }: Props) {
             />
           ))}
         </div>
-        <DragOverlay>
+        <DragOverlay dropAnimation={null}>
           {activeLead && (
-            <div className="rotate-2 opacity-90">
+            <div className="rotate-1 opacity-90 w-[255px]">
               <LeadCard lead={activeLead} onClick={() => {}} />
             </div>
           )}

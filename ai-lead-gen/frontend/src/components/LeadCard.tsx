@@ -7,22 +7,26 @@ interface Props {
   onClick: () => void;
 }
 
-const platformIcon: Record<string, string> = {
+const PLATFORM_ICON: Record<string, string> = {
   instagram: "📸",
-  twitter: "🐦",
+  twitter: "𝕏",
   linkedin: "💼",
   tiktok: "🎵",
 };
 
-function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 8 ? "bg-emerald-900 text-emerald-400" :
-    score >= 5 ? "bg-amber-900 text-amber-400" :
-    "bg-red-900 text-red-400";
+function ScoreDot({ score }: { score: number }) {
+  if (!score) return null;
+  const bg =
+    score >= 8 ? "bg-emerald-500" :
+    score >= 6 ? "bg-amber-500" : "bg-red-500";
+  const label =
+    score >= 8 ? "text-emerald-400" :
+    score >= 6 ? "text-amber-400" : "text-red-400";
   return (
-    <span className={`text-xs px-1.5 py-0.5 rounded font-mono font-bold ${color}`}>
-      {score.toFixed(1)}
-    </span>
+    <div className="flex items-center gap-1">
+      <div className={`w-1.5 h-1.5 rounded-full ${bg}`} />
+      <span className={`text-[10px] font-mono font-bold ${label}`}>{score.toFixed(1)}</span>
+    </div>
   );
 }
 
@@ -34,8 +38,15 @@ export default function LeadCard({ lead, onClick }: Props) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.3 : 1,
   };
+
+  // Follow-up indicator
+  const hasFollowupDue =
+    lead.stage === "contacted" &&
+    lead.messaged_at &&
+    !lead.reply_received &&
+    !lead.followup_d7_sent_at;
 
   return (
     <div
@@ -44,29 +55,33 @@ export default function LeadCard({ lead, onClick }: Props) {
       {...attributes}
       {...listeners}
       onClick={onClick}
-      className="bg-slate-800 border border-slate-700 hover:border-slate-500 rounded-xl p-4 cursor-pointer select-none transition-colors group"
+      className="bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-slate-500 rounded-xl p-3.5 cursor-pointer select-none transition-all group"
     >
-      {/* Header */}
+      {/* Top row */}
       <div className="flex items-start justify-between gap-2 mb-2">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-white truncate">{lead.name || "—"}</p>
-          <p className="text-xs text-slate-500 truncate">
-            {platformIcon[lead.platform] || "👤"} @{lead.handle}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-white truncate leading-snug">
+            {lead.name || `@${lead.handle}`}
+          </p>
+          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+            {PLATFORM_ICON[lead.platform] || "👤"} @{lead.handle}
           </p>
         </div>
-        {lead.qualification_score > 0 && <ScoreBadge score={lead.qualification_score} />}
+        <ScoreDot score={lead.qualification_score} />
       </div>
 
       {/* Bio snippet */}
       {lead.bio && (
-        <p className="text-xs text-slate-400 line-clamp-2 mb-3">{lead.bio}</p>
+        <p className="text-[11px] text-slate-400 line-clamp-2 mb-2.5 leading-relaxed">
+          {lead.bio}
+        </p>
       )}
 
-      {/* Pain points */}
+      {/* Pain point pills */}
       {lead.pain_points?.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-3">
+        <div className="flex flex-wrap gap-1 mb-2.5">
           {lead.pain_points.slice(0, 2).map((p) => (
-            <span key={p} className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded-full">
+            <span key={p} className="text-[9px] bg-slate-700/80 text-slate-400 px-1.5 py-0.5 rounded-full">
               {p}
             </span>
           ))}
@@ -74,9 +89,20 @@ export default function LeadCard({ lead, onClick }: Props) {
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-[11px] text-slate-600 mt-1">
-        <span>{lead.followers > 0 ? `${lead.followers.toLocaleString()} followers` : ""}</span>
-        {lead.airtable_record_id && <span className="text-emerald-700">✦ Airtable</span>}
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-slate-600">
+          {lead.followers > 0 ? `${lead.followers.toLocaleString()} followers` : ""}
+        </span>
+        <div className="flex items-center gap-2">
+          {hasFollowupDue && (
+            <span className="text-[9px] bg-amber-900/60 text-amber-400 px-1.5 py-0.5 rounded-full border border-amber-900/80">
+              follow-up due
+            </span>
+          )}
+          {lead.airtable_record_id && (
+            <span className="text-[9px] text-emerald-700">✦</span>
+          )}
+        </div>
       </div>
     </div>
   );
