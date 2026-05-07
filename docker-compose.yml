@@ -19,6 +19,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "80:80"
+    environment:
+      # Matches the backend service name in this compose file
+      BACKEND_URL: http://backend:8000
     depends_on:
       - backend
     restart: unless-stopped

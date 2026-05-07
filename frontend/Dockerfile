@@ -12,11 +12,17 @@ RUN npm run build
 # ── Runtime: nginx serves static files + proxies /api ─────────────────────────
 FROM nginx:1.27-alpine
 
-# Remove default site, copy our config and built files
+# gettext provides envsubst, used to inject BACKEND_URL at container start
+RUN apk add --no-cache gettext
+
 RUN rm /etc/nginx/conf.d/default.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+# Substitute only $BACKEND_URL in the nginx config; leave nginx's own
+# $host / $uri / $remote_addr etc. untouched (single-quoted argument).
+CMD ["/bin/sh", "-c", \
+  "envsubst '$BACKEND_URL' < /etc/nginx/nginx.conf.template \
+     > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
