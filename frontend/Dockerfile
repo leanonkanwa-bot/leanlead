@@ -19,7 +19,7 @@ RUN rm /etc/nginx/conf.d/default.conf
 COPY nginx.conf.template /etc/nginx/nginx.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 8080
 
 # Substitute only $BACKEND_URL in the nginx config; leave nginx's own
 # $host / $uri / $remote_addr etc. untouched (single-quoted argument).
