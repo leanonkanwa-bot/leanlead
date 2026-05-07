@@ -55,6 +55,11 @@ if _dist.exists():
         return FileResponse(str(_dist / "index.html"))
 
 
+@app.get("/")
+def root():
+    return {"status": "ok"}
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "version": "2.0.0"}
