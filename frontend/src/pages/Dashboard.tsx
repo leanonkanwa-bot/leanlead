@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  authApi, leadsApi, pipelineApi, followupsApi, prospectingApi,
+  authApi, leadsApi, pipelineApi, followupsApi, prospectingApi, analyticsApi,
   type Lead, type Stage, type FollowupDue, type Classification, type ReplyAnalysis,
+  type AnalyticsData,
 } from "../lib/api";
 import KanbanBoard from "../components/KanbanBoard";
 
@@ -794,9 +795,246 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   ANALYTICS + ONBOARDING
+════════════════════════════════════════════════════════════════════ */
+const pct = (n: number) => `${Math.round(n * 100)} %`;
+
+function StatCard({ label, value, sub, accent }: {
+  label: string; value: string | number; sub?: string; accent?: string;
+}) {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col gap-1">
+      <p className="text-xs text-slate-500 uppercase tracking-wider">{label}</p>
+      <p className={`text-3xl font-black ${accent ?? "text-white"}`}>{value}</p>
+      {sub && <p className="text-xs text-slate-500">{sub}</p>}
+    </div>
+  );
+}
+
+function MiniBar({ label, value, max, color }: {
+  label: string; value: number; max: number; color: string;
+}) {
+  const pctW = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-xs text-slate-400 w-24 flex-shrink-0 truncate">{label}</span>
+      <div className="flex-1 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pctW}%` }} />
+      </div>
+      <span className="text-xs font-semibold text-slate-300 w-6 text-right">{value}</span>
+    </div>
+  );
+}
+
+function OnboardingChecklist({ ob }: { ob: AnalyticsData["onboarding"] }) {
+  const steps = [
+    { label: "Compte créé",           done: ob.account_created },
+    { label: "Niche & offre définies", done: ob.niche_set },
+    { label: "Premier lead prospecté", done: ob.first_lead },
+    { label: "Premier DM envoyé",      done: ob.first_dm },
+    { label: "Premier appel booké",    done: ob.first_booking },
+  ];
+  const count = steps.filter(s => s.done).length;
+  const allDone = count === steps.length;
+
+  return (
+    <div className={`bg-slate-900 border rounded-2xl p-5 ${allDone ? "border-emerald-800/50" : "border-slate-800"}`}>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="font-heading font-bold text-white text-sm">
+            {allDone ? "🎉 Objectif atteint !" : "Checklist de démarrage"}
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">{count} / {steps.length} étapes complètes</p>
+        </div>
+        <div className="w-10 h-10 rounded-full border-2 border-slate-700 flex items-center justify-center text-xs font-black text-white">
+          {Math.round((count / steps.length) * 100)}%
+        </div>
+      </div>
+      <div className="space-y-2">
+        {steps.map(step => (
+          <div key={step.label} className="flex items-center gap-3">
+            <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[11px] ${
+              step.done ? "bg-emerald-500/20 text-emerald-400" : "bg-slate-800 text-slate-600"
+            }`}>
+              {step.done ? "✓" : "○"}
+            </span>
+            <span className={`text-sm ${step.done ? "text-slate-300" : "text-slate-500"}`}>{step.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
+  const qc = useQueryClient();
+  const [priceInput, setPriceInput] = useState(
+    coach.offer_price != null ? String(coach.offer_price) : ""
+  );
+  const [priceSaved, setPriceSaved] = useState(false);
+
+  const { data: stats, isLoading } = useQuery({
+    queryKey: ["analytics"],
+    queryFn: () => analyticsApi.get().then(r => r.data),
+    refetchInterval: 60_000,
+  });
+
+  const savePrice = useMutation({
+    mutationFn: () => authApi.updateSettings({ offer_price: parseFloat(priceInput) || 0 }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["analytics"] });
+      qc.invalidateQueries({ queryKey: ["me"] });
+      setPriceSaved(true);
+      setTimeout(() => setPriceSaved(false), 2000);
+    },
+  });
+
+  if (isLoading || !stats) {
+    return (
+      <div className="flex items-center justify-center h-64 text-slate-600 text-sm animate-pulse">
+        Calcul des statistiques…
+      </div>
+    );
+  }
+
+  const maxHashtag = Math.max(...stats.top_hashtags.map(h => h.leads), 1);
+  const maxConv    = Math.max(...stats.followup_conversions.map(c => c.count), 1);
+  const convColors = ["bg-slate-500", "bg-sky-500", "bg-brand-500", "bg-amber-500"];
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <h2 className="font-heading font-extrabold text-2xl text-white">Analytics</h2>
+
+      {/* ── KPIs ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <StatCard label="Leads · semaine"  value={stats.leads_this_week}  />
+        <StatCard label="Leads · mois"     value={stats.leads_this_month} />
+        <StatCard
+          label="Taux de réponse"
+          value={pct(stats.reply_rate)}
+          sub={`${(stats.by_stage.replied ?? 0) + (stats.by_stage.booked ?? 0) + (stats.by_stage.closed ?? 0)} leads ont répondu`}
+          accent="text-sky-400"
+        />
+        <StatCard
+          label="Taux de réservation"
+          value={pct(stats.booking_rate)}
+          sub={`${(stats.by_stage.booked ?? 0) + (stats.by_stage.closed ?? 0)} appels bookés`}
+          accent="text-emerald-400"
+        />
+      </div>
+
+      {/* ── Hashtags + Follow-up perf ── */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        {/* Top hashtags */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <h3 className="font-heading font-bold text-sm text-white mb-4">Top hashtags</h3>
+          {stats.top_hashtags.length === 0 ? (
+            <p className="text-xs text-slate-500">Aucune campagne de prospection terminée.</p>
+          ) : (
+            <div className="space-y-3">
+              {stats.top_hashtags.map(h => (
+                <MiniBar
+                  key={h.tag}
+                  label={`#${h.tag}`}
+                  value={Math.round(h.leads)}
+                  max={maxHashtag}
+                  color="bg-brand-500"
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Follow-up conversions */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <h3 className="font-heading font-bold text-sm text-white mb-1">Relances → réponses</h3>
+          <p className="text-xs text-slate-500 mb-4">Quelle relance a déclenché la réponse ?</p>
+          {stats.followup_conversions.every(c => c.count === 0) ? (
+            <p className="text-xs text-slate-500">Pas encore de données de conversion.</p>
+          ) : (
+            <div className="space-y-3">
+              {stats.followup_conversions.map((c, i) => (
+                <MiniBar
+                  key={c.label}
+                  label={c.label}
+                  value={c.count}
+                  max={maxConv}
+                  color={convColors[i] ?? "bg-slate-500"}
+                />
+              ))}
+            </div>
+          )}
+          <div className="mt-4 pt-4 border-t border-slate-800 flex gap-4 text-xs text-slate-500">
+            <span>Relances envoyées :</span>
+            <span className="text-slate-300">D+2 <b>{stats.followup_sent.d2}</b></span>
+            <span className="text-slate-300">D+4 <b>{stats.followup_sent.d4}</b></span>
+            <span className="text-slate-300">D+7 <b>{stats.followup_sent.d7}</b></span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Revenue tracker + Checklist ── */}
+      <div className="grid sm:grid-cols-2 gap-4">
+        {/* Revenue */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+          <h3 className="font-heading font-bold text-sm text-white">Projection de revenus</h3>
+          <div>
+            <label className="text-xs text-slate-400 mb-1.5 block">Prix de votre offre (€)</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="0"
+                value={priceInput}
+                onChange={e => setPriceInput(e.target.value)}
+                placeholder="ex. 2000"
+                className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm
+                           focus:outline-none focus:border-brand-500 transition-colors"
+              />
+              <button
+                onClick={() => savePrice.mutate()}
+                disabled={savePrice.isPending}
+                className="px-4 py-2 bg-brand-500 hover:bg-brand-400 disabled:opacity-50
+                           rounded-xl text-sm font-semibold transition-colors"
+              >
+                {priceSaved ? "✓" : "OK"}
+              </button>
+            </div>
+          </div>
+          <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-500">Deals closés</p>
+              <p className="text-2xl font-black text-white">{stats.closed_leads}</p>
+            </div>
+            <div className="text-slate-700 text-2xl">×</div>
+            <div>
+              <p className="text-xs text-slate-500">Prix offre</p>
+              <p className="text-2xl font-black text-white">
+                {stats.offer_price > 0 ? `${stats.offer_price.toLocaleString("fr-FR")} €` : "—"}
+              </p>
+            </div>
+            <div className="text-slate-700 text-2xl">=</div>
+            <div>
+              <p className="text-xs text-slate-500">Revenus générés</p>
+              <p className={`text-2xl font-black ${stats.projected_mrr > 0 ? "text-emerald-400" : "text-slate-600"}`}>
+                {stats.projected_mrr > 0
+                  ? `${stats.projected_mrr.toLocaleString("fr-FR")} €`
+                  : "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Onboarding checklist */}
+        <OnboardingChecklist ob={stats.onboarding} />
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
    TABLEAU DE BORD
 ════════════════════════════════════════════════════════════════════ */
-type Tab = "pipeline" | "prospects" | "followups" | "replies";
+type Tab = "pipeline" | "prospects" | "followups" | "replies" | "analytics";
 
 export default function Dashboard() {
   const nav = useNavigate();
@@ -847,6 +1085,7 @@ export default function Dashboard() {
     { id: "prospects", label: "Prospection" },
     { id: "followups", label: "Relances", badge: followups.length || undefined },
     { id: "replies",   label: "Réponses" },
+    { id: "analytics", label: "Analytics" },
   ];
 
   const initials = (coach?.name ?? "?")[0].toUpperCase();
@@ -976,6 +1215,12 @@ export default function Dashboard() {
         {tab === "replies" && (
           <div className="px-5 py-6 overflow-auto">
             <RepliesTab leads={leads} />
+          </div>
+        )}
+
+        {tab === "analytics" && (
+          <div className="px-5 py-6 overflow-auto">
+            <AnalyticsTab coach={coach ?? {}} />
           </div>
         )}
       </div>

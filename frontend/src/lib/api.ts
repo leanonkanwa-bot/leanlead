@@ -14,6 +14,29 @@ export interface Coach {
   niche?: string; offer_description?: string;
   target_audience?: string; calendly_link?: string;
   onboarded: boolean; has_apify_key?: boolean;
+  offer_price?: number | null;
+}
+
+export interface AnalyticsData {
+  leads_this_week: number;
+  leads_this_month: number;
+  total_leads: number;
+  by_stage: Record<string, number>;
+  reply_rate: number;
+  booking_rate: number;
+  top_hashtags: { tag: string; leads: number }[];
+  followup_conversions: { label: string; count: number }[];
+  followup_sent: { d2: number; d4: number; d7: number };
+  closed_leads: number;
+  offer_price: number;
+  projected_mrr: number;
+  onboarding: {
+    account_created: boolean;
+    niche_set: boolean;
+    first_lead: boolean;
+    first_dm: boolean;
+    first_booking: boolean;
+  };
 }
 
 export type Stage = "new" | "contacted" | "replied" | "booked" | "closed";
@@ -65,7 +88,7 @@ export const authApi = {
 
   updateSettings: (d: {
     niche?: string; offer_description?: string; target_audience?: string;
-    calendly_link?: string; apify_api_key?: string;
+    calendly_link?: string; apify_api_key?: string; offer_price?: number;
   }) => api.patch("/auth/settings", d),
 
   onboard: (d: {
@@ -100,6 +123,11 @@ export const followupsApi = {
     api.post<{ message: string; day: number }>(`/followups/${id}/send`, { day }),
   markSent: (id: number, day: number) =>
     api.post(`/followups/${id}/mark-sent`, { day }),
+};
+
+/* ── Analytics ── */
+export const analyticsApi = {
+  get: () => api.get<AnalyticsData>("/analytics"),
 };
 
 /* ── Prospecting ── */

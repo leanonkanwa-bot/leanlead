@@ -67,6 +67,7 @@ class SettingsRequest(BaseModel):
     target_audience: str | None = None
     calendly_link: str | None = None
     apify_api_key: str | None = None
+    offer_price: float | None = None
 
 
 @router.patch("/settings")
@@ -95,6 +96,7 @@ def me(coach: models.Coach = Depends(get_current_coach)):
         "calendly_link": coach.calendly_link,
         "onboarded": coach.onboarded,
         "has_apify_key": bool(coach.apify_api_key),
+        "offer_price": coach.offer_price,
     }
 
 

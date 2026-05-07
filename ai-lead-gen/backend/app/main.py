@@ -10,10 +10,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
+from sqlalchemy import text
 from .database import Base, engine
-from .routers import auth, leads, pipeline, prospecting, followups
+from .routers import auth, leads, pipeline, prospecting, followups, analytics
 
 Base.metadata.create_all(bind=engine)
+
+# Lightweight additive migrations for columns added after initial deploy
+_migrations = [
+    "ALTER TABLE coaches ADD COLUMN offer_price REAL",
+]
+with engine.connect() as _conn:
+    for _sql in _migrations:
+        try:
+            _conn.execute(text(_sql))
+            _conn.commit()
+        except Exception:
+            pass  # column already exists
 
 app = FastAPI(title="LeanLead AI", version="2.0.0")
 
@@ -30,6 +43,7 @@ app.include_router(leads.router)
 app.include_router(pipeline.router)
 app.include_router(prospecting.router)
 app.include_router(followups.router)
+app.include_router(analytics.router)
 
 # Serve built React frontend
 _dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
