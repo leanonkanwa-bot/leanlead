@@ -2,8 +2,8 @@
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
     "builder": "DOCKERFILE",
-    "dockerfilePath": "Dockerfile",
-    "watchPatterns": ["src/**", "public/**", "package.json", "vite.config.ts"]
+    "dockerfilePath": "frontend/Dockerfile",
+    "watchPatterns": ["frontend/src/**", "frontend/public/**", "frontend/package.json", "frontend/nginx.conf.template"]
   },
   "deploy": {
     "healthcheckPath": "/",
