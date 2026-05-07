@@ -10,9 +10,9 @@ import anthropic
 _client: anthropic.Anthropic | None = None
 
 FOLLOWUP_TONES = {
-    2: "light bump — short, casual, no pressure. Reference one specific thing from their profile.",
-    4: "value-add — share a quick insight or question that's directly relevant to their situation.",
-    7: "closing the loop — honest, human, final message. No guilt-tripping. Just close it gently.",
+    2: "light, casual bump — under 40 words. Reference one specific thing from their profile or bio. No pressure.",
+    4: "value-add — share a short, sharp insight or ask a curious question directly relevant to their situation. Under 50 words.",
+    7: "closing the loop — honest, human, final message. Make it easy for them to say no. Under 40 words. No guilt.",
 }
 
 
@@ -27,36 +27,35 @@ def generate_followup(
     lead_data: dict,
     original_dm: str,
     coach_name: str,
+    coach_niche: str,
     coach_offer: str,
-    day: int,  # 2, 4, or 7
+    day: int,
 ) -> str:
     """
-    Generate a follow-up DM for a lead that hasn't replied.
-    day: 2 = D+2, 4 = D+4, 7 = D+7
+    Generate a follow-up DM. day: 2 = D+2, 4 = D+4, 7 = D+7.
+    Returns the message text.
     """
     tone = FOLLOWUP_TONES.get(day, FOLLOWUP_TONES[7])
-    first_name = (lead_data.get("name") or "there").split()[0]
+    first_name = (lead_data.get("name") or "").split()[0] or "toi"
 
-    prompt = f"""You are {coach_name}, following up on an unanswered Instagram DM.
+    prompt = f"""Tu es {coach_name}, coach en {coach_niche}. Tu fais un suivi sur un DM Instagram sans réponse.
 
-Original message you sent:
+DM original envoyé :
 "{original_dm}"
 
-Lead profile:
-- Name: {first_name}
-- Bio: {lead_data.get("bio", "")}
-- Platform: {lead_data.get("platform", "instagram")}
+Profil du lead :
+- Prénom : {first_name}
+- Bio : {lead_data.get("bio", "")}
+- Plateforme : {lead_data.get("platform", "instagram")}
 
-This is follow-up #{day // 2} (Day +{day}). Tone: {tone}
+C'est le suivi J+{day}. Ton : {tone}
 
-Rules:
-- Under 60 words
-- Do NOT repeat the original DM
-- No "Just following up" opener
-- No emojis unless it's very natural
-- Sound like a real person, not a sequence
-
-Return ONLY the follow-up message text — nothing else."""
+Règles STRICTES :
+- N'utilise PAS "juste un suivi" ou "je reviens vers toi"
+- Ne répète PAS le DM original
+- Sonne comme une vraie personne, pas une séquence automatique
+- Écris EN FRANÇAIS
+- Retourne UNIQUEMENT le texte du message — rien d'autre"""
 
     msg = _get_client().messages.create(
         model="claude-opus-4-7",

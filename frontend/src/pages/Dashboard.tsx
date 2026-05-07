@@ -347,15 +347,11 @@ function ProspectsTab() {
 /* ════════════════════════════════════════════════════════════════════
    ONGLET RELANCES
 ════════════════════════════════════════════════════════════════════ */
-function dayLabel(day: number) {
-  return day === 2 ? "J+2 · Rappel léger" : day === 4 ? "J+4 · Valeur ajoutée" : "J+7 · Dernière relance";
-}
-
-function dayClasses(day: number) {
-  return day === 2 ? "bg-amber-950 border-amber-800 text-amber-400"
-       : day === 4 ? "bg-brand-950 border-brand-800 text-brand-400"
-       : "bg-rose-950 border-rose-900 text-rose-400";
-}
+const DAY_CONFIG = {
+  2: { label: "J+2", sublabel: "Rappel léger",       badge: "bg-amber-950/70 border-amber-800/60 text-amber-400", ring: "ring-amber-800/20" },
+  4: { label: "J+4", sublabel: "Valeur ajoutée",      badge: "bg-brand-950/70 border-brand-800/60 text-brand-400", ring: "ring-brand-800/20" },
+  7: { label: "J+7", sublabel: "Dernière relance",    badge: "bg-rose-950/70 border-rose-900/60 text-rose-400",    ring: "ring-rose-900/20" },
+} as const;
 
 function msgKey(day: number): keyof FollowupDue {
   return day === 2 ? "followup_d2_message" : day === 4 ? "followup_d4_message" : "followup_d7_message";
@@ -369,84 +365,119 @@ function daysSince(iso: string) {
 function FollowupRow({ item }: { item: FollowupDue }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [localMessage, setLocalMessage] = useState<string | undefined>(
+    item[msgKey(item.due_day)] as string | undefined
+  );
+  const [sent, setSent] = useState(false);
+
+  const cfg = DAY_CONFIG[item.due_day as 2 | 4 | 7];
   const refresh = () => { qc.invalidateQueries({ queryKey: ["followups"] }); qc.invalidateQueries({ queryKey: ["leads"] }); };
 
-  const generate = useMutation({ mutationFn: () => followupsApi.generate(item.lead_id, item.due_day), onSuccess: refresh });
-  const markSent = useMutation({ mutationFn: () => followupsApi.markSent(item.lead_id, item.due_day), onSuccess: refresh });
+  const generate = useMutation({
+    mutationFn: () => followupsApi.generate(item.lead_id, item.due_day),
+    onSuccess: ({ data }) => setLocalMessage(data.message),
+  });
 
-  const message = item[msgKey(item.due_day)] as string | undefined;
-
-  function copy() {
-    if (!message) return;
-    navigator.clipboard.writeText(message);
-    setCopied(true); setTimeout(() => setCopied(false), 1500);
-  }
+  // Primary action: generate if needed → copy → mark sent
+  const send = useMutation({
+    mutationFn: () => followupsApi.send(item.lead_id, item.due_day),
+    onSuccess: ({ data }) => {
+      setLocalMessage(data.message);
+      navigator.clipboard.writeText(data.message).catch(() => {});
+      setSent(true);
+      setTimeout(refresh, 800);
+    },
+  });
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-800/30 transition-colors"
-        onClick={() => setOpen(o => !o)}>
+    <div className={`bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition-all ${
+      open ? `ring-1 ${cfg.ring}` : ""
+    }`}>
+      {/* Header row */}
+      <div
+        className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-800/20 transition-colors"
+        onClick={() => setOpen(o => !o)}
+      >
         <div className="flex items-center gap-3 min-w-0">
-          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border flex-shrink-0 ${dayClasses(item.due_day)}`}>
-            {dayLabel(item.due_day)}
-          </span>
+          <div className={`flex-shrink-0 px-2.5 py-1 rounded-lg border text-[10px] font-bold ${cfg.badge}`}>
+            {cfg.label}
+            <span className="hidden sm:inline"> · {cfg.sublabel}</span>
+          </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-white truncate">{item.name || `@${item.handle}`}</p>
-            <p className="text-xs text-slate-500">@{item.handle} · contacté {daysSince(item.messaged_at)}</p>
+            <p className="text-sm font-semibold text-slate-100 truncate">{item.name || `@${item.handle}`}</p>
+            <p className="text-[11px] text-slate-600">@{item.handle} · contacté {daysSince(item.messaged_at)}</p>
           </div>
         </div>
-        <span className="text-slate-600 ml-3 flex-shrink-0">{open ? "▲" : "▼"}</span>
+        <div className="flex items-center gap-3 ml-3 flex-shrink-0">
+          {sent && <span className="text-[10px] text-emerald-400">✓ envoyé</span>}
+          <span className="text-slate-700 text-xs">{open ? "▲" : "▼"}</span>
+        </div>
       </div>
 
+      {/* Expanded content */}
       {open && (
-        <div className="px-5 pb-5 border-t border-slate-800 space-y-4">
+        <div className="border-t border-slate-800/60 px-5 pt-4 pb-5 space-y-4 animate-fade-in">
+          {/* Original DM context */}
           {item.outreach_message && (
-            <div className="mt-4">
-              <p className="text-xs text-slate-500 mb-1">DM original</p>
-              <p className="text-xs text-slate-400 bg-slate-800/60 rounded-xl p-3 leading-relaxed line-clamp-3">
-                {item.outreach_message}
+            <div>
+              <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wider mb-1.5">DM original</p>
+              <p className="text-xs text-slate-500 bg-slate-800/40 rounded-xl p-3 leading-relaxed line-clamp-2 italic">
+                "{item.outreach_message}"
               </p>
             </div>
           )}
 
-          {message ? (
-            <div>
-              <p className="text-xs text-slate-500 mb-2">Message de relance</p>
-              <div className="bg-slate-800 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                {message}
-              </div>
-              <div className="flex gap-4 mt-2">
-                <button onClick={copy} className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
-                  {copied ? "Copié !" : "📋 Copier"}
-                </button>
-                <button onClick={() => generate.mutate()} disabled={generate.isPending}
-                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors">
+          {/* Follow-up message */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wider">Message de relance</p>
+              {localMessage && !send.isPending && (
+                <button
+                  onClick={() => generate.mutate()}
+                  disabled={generate.isPending}
+                  className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors"
+                >
                   {generate.isPending ? "Réécriture…" : "↻ Régénérer"}
                 </button>
-              </div>
+              )}
             </div>
-          ) : (
-            <button onClick={() => generate.mutate()} disabled={generate.isPending}
-              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-xl text-sm text-slate-300 transition-colors">
-              {generate.isPending ? "Rédaction…" : `✍️ Générer le message ${dayLabel(item.due_day)}`}
-            </button>
-          )}
 
-          <div className="flex gap-3">
-            <button onClick={() => markSent.mutate()} disabled={markSent.isPending || !message}
-              className="flex-1 py-2.5 bg-emerald-900 hover:bg-emerald-800 disabled:opacity-40 text-emerald-300 rounded-xl text-sm font-medium transition-colors">
-              {markSent.isPending ? "Marquage…" : "✓ Marquer comme envoyé"}
-            </button>
-            <button onClick={() => markSent.mutate()}
-              className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-500 rounded-xl text-sm transition-colors"
-              title="Ignorer cette relance">
-              Ignorer
-            </button>
+            {localMessage ? (
+              <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                {localMessage}
+              </div>
+            ) : (
+              <div className="bg-slate-800/30 border border-dashed border-slate-700/40 rounded-xl px-4 py-6 text-center">
+                <p className="text-xs text-slate-600">
+                  {generate.isPending ? "Rédaction en cours…" : "Le message sera généré à l'envoi"}
+                </p>
+              </div>
+            )}
           </div>
 
-          {generate.isError && (
-            <p className="text-red-400 text-xs">{(generate.error as any)?.response?.data?.detail}</p>
+          {/* Errors */}
+          {(send.isError || generate.isError) && (
+            <p className="text-red-400 text-xs bg-red-950/30 border border-red-900/40 rounded-xl px-3 py-2">
+              {((send.error || generate.error) as any)?.response?.data?.detail || "Erreur lors de la génération"}
+            </p>
+          )}
+
+          {/* Actions */}
+          {sent ? (
+            <div className="flex items-center gap-2 py-2.5 px-4 bg-emerald-950/30 border border-emerald-900/40 rounded-xl">
+              <span className="text-emerald-400 text-sm">✓</span>
+              <span className="text-sm text-emerald-400 font-medium">Copié dans le presse-papier · Marqué comme envoyé</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => send.mutate()}
+              disabled={send.isPending}
+              className="w-full py-3 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-all duration-150"
+            >
+              {send.isPending
+                ? (localMessage ? "Copie + marquage…" : "Génération + envoi…")
+                : (localMessage ? "📋 Copier & marquer envoyé" : "✨ Générer & envoyer")}
+            </button>
           )}
         </div>
       )}
@@ -458,43 +489,58 @@ function FollowupsTab() {
   const { data: items = [], isLoading, refetch } = useQuery({
     queryKey: ["followups"],
     queryFn: () => followupsApi.due().then(r => r.data),
-    refetchInterval: 60_000,
+    refetchInterval: 30_000,
   });
 
   const byDay = (d: number) => items.filter(i => i.due_day === d);
+  const total = items.length;
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="max-w-2xl mx-auto space-y-5">
+      {/* Header */}
+      <div className="flex items-start justify-between">
         <div>
-          <h2 className="font-semibold text-white">File de relances</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Leads nécessitant une relance J+2, J+4 ou J+7 aujourd'hui</p>
+          <h2 className="font-heading font-semibold text-white text-lg">File de relances</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {total === 0 ? "Aucune relance en attente" : `${total} relance${total > 1 ? "s" : ""} à traiter`}
+          </p>
         </div>
-        <button onClick={() => refetch()} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">↻ Actualiser</button>
+        <button onClick={() => refetch()} className="text-xs text-slate-600 hover:text-slate-400 transition-colors mt-1">
+          ↻ Actualiser
+        </button>
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-slate-600 text-center py-12">Chargement…</p>
+        <div className="space-y-3">
+          {[1,2,3].map(i => <div key={i} className="h-16 bg-slate-900 rounded-2xl animate-pulse" />)}
+        </div>
       ) : items.length === 0 ? (
         <div className="text-center py-16 bg-slate-900 border border-slate-800 rounded-2xl">
-          <p className="text-2xl mb-2">🎉</p>
-          <p className="text-sm font-medium text-white mb-1">File vide</p>
-          <p className="text-xs text-slate-500">Aucune relance en attente. Revenez demain.</p>
+          <p className="text-3xl mb-3">🎉</p>
+          <p className="font-heading font-semibold text-white mb-1">File vide</p>
+          <p className="text-xs text-slate-500 max-w-xs mx-auto">
+            Aucune relance en attente. Les leads apparaissent ici automatiquement J+2, J+4 et J+7 après votre premier contact.
+          </p>
         </div>
       ) : (
         <>
+          {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
-            {[
-              { day: 2, label: "J+2 à faire", cls: "text-amber-400" },
-              { day: 4, label: "J+4 à faire", cls: "text-brand-400" },
-              { day: 7, label: "J+7 à faire", cls: "text-rose-400" },
-            ].map(({ day, label, cls }) => (
-              <div key={day} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-center">
-                <p className={`text-xl font-black ${cls}`}>{byDay(day).length}</p>
-                <p className="text-[10px] text-slate-500 mt-0.5">{label}</p>
-              </div>
-            ))}
+            {([2, 4, 7] as const).map(day => {
+              const cfg = DAY_CONFIG[day];
+              const count = byDay(day).length;
+              return (
+                <div key={day} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-center">
+                  <p className={`font-heading text-2xl font-black ${count > 0 ? cfg.badge.split(" ").find(c => c.startsWith("text-")) : "text-slate-700"}`}>
+                    {count}
+                  </p>
+                  <p className="text-[10px] text-slate-600 mt-0.5">{cfg.label} · {cfg.sublabel}</p>
+                </div>
+              );
+            })}
           </div>
+
+          {/* Rows — most urgent first (7 → 4 → 2) */}
           <div className="space-y-3">
             {[7, 4, 2].flatMap(day => byDay(day)).map(item => (
               <FollowupRow key={`${item.lead_id}-${item.due_day}`} item={item} />

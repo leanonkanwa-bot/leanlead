@@ -88,6 +88,8 @@ export const followupsApi = {
   due:      () => api.get<FollowupDue[]>("/followups/due"),
   generate: (id: number, day: number) =>
     api.post<{ message: string }>(`/followups/${id}/generate`, { day }),
+  send:     (id: number, day: number) =>
+    api.post<{ message: string; day: number }>(`/followups/${id}/send`, { day }),
   markSent: (id: number, day: number) =>
     api.post(`/followups/${id}/mark-sent`, { day }),
 };

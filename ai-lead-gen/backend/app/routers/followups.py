@@ -1,10 +1,12 @@
 """
 Follow-up router
-GET  /api/followups/due              – leads due for D+2 / D+4 / D+7 follow-up
-POST /api/followups/{lead_id}/generate – generate follow-up message for given day
-POST /api/followups/{lead_id}/mark-sent – mark follow-up as sent
+GET  /api/followups/due                – leads due for D+2 / D+4 / D+7
+POST /api/followups/{lead_id}/generate – generate a follow-up message (preview only)
+POST /api/followups/{lead_id}/send     – generate if needed + mark as sent (primary action)
+POST /api/followups/{lead_id}/mark-sent – mark sent without generating (legacy)
 """
-from datetime import datetime, timedelta
+import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -20,20 +22,46 @@ router = APIRouter(prefix="/api/followups", tags=["followups"])
 FOLLOWUP_DAYS = [2, 4, 7]
 
 
-def _due_day(lead: models.Lead) -> int | None:
-    """Return which follow-up day is due (2, 4, or 7), or None."""
-    if not lead.messaged_at or lead.stage != "contacted":
-        return None
-    now = datetime.utcnow()
-    delta = (now - lead.messaged_at).days
+def _msg_field(day: int) -> str:
+    return f"followup_d{day}_message"
 
-    if delta >= 7 and not lead.followup_d7_sent_at:
-        return 7
-    if delta >= 4 and not lead.followup_d4_sent_at:
-        return 4
-    if delta >= 2 and not lead.followup_d2_sent_at:
-        return 2
-    return None
+
+def _sent_field(day: int) -> str:
+    return f"followup_d{day}_sent_at"
+
+
+def _due_days(lead: models.Lead) -> list[int]:
+    """Return ALL follow-up days that are due and not yet sent, lowest first."""
+    if not lead.messaged_at or lead.stage != "contacted":
+        return []
+    delta = (datetime.utcnow() - lead.messaged_at).days
+    return [
+        day for day in FOLLOWUP_DAYS
+        if delta >= day and not getattr(lead, _sent_field(day))
+    ]
+
+
+def _serialize_due(lead: models.Lead) -> list[dict]:
+    """One entry per due day for this lead."""
+    days = _due_days(lead)
+    if not days:
+        return []
+    base = {
+        "lead_id":          lead.id,
+        "name":             lead.name,
+        "handle":           lead.handle,
+        "platform":         lead.platform,
+        "bio":              lead.bio,
+        "messaged_at":      lead.messaged_at.isoformat(),
+        "outreach_message": lead.outreach_message,
+        "followup_d2_message":  lead.followup_d2_message,
+        "followup_d2_sent_at":  lead.followup_d2_sent_at.isoformat() if lead.followup_d2_sent_at else None,
+        "followup_d4_message":  lead.followup_d4_message,
+        "followup_d4_sent_at":  lead.followup_d4_sent_at.isoformat() if lead.followup_d4_sent_at else None,
+        "followup_d7_message":  lead.followup_d7_message,
+        "followup_d7_sent_at":  lead.followup_d7_sent_at.isoformat() if lead.followup_d7_sent_at else None,
+    }
+    return [{**base, "due_day": day} for day in days]
 
 
 @router.get("/due")
@@ -41,7 +69,6 @@ def get_due(
     coach: models.Coach = Depends(get_current_coach),
     db: Session = Depends(get_db),
 ):
-    """Return all leads that have a follow-up due."""
     leads = (
         db.query(models.Lead)
         .filter(
@@ -51,101 +78,96 @@ def get_due(
         )
         .all()
     )
-    due = []
+    result = []
     for lead in leads:
-        day = _due_day(lead)
-        if day is not None:
-            import json
-            pain_points: list = []
-            try:
-                pain_points = json.loads(lead.pain_points or "[]")
-            except Exception:
-                pass
-            due.append({
-                "lead_id": lead.id,
-                "name": lead.name,
-                "handle": lead.handle,
-                "platform": lead.platform,
-                "bio": lead.bio,
-                "messaged_at": lead.messaged_at.isoformat(),
-                "outreach_message": lead.outreach_message,
-                "due_day": day,
-                "followup_d2_sent_at": lead.followup_d2_sent_at.isoformat() if lead.followup_d2_sent_at else None,
-                "followup_d4_sent_at": lead.followup_d4_sent_at.isoformat() if lead.followup_d4_sent_at else None,
-                "followup_d7_sent_at": lead.followup_d7_sent_at.isoformat() if lead.followup_d7_sent_at else None,
-                "followup_d2_message": lead.followup_d2_message,
-                "followup_d4_message": lead.followup_d4_message,
-                "followup_d7_message": lead.followup_d7_message,
-            })
-    return due
+        result.extend(_serialize_due(lead))
+    # Sort: most urgent (day 7) first, then by messaged_at descending
+    result.sort(key=lambda x: (-x["due_day"], x["messaged_at"]))
+    return result
 
 
-class GenerateRequest(BaseModel):
-    day: int   # 2, 4, or 7
+class DayRequest(BaseModel):
+    day: int
+
+
+def _get_lead(lead_id: int, coach_id: int, db: Session) -> models.Lead:
+    lead = db.query(models.Lead).filter(
+        models.Lead.id == lead_id,
+        models.Lead.coach_id == coach_id,
+    ).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead introuvable")
+    return lead
 
 
 @router.post("/{lead_id}/generate")
 def generate(
     lead_id: int,
-    req: GenerateRequest,
+    req: DayRequest,
     coach: models.Coach = Depends(get_current_coach),
     db: Session = Depends(get_db),
 ):
     if req.day not in FOLLOWUP_DAYS:
-        raise HTTPException(status_code=400, detail=f"day must be one of {FOLLOWUP_DAYS}")
-    lead = db.query(models.Lead).filter(
-        models.Lead.id == lead_id, models.Lead.coach_id == coach.id
-    ).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
+        raise HTTPException(status_code=400, detail=f"day doit être dans {FOLLOWUP_DAYS}")
+    lead = _get_lead(lead_id, coach.id, db)
     if not lead.outreach_message:
-        raise HTTPException(status_code=400, detail="No original DM found for this lead")
+        raise HTTPException(status_code=400, detail="Aucun DM original trouvé pour ce lead")
 
     message = followup_agent.generate_followup(
         lead_data={"name": lead.name, "bio": lead.bio or "", "platform": lead.platform},
         original_dm=lead.outreach_message,
         coach_name=coach.name,
+        coach_niche=coach.niche or "",
         coach_offer=coach.offer_description or "",
         day=req.day,
     )
-
-    if req.day == 2:
-        lead.followup_d2_message = message
-    elif req.day == 4:
-        lead.followup_d4_message = message
-    else:
-        lead.followup_d7_message = message
+    setattr(lead, _msg_field(req.day), message)
     db.commit()
-
     return {"ok": True, "message": message, "day": req.day}
 
 
-class MarkSentRequest(BaseModel):
-    day: int
+@router.post("/{lead_id}/send")
+def send_followup(
+    lead_id: int,
+    req: DayRequest,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    """Generate message if not yet written, then mark as sent. Primary one-click action."""
+    if req.day not in FOLLOWUP_DAYS:
+        raise HTTPException(status_code=400, detail=f"day doit être dans {FOLLOWUP_DAYS}")
+    lead = _get_lead(lead_id, coach.id, db)
+
+    message = getattr(lead, _msg_field(req.day))
+
+    if not message:
+        if not lead.outreach_message:
+            raise HTTPException(status_code=400, detail="Aucun DM original — générez d'abord le message de prospection")
+        message = followup_agent.generate_followup(
+            lead_data={"name": lead.name, "bio": lead.bio or "", "platform": lead.platform},
+            original_dm=lead.outreach_message,
+            coach_name=coach.name,
+            coach_niche=coach.niche or "",
+            coach_offer=coach.offer_description or "",
+            day=req.day,
+        )
+        setattr(lead, _msg_field(req.day), message)
+
+    setattr(lead, _sent_field(req.day), datetime.utcnow())
+    db.commit()
+    return {"ok": True, "message": message, "day": req.day}
 
 
 @router.post("/{lead_id}/mark-sent")
 def mark_sent(
     lead_id: int,
-    req: MarkSentRequest,
+    req: DayRequest,
     coach: models.Coach = Depends(get_current_coach),
     db: Session = Depends(get_db),
 ):
     if req.day not in FOLLOWUP_DAYS:
-        raise HTTPException(status_code=400, detail=f"day must be one of {FOLLOWUP_DAYS}")
-    lead = db.query(models.Lead).filter(
-        models.Lead.id == lead_id, models.Lead.coach_id == coach.id
-    ).first()
-    if not lead:
-        raise HTTPException(status_code=404, detail="Lead not found")
-
-    now = datetime.utcnow()
-    if req.day == 2:
-        lead.followup_d2_sent_at = now
-    elif req.day == 4:
-        lead.followup_d4_sent_at = now
-    else:
-        lead.followup_d7_sent_at = now
+        raise HTTPException(status_code=400, detail=f"day doit être dans {FOLLOWUP_DAYS}")
+    lead = _get_lead(lead_id, coach.id, db)
+    setattr(lead, _sent_field(req.day), datetime.utcnow())
     db.commit()
-
     return {"ok": True, "day": req.day}
