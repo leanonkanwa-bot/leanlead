@@ -1,7 +1,11 @@
+import os
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./leanlead.db"
+# Default: local file (dev). In Docker, override via DATABASE_URL env var
+# to point at the mounted volume, e.g. sqlite:////app/data/leanlead.db
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./leanlead.db")
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
