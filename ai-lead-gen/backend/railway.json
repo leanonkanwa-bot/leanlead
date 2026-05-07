@@ -6,7 +6,7 @@
     "watchPatterns": ["ai-lead-gen/backend/app/**", "ai-lead-gen/backend/requirements.txt"]
   },
   "deploy": {
-    "startCommand": "python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT",
+    "startCommand": "python -m uvicorn app.main:app --host 0.0.0.0 --port 8080",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
