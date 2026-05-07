@@ -1,143 +1,136 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authApi } from "../lib/api";
 
-export default function Settings() {
-  const nav = useNavigate();
-  const qc = useQueryClient();
+const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div>
+    <label className="block text-xs font-medium text-slate-400 mb-1.5 tracking-wide">{label}</label>
+    {children}
+  </div>
+);
 
-  const { data: coach } = useQuery({
+export default function Settings() {
+  const qc = useQueryClient();
+  const { data: coach, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: () => authApi.me().then(r => r.data),
   });
 
   const [form, setForm] = useState({
-    niche: "", offer_description: "", target_audience: "",
-    calendly_link: "", apify_api_key: "",
+    niche: "", offer_description: "", target_audience: "", calendly_link: "",
   });
-  const [initialized, setInitialized] = useState(false);
+  const [apifyKey, setApifyKey] = useState("");
+  const [saved, setSaved] = useState(false);
 
-  if (coach && !initialized) {
-    setForm({
-      niche: coach.niche || "",
-      offer_description: coach.offer_description || "",
-      target_audience: coach.target_audience || "",
-      calendly_link: coach.calendly_link || "",
-      apify_api_key: "",
-    });
-    setInitialized(true);
-  }
+  useEffect(() => {
+    if (coach) {
+      setForm({
+        niche:             coach.niche             || "",
+        offer_description: coach.offer_description || "",
+        target_audience:   coach.target_audience   || "",
+        calendly_link:     coach.calendly_link     || "",
+      });
+    }
+  }, [coach]);
 
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
 
   const save = useMutation({
     mutationFn: () => {
-      const payload: Record<string, string> = {
-        niche: form.niche,
-        offer_description: form.offer_description,
-        target_audience: form.target_audience,
-        calendly_link: form.calendly_link,
-      };
-      if (form.apify_api_key) payload.apify_api_key = form.apify_api_key;
+      const payload: Record<string, string> = { ...form };
+      if (apifyKey) payload.apify_api_key = apifyKey;
       return authApi.updateSettings(payload);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
-      setForm(f => ({ ...f, apify_api_key: "" }));
+      setApifyKey("");
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
     },
   });
 
+  const inputCls = "w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all duration-150";
+
   return (
-    <div className="min-h-screen bg-slate-950 px-4 py-10">
-      <div className="max-w-xl mx-auto">
+    <div className="min-h-screen bg-slate-950" style={{ backgroundImage: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255,117,31,0.05), transparent)" }}>
+      <div className="max-w-xl mx-auto px-4 py-10">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <Link to="/dashboard" className="text-slate-500 hover:text-white text-sm transition-colors">
-            ← Retour au tableau de bord
+        <div className="flex items-center justify-between mb-10">
+          <Link to="/dashboard" className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 text-sm transition-colors">
+            ← Tableau de bord
           </Link>
-          <span className="font-extrabold text-lg">
+          <span className="font-heading font-extrabold text-lg tracking-tight">
             Lean<span className="text-brand-400">Lead</span>
           </span>
         </div>
 
-        <h1 className="text-xl font-semibold text-white mb-6">Paramètres</h1>
+        <h1 className="font-heading text-2xl font-bold text-white mb-1">Paramètres</h1>
+        <p className="text-sm text-slate-500 mb-8">Personnalisez votre profil et vos intégrations.</p>
 
-        <div className="space-y-5">
-          {/* Coaching info */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <h2 className="text-sm font-semibold text-white mb-4">Informations de coaching</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Créneau de coaching</label>
-                <input value={form.niche} onChange={set("niche")}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors"
-                  placeholder="ex. Coaching business pour entrepreneurs en ligne" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Client idéal</label>
-                <textarea value={form.target_audience} onChange={set("target_audience")} rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors resize-none"
-                  placeholder="ex. Coachs en ligne souhaitant décrocher 5 clients premium en 90 jours…" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Description de l'offre</label>
-                <textarea value={form.offer_description} onChange={set("offer_description")} rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors resize-none"
-                  placeholder="ex. J'aide les coachs à décrocher leurs 5 premiers clients premium en 90 jours…" />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Lien Calendly</label>
-                <input value={form.calendly_link} onChange={set("calendly_link")}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors"
-                  placeholder="https://calendly.com/yourname/30min" />
+        {isLoading ? (
+          <div className="space-y-4 animate-pulse">
+            {[1,2,3].map(i => <div key={i} className="h-24 bg-slate-900 rounded-2xl" />)}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Coaching info */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <p className="font-heading text-sm font-semibold text-white mb-5">Profil de coaching</p>
+              <div className="space-y-4">
+                <Field label="Votre créneau">
+                  <input value={form.niche} onChange={set("niche")} className={inputCls}
+                    placeholder="ex. Coaching business pour entrepreneurs en ligne" />
+                </Field>
+                <Field label="Client idéal">
+                  <textarea value={form.target_audience} onChange={set("target_audience")} rows={3}
+                    className={inputCls + " resize-none"}
+                    placeholder="ex. Coachs en ligne souhaitant décrocher 5 clients premium en 90 jours…" />
+                </Field>
+                <Field label="Transformation que vous apportez">
+                  <textarea value={form.offer_description} onChange={set("offer_description")} rows={3}
+                    className={inputCls + " resize-none"}
+                    placeholder="ex. J'aide les coachs à décrocher leurs 5 premiers clients premium en 90 jours…" />
+                </Field>
+                <Field label="Lien Calendly">
+                  <input value={form.calendly_link} onChange={set("calendly_link")} className={inputCls}
+                    placeholder="https://calendly.com/yourname/30min" />
+                </Field>
               </div>
             </div>
-          </div>
 
-          {/* API keys */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-            <h2 className="text-sm font-semibold text-white mb-1">Intégrations</h2>
-            <p className="text-xs text-slate-500 mb-4">Vos clés sont stockées en sécurité et utilisées uniquement pour votre compte.</p>
-            <div>
-              <label className="block text-xs text-slate-400 mb-1.5">
-                Clé API Apify
-                {coach?.has_apify_key && (
-                  <span className="ml-2 text-emerald-400">✓ configurée</span>
-                )}
-              </label>
-              <input
-                type="password"
-                value={form.apify_api_key}
-                onChange={set("apify_api_key")}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors"
-                placeholder={coach?.has_apify_key ? "Entrez une nouvelle clé pour remplacer" : "apify_api_••••••••"}
-              />
-              <p className="text-xs text-slate-600 mt-1">
-                console.apify.com → Paramètres → Clés API. Requis pour le scraping Instagram et TikTok.
+            {/* Account info */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+              <p className="font-heading text-sm font-semibold text-white mb-4">Compte</p>
+              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+                <span className="text-xs text-slate-500">Nom</span>
+                <span className="text-sm text-slate-300">{coach?.name}</span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-xs text-slate-500">E-mail</span>
+                <span className="text-sm text-slate-300">{coach?.email}</span>
+              </div>
+            </div>
+
+            {/* Save */}
+            {save.isError && (
+              <p className="text-red-400 text-xs bg-red-950/40 border border-red-900/40 rounded-xl px-4 py-3">
+                {(save.error as any)?.response?.data?.detail || "Échec de l'enregistrement."}
               </p>
-            </div>
-          </div>
+            )}
+            {saved && (
+              <p className="text-emerald-400 text-xs bg-emerald-950/30 border border-emerald-900/40 rounded-xl px-4 py-3">
+                ✓ Paramètres enregistrés avec succès.
+              </p>
+            )}
 
-          {/* Save */}
-          {save.isError && (
-            <p className="text-red-400 text-xs bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2">
-              {(save.error as any)?.response?.data?.detail || "Échec de l'enregistrement."}
-            </p>
-          )}
-          {save.isSuccess && (
-            <p className="text-emerald-400 text-xs bg-emerald-950/40 border border-emerald-900/40 rounded-lg px-3 py-2">
-              ✓ Paramètres enregistrés.
-            </p>
-          )}
-          <button
-            onClick={() => save.mutate()}
-            disabled={save.isPending}
-            className="w-full py-3 bg-brand-500 hover:bg-brand-400 disabled:opacity-50 rounded-xl text-sm font-semibold transition-colors">
-            {save.isPending ? "Enregistrement…" : "Enregistrer les paramètres"}
-          </button>
-        </div>
+            <button onClick={() => save.mutate()} disabled={save.isPending}
+              className="w-full py-3 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-all duration-150">
+              {save.isPending ? "Enregistrement…" : "Enregistrer les paramètres"}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

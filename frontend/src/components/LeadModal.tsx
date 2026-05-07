@@ -40,7 +40,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl animate-fade-in"
+      <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 animate-fade-in"
         onClick={e => e.stopPropagation()}>
         {/* En-tête */}
         <div className="flex items-start justify-between p-5 border-b border-slate-800">
@@ -139,7 +139,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                 </div>
               )}
               <button onClick={() => write.mutate()} disabled={busy || !lead.qualification_reason}
-                className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+                className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
                 {write.isPending ? "Rédaction du DM…" : lead.outreach_message ? "↻ Régénérer le DM" : "✍️ Générer un DM"}
               </button>
               {write.isError && (
@@ -176,7 +176,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                 </div>
               )}
               <button onClick={() => reply.mutate()} disabled={busy || !replyText}
-                className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+                className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
                 {reply.isPending ? "Génération…" : "🤖 Générer une réponse"}
               </button>
               {reply.isError && (

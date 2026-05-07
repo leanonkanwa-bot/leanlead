@@ -4,12 +4,58 @@
 
 @layer base {
   * { box-sizing: border-box; }
-  body { @apply bg-slate-950 text-slate-100 antialiased min-h-screen; }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+
+  body {
+    @apply bg-slate-950 text-slate-100 antialiased min-h-screen;
+    font-family: "Inter", system-ui, sans-serif;
+    background-color: #0a0a0a;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: "Syne", system-ui, sans-serif;
+  }
+
+  ::-webkit-scrollbar       { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-slate-700 rounded-full; }
+  ::-webkit-scrollbar-thumb { background: #262626; border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: #333333; }
+}
+
+@layer components {
+  /* Input base — every input/textarea/select inherits this */
+  .input {
+    @apply w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm
+           text-slate-100 placeholder-slate-600
+           focus:outline-none focus:border-brand-500 focus:shadow-glow-sm
+           transition-all duration-150;
+  }
+
+  /* Primary button */
+  .btn-primary {
+    @apply px-4 py-2.5 bg-brand-500 hover:bg-brand-400 text-white rounded-xl
+           text-sm font-semibold transition-all duration-150
+           disabled:opacity-40 disabled:cursor-not-allowed
+           shadow-glow-brand hover:shadow-glow-brand-lg;
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply px-4 py-2.5 border border-slate-700 hover:border-slate-600
+           text-slate-300 hover:text-white rounded-xl text-sm transition-all duration-150;
+  }
+
+  /* Card */
+  .card {
+    @apply bg-slate-900 border border-slate-800 rounded-2xl;
+  }
 }
 
 @layer utilities {
-  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: rgb(51 65 85) transparent; }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #262626 transparent; }
+
+  /* Subtle orange left border accent */
+  .accent-left { border-left: 2px solid #ff751f; }
+
+  /* Frosted dark overlay */
+  .glass { backdrop-filter: blur(16px); background: rgba(10,10,10,0.85); }
 }

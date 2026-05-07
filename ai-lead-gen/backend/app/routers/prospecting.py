@@ -40,12 +40,10 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
         job.status = "running"
         db.commit()
 
-        apify_key = coach.apify_api_key or None
         raw_profiles = prospector_agent.prospect(
             platform=req.platform,
             hashtags=req.hashtags,
             max_results=req.max_results,
-            apify_api_key=apify_key,
         )
 
         added = 0
@@ -186,7 +184,6 @@ def prospect_from_url(
     """Synchronously scrape a single profile URL, qualify + write DM, save lead."""
     profile = prospector_agent.prospect_by_url(
         profile_url=req.profile_url,
-        apify_api_key=coach.apify_api_key or None,
     )
 
     handle = (profile.get("handle") or "").strip().lower()

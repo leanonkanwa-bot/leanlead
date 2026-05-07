@@ -125,7 +125,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-x-hidden">
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-slate-900 bg-slate-950/90 backdrop-blur-md">
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 py-4 border-b border-slate-900 bg-[#0a0a0a]/90 backdrop-blur-md">
         <span className="font-extrabold text-lg">Lean<span className="text-brand-400">Lead</span></span>
         <div className="hidden sm:flex gap-7 text-sm text-slate-400">
           {[["#features","Fonctionnalités"],["#how","Comment ça marche"],["#pricing","Tarifs"]].map(([h,l]) => (
@@ -155,7 +155,7 @@ export default function Landing() {
           Sans assistant virtuel.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
-          <Link to="/register" className="px-8 py-3.5 bg-brand-500 hover:bg-brand-400 rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-brand-900/40">
+          <Link to="/register" className="px-8 py-3.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-brand-900/40">
             Commencer gratuitement →
           </Link>
           <a href="#how" className="px-6 py-3.5 border border-slate-700 hover:border-slate-500 text-slate-300 rounded-xl text-sm transition-colors">
@@ -282,7 +282,7 @@ export default function Landing() {
       <section className="py-24 px-6 text-center">
         <h2 className="text-4xl font-black mb-4">Prêt à remplir votre agenda ?</h2>
         <p className="text-slate-400 text-sm mb-8 max-w-xs mx-auto">Configuration en 5 minutes. Premiers leads qualifiés en 10.</p>
-        <Link to="/register" className="inline-block px-10 py-4 bg-brand-500 hover:bg-brand-400 rounded-xl font-bold text-base transition-colors shadow-xl shadow-brand-900/40">
+        <Link to="/register" className="inline-block px-10 py-4 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg rounded-xl font-bold text-base transition-colors shadow-xl shadow-brand-900/40">
           Commencer gratuitement aujourd'hui →
         </Link>
         <p className="text-xs text-slate-700 mt-3">Sans carte bancaire · Annulable à tout moment</p>

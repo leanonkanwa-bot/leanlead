@@ -75,16 +75,10 @@ def update_settings(
     coach: models.Coach = Depends(get_current_coach),
     db: Session = Depends(get_db),
 ):
-    if req.niche is not None:
-        coach.niche = req.niche
-    if req.offer_description is not None:
-        coach.offer_description = req.offer_description
-    if req.target_audience is not None:
-        coach.target_audience = req.target_audience
-    if req.calendly_link is not None:
-        coach.calendly_link = req.calendly_link
-    if req.apify_api_key is not None:
-        coach.apify_api_key = req.apify_api_key or None
+    data = req.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(coach, field, value or None if field == "apify_api_key" else value)
+    coach.onboarded = True
     db.commit()
     return {"ok": True}
 

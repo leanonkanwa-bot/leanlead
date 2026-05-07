@@ -61,7 +61,7 @@ export default function Onboarding() {
           {/* ── Étape 0 : Créneau ── */}
           {step === 0 && (
             <>
-              <h1 className="text-lg font-semibold mb-1">Dans quoi êtes-vous coach ?</h1>
+              <h1 className="font-heading text-lg font-semibold mb-1">Dans quoi êtes-vous coach ?</h1>
               <p className="text-xs text-slate-500 mb-6">L'IA utilise ces informations pour noter les leads et personnaliser chaque message.</p>
               <div className="space-y-5">
                 <div>
@@ -78,7 +78,7 @@ export default function Onboarding() {
                 </div>
               </div>
               <button onClick={() => setStep(1)} disabled={!form.niche || !form.target_audience}
-                className="mt-6 w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+                className="mt-6 w-full py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
                 Continuer →
               </button>
             </>
@@ -87,7 +87,7 @@ export default function Onboarding() {
           {/* ── Étape 1 : Offre ── */}
           {step === 1 && (
             <>
-              <h1 className="text-lg font-semibold mb-1">Décrivez votre offre</h1>
+              <h1 className="font-heading text-lg font-semibold mb-1">Décrivez votre offre</h1>
               <p className="text-xs text-slate-500 mb-6">L'IA rédige des DMs ciblant directement cette transformation.</p>
               <div className="space-y-5">
                 <div>
@@ -110,7 +110,7 @@ export default function Onboarding() {
                   ← Retour
                 </button>
                 <button onClick={() => setStep(2)} disabled={!form.offer_description}
-                  className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+                  className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
                   Continuer →
                 </button>
               </div>
@@ -120,7 +120,7 @@ export default function Onboarding() {
           {/* ── Étape 2 : Intégrations ── */}
           {step === 2 && (
             <>
-              <h1 className="text-lg font-semibold mb-1">Connectez vos outils</h1>
+              <h1 className="font-heading text-lg font-semibold mb-1">Connectez vos outils</h1>
               <p className="text-xs text-slate-500 mb-6">Facultatif — vous pouvez les ajouter plus tard dans les Paramètres.</p>
               <div className="space-y-4">
                 <div>
@@ -150,7 +150,7 @@ export default function Onboarding() {
                   ← Retour
                 </button>
                 <button onClick={finish} disabled={saving}
-                  className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-50 rounded-xl text-sm font-semibold transition-colors">
+                  className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-50 rounded-xl text-sm font-semibold transition-colors">
                   {saving ? "Enregistrement…" : "Accéder au tableau de bord →"}
                 </button>
               </div>

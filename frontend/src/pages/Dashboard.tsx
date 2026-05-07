@@ -31,7 +31,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl animate-fade-in"
+      <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 animate-fade-in"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-slate-800">
           <h2 className="font-semibold text-white">Ajouter un lead</h2>
@@ -112,7 +112,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 
         <div className="p-5 border-t border-slate-800">
           <button onClick={() => add.mutate()} disabled={add.isPending || !f.handle}
-            className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+            className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
             {add.isPending
               ? (autoQualify ? "Ajout et qualification…" : "Ajout…")
               : "Ajouter le lead"}
@@ -216,7 +216,7 @@ function ProspectsTab() {
         <button
           onClick={() => fromUrl.mutate()}
           disabled={fromUrl.isPending || !profileUrl.trim()}
-          className="w-full py-3 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+          className="w-full py-3 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
           {fromUrl.isPending
             ? (autoWrite ? "Qualification + rédaction du DM…" : "Qualification en cours…")
             : "🚀 Lancer la prospection"}
@@ -298,7 +298,7 @@ function ProspectsTab() {
         )}
 
         <button onClick={() => run.mutate()} disabled={run.isPending || !tags.length || running}
-          className="w-full py-3 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-sm font-semibold transition-colors">
+          className="w-full py-3 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
           {run.isPending ? "Démarrage…" : running ? "Tâche en cours…" : `🔍 Trouver des leads sur ${platform}`}
         </button>
         {running && (
@@ -567,9 +567,9 @@ export default function Dashboard() {
     <div className="min-h-screen bg-slate-950 flex flex-col">
       {/* ── Barre de navigation ── */}
       <nav className="sticky top-0 z-40 flex items-center justify-between gap-4 px-5 py-3
-                      border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
+                      border-b border-slate-800 bg-[#0a0a0a]/90 backdrop-blur-md">
         <div className="flex items-center gap-4 min-w-0">
-          <span className="font-extrabold text-lg flex-shrink-0">
+          <span className="font-heading font-extrabold text-lg flex-shrink-0">
             Lean<span className="text-brand-400">Lead</span>
           </span>
 
@@ -578,7 +578,7 @@ export default function Dashboard() {
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`relative px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  tab === t.id ? "bg-slate-800 text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                  tab === t.id ? "bg-slate-800 text-white shadow-glow-sm" : "text-slate-500 hover:text-slate-300"}`}>
                 {t.label}
                 {t.badge ? (
                   <span className="absolute -top-1.5 -right-1.5 w-4 h-4 flex items-center justify-center
@@ -598,7 +598,7 @@ export default function Dashboard() {
                          text-sm focus:outline-none focus:border-brand-500 w-36 transition-colors" />
           )}
           <button onClick={() => setShowAdd(true)}
-            className="px-3.5 py-1.5 bg-brand-500 hover:bg-brand-400 rounded-xl text-sm font-semibold transition-colors">
+            className="px-3.5 py-1.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg rounded-xl text-sm font-semibold transition-colors">
             + Ajouter un lead
           </button>
 
@@ -663,7 +663,7 @@ export default function Dashboard() {
                 <p className="text-sm font-semibold text-white mb-1">Aucun lead pour l'instant</p>
                 <p className="text-xs text-slate-500 mb-4">Ajoutez des leads manuellement ou utilisez l'onglet Prospection pour scraper Instagram/TikTok.</p>
                 <button onClick={() => setShowAdd(true)}
-                  className="px-4 py-2 bg-brand-500 hover:bg-brand-400 rounded-xl text-sm font-medium transition-colors">
+                  className="px-4 py-2 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg rounded-xl text-sm font-medium transition-colors">
                   + Ajouter votre premier lead
                 </button>
               </div>

@@ -20,23 +20,18 @@ const STAGES: {
   id: Stage;
   label: string;
   border: string;
-  dot: string;
+  dotBg: string;
+  glow: string;
   description: string;
 }[] = [
-  { id: "new",       label: "Nouveau",  border: "border-slate-700",   dot: "bg-slate-500",   description: "Ajouté, pas encore contacté" },
-  { id: "contacted", label: "Contacté", border: "border-brand-800",   dot: "bg-brand-500",   description: "DM envoyé, en attente de réponse" },
-  { id: "replied",   label: "Répondu",  border: "border-brand-800",   dot: "bg-brand-400",   description: "Le lead a répondu" },
-  { id: "booked",    label: "Réservé",  border: "border-emerald-800", dot: "bg-emerald-500", description: "Appel réservé sur Calendly" },
-  { id: "closed",    label: "Clôturé",  border: "border-rose-900",    dot: "bg-rose-600",    description: "Affaire gagnée ou perdue" },
+  { id: "new",       label: "Nouveau",  border: "border-slate-800",   dotBg: "bg-slate-600",   glow: "",                           description: "Ajouté, pas encore contacté" },
+  { id: "contacted", label: "Contacté", border: "border-brand-900",   dotBg: "bg-brand-500",   glow: "shadow-[0_0_12px_rgba(255,117,31,0.1)]", description: "DM envoyé, en attente de réponse" },
+  { id: "replied",   label: "Répondu",  border: "border-brand-900",   dotBg: "bg-brand-400",   glow: "shadow-[0_0_12px_rgba(255,117,31,0.1)]", description: "Le lead a répondu" },
+  { id: "booked",    label: "Réservé",  border: "border-emerald-900", dotBg: "bg-emerald-500", glow: "",                           description: "Appel réservé sur Calendly" },
+  { id: "closed",    label: "Clôturé",  border: "border-slate-800",   dotBg: "bg-slate-500",   glow: "",                           description: "Affaire gagnée ou perdue" },
 ];
 
-function Column({
-  stage, leads, onCardClick,
-}: {
-  stage: typeof STAGES[0];
-  leads: Lead[];
-  onCardClick: (l: Lead) => void;
-}) {
+function Column({ stage, leads, onCardClick }: { stage: typeof STAGES[0]; leads: Lead[]; onCardClick: (l: Lead) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: stage.id });
 
   const avgScore = leads.length
@@ -44,24 +39,24 @@ function Column({
     : null;
 
   return (
-    <div className={`flex flex-col rounded-2xl border ${stage.border} bg-slate-900/50 min-w-[250px] w-[250px] flex-shrink-0`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/80">
+    <div className={`flex flex-col rounded-2xl border ${stage.border} ${stage.glow} bg-slate-900/60 min-w-[250px] w-[250px] flex-shrink-0 transition-shadow`}>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60">
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${stage.dot}`} />
-          <span className="text-xs font-bold text-slate-300 uppercase tracking-widest">{stage.label}</span>
+          <div className={`w-2 h-2 rounded-full ${stage.dotBg}`} />
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest font-heading">{stage.label}</span>
         </div>
         <div className="flex items-center gap-2">
           {avgScore && (
             <span className="text-[10px] text-slate-600 font-mono">{avgScore} moy</span>
           )}
-          <span className="text-xs bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full">{leads.length}</span>
+          <span className="text-[10px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full tabular-nums">{leads.length}</span>
         </div>
       </div>
 
       <div
         ref={setNodeRef}
-        className={`flex-1 p-3 space-y-2 min-h-[120px] rounded-b-2xl transition-colors ${
-          isOver ? "bg-slate-800/40 ring-1 ring-inset ring-brand-800/40" : ""
+        className={`flex-1 p-3 space-y-2 min-h-[120px] rounded-b-2xl transition-all ${
+          isOver ? "bg-brand-950/30 ring-1 ring-inset ring-brand-800/30" : ""
         }`}
       >
         <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
@@ -105,9 +100,7 @@ export default function KanbanBoard({ leads }: { leads: Lead[] }) {
 
   const activeLead = activeId ? leads.find(l => l.id === activeId) : null;
 
-  function onDragStart({ active }: DragStartEvent) {
-    setActiveId(active.id as number);
-  }
+  function onDragStart({ active }: DragStartEvent) { setActiveId(active.id as number); }
 
   function onDragEnd({ active, over }: DragEndEvent) {
     setActiveId(null);
