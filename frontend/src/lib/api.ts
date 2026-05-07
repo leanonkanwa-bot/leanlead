@@ -17,6 +17,14 @@ export interface Coach {
 }
 
 export type Stage = "new" | "contacted" | "replied" | "booked" | "closed";
+export type Classification = "POSITIF" | "NEUTRE" | "NEGATIF" | "SIGNAL_ACHAT";
+
+export interface ReplyAnalysis {
+  classification: Classification;
+  reasoning: string;
+  suggested_reply: string;
+  inject_calendly: boolean;
+}
 
 export interface Lead {
   id: number; coach_id: number;
@@ -80,7 +88,7 @@ export const pipelineApi = {
   qualify: (id: number) => api.post(`/pipeline/${id}/qualify`),
   write:   (id: number) => api.post(`/pipeline/${id}/write`),
   reply:   (id: number, d: { lead_reply: string; conversation_history?: string }) =>
-    api.post(`/pipeline/${id}/reply`, d),
+    api.post<ReplyAnalysis>(`/pipeline/${id}/reply`, d),
 };
 
 /* ── Follow-ups ── */

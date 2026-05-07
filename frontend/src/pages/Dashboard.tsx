@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   authApi, leadsApi, pipelineApi, followupsApi, prospectingApi,
-  type Lead, type Stage, type FollowupDue,
+  type Lead, type Stage, type FollowupDue, type Classification, type ReplyAnalysis,
 } from "../lib/api";
 import KanbanBoard from "../components/KanbanBoard";
 
@@ -553,9 +553,250 @@ function FollowupsTab() {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   ONGLET RÉPONSES
+════════════════════════════════════════════════════════════════════ */
+const CLASS_CONFIG: Record<Classification, { label: string; bg: string; border: string; text: string; icon: string }> = {
+  POSITIF:      { label: "Positif",        bg: "bg-emerald-950/60", border: "border-emerald-800/50", text: "text-emerald-400", icon: "↗" },
+  NEUTRE:       { label: "Neutre",          bg: "bg-slate-800/60",   border: "border-slate-700/50",   text: "text-slate-400",   icon: "→" },
+  NEGATIF:      { label: "Négatif",         bg: "bg-rose-950/60",    border: "border-rose-900/50",    text: "text-rose-400",    icon: "✕" },
+  SIGNAL_ACHAT: { label: "Signal d'achat!", bg: "bg-brand-950/60",   border: "border-brand-800/50",   text: "text-brand-400",   icon: "🎯" },
+};
+
+const STAGE_LABELS: Record<string, string> = {
+  replied: "Répondu", booked: "Réservé", closed: "Clôturé",
+};
+
+function RepliesTab({ leads }: { leads: Lead[] }) {
+  const qc = useQueryClient();
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [convHistory, setConvHistory] = useState("");
+  const [search, setSearch] = useState("");
+  const [analysis, setAnalysis] = useState<ReplyAnalysis | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const contactedLeads = leads.filter(l => l.stage === "contacted" || l.stage === "replied");
+  const filteredLeads = search
+    ? contactedLeads.filter(l =>
+        l.name?.toLowerCase().includes(search.toLowerCase()) ||
+        l.handle?.toLowerCase().includes(search.toLowerCase())
+      )
+    : contactedLeads;
+
+  const selected = leads.find(l => l.id === selectedId) ?? null;
+
+  const analyze = useMutation({
+    mutationFn: () => pipelineApi.reply(selectedId!, { lead_reply: replyText, conversation_history: convHistory }),
+    onSuccess: ({ data }) => {
+      setAnalysis(data);
+      qc.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+
+  function selectLead(lead: Lead) {
+    setSelectedId(lead.id);
+    setReplyText("");
+    setConvHistory("");
+    setAnalysis(null);
+    setCopied(false);
+  }
+
+  function copy(text: string) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const inputCls = "w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all resize-none";
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-5">
+        <h2 className="font-heading font-semibold text-white text-lg">Gestion des réponses</h2>
+        <p className="text-xs text-slate-500 mt-0.5">
+          Collez la réponse reçue — Claude la classifie et génère la réponse parfaite.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5">
+        {/* ── Lead selector ── */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col" style={{ maxHeight: "72vh" }}>
+          <div className="px-4 pt-4 pb-3 border-b border-slate-800">
+            <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-2">
+              Leads contactés ({contactedLeads.length})
+            </p>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all"
+              placeholder="Rechercher…"
+            />
+          </div>
+
+          <div className="flex-1 overflow-y-auto scrollbar-thin p-2 space-y-1">
+            {filteredLeads.length === 0 ? (
+              <p className="text-xs text-slate-600 text-center py-8 px-4">
+                {contactedLeads.length === 0
+                  ? "Aucun lead contacté. Envoyez des DMs d'abord."
+                  : "Aucun résultat."}
+              </p>
+            ) : filteredLeads.map(lead => (
+              <button
+                key={lead.id}
+                onClick={() => selectLead(lead)}
+                className={`w-full text-left px-3 py-2.5 rounded-xl transition-all ${
+                  selectedId === lead.id
+                    ? "bg-brand-950/60 border border-brand-800/50 shadow-glow-sm"
+                    : "hover:bg-slate-800/50 border border-transparent"
+                }`}
+              >
+                <p className="text-sm font-medium text-slate-200 truncate">{lead.name || `@${lead.handle}`}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-[11px] text-slate-600 truncate">@{lead.handle}</p>
+                  {lead.reply_received && (
+                    <span className="text-[9px] bg-emerald-950/60 text-emerald-500 border border-emerald-900/50 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                      déjà analysé
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Reply composer ── */}
+        <div className="space-y-4">
+          {!selected ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center" style={{ minHeight: "320px" }}>
+              <div className="text-center px-8">
+                <p className="text-3xl mb-3">💬</p>
+                <p className="font-heading font-semibold text-slate-400 mb-1">Sélectionnez un lead</p>
+                <p className="text-xs text-slate-600">Choisissez un lead contacté dans la liste pour analyser sa réponse.</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Lead info header */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-white">{selected.name || `@${selected.handle}`}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">@{selected.handle} · {selected.platform}</p>
+                  </div>
+                  {selected.outreach_message && (
+                    <div className="text-right hidden sm:block">
+                      <p className="text-[10px] text-slate-600 mb-1">DM envoyé</p>
+                      <p className="text-xs text-slate-500 max-w-[200px] truncate italic">"{selected.outreach_message}"</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Input form */}
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+                <div>
+                  <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block mb-2">
+                    Réponse reçue *
+                  </label>
+                  <textarea
+                    value={replyText}
+                    onChange={e => { setReplyText(e.target.value); setAnalysis(null); }}
+                    rows={4}
+                    className={inputCls}
+                    placeholder="Collez ici le message reçu du lead…"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block mb-2">
+                    Historique de conversation <span className="normal-case text-slate-700">(facultatif)</span>
+                  </label>
+                  <textarea
+                    value={convHistory}
+                    onChange={e => setConvHistory(e.target.value)}
+                    rows={2}
+                    className={inputCls}
+                    placeholder={"Vous : [votre DM]\nEux : [leur réponse précédente]\n…"}
+                  />
+                </div>
+
+                {analyze.isError && (
+                  <p className="text-red-400 text-xs bg-red-950/30 border border-red-900/40 rounded-xl px-3 py-2">
+                    {(analyze.error as any)?.response?.data?.detail || "Erreur lors de l'analyse."}
+                  </p>
+                )}
+
+                <button
+                  onClick={() => analyze.mutate()}
+                  disabled={analyze.isPending || !replyText.trim()}
+                  className="w-full py-3 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-all duration-150"
+                >
+                  {analyze.isPending ? "Analyse en cours…" : "🤖 Analyser et générer la réponse"}
+                </button>
+              </div>
+
+              {/* Analysis result */}
+              {analysis && (() => {
+                const cfg = CLASS_CONFIG[analysis.classification];
+                const newStage = analysis.classification === "SIGNAL_ACHAT" ? "booked"
+                               : analysis.classification === "NEGATIF" ? "closed"
+                               : "replied";
+                return (
+                  <div className={`border rounded-2xl p-5 space-y-4 animate-slide-up ${cfg.bg} ${cfg.border}`}>
+                    {/* Classification */}
+                    <div className="flex items-start gap-3">
+                      <div className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl border ${cfg.bg} ${cfg.border}`}>
+                        <span className="text-base">{cfg.icon}</span>
+                        <span className={`text-sm font-bold ${cfg.text}`}>{cfg.label}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-400 leading-relaxed">{analysis.reasoning}</p>
+                        <p className="text-[10px] text-slate-600 mt-1">
+                          Lead déplacé vers : <span className="text-slate-400">{STAGE_LABELS[newStage] ?? newStage}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    {analysis.inject_calendly && (
+                      <div className="flex items-center gap-2 bg-brand-950/40 border border-brand-800/40 rounded-xl px-3 py-2">
+                        <span className="text-brand-400 text-sm">📅</span>
+                        <p className="text-xs text-brand-300">Lien Calendly injecté dans la réponse</p>
+                      </div>
+                    )}
+
+                    {/* Generated reply */}
+                    <div>
+                      <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-2">Réponse suggérée</p>
+                      <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                        {analysis.suggested_reply}
+                      </div>
+                    </div>
+
+                    {/* Copy CTA */}
+                    <button
+                      onClick={() => copy(analysis.suggested_reply)}
+                      className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 ${
+                        copied
+                          ? "bg-emerald-900/50 border border-emerald-800/50 text-emerald-400"
+                          : "bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg text-white"
+                      }`}
+                    >
+                      {copied ? "✓ Copié dans le presse-papiers !" : "📋 Copier la réponse"}
+                    </button>
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
    TABLEAU DE BORD
 ════════════════════════════════════════════════════════════════════ */
-type Tab = "pipeline" | "prospects" | "followups";
+type Tab = "pipeline" | "prospects" | "followups" | "replies";
 
 export default function Dashboard() {
   const nav = useNavigate();
@@ -605,6 +846,7 @@ export default function Dashboard() {
     { id: "pipeline",  label: "Pipeline" },
     { id: "prospects", label: "Prospection" },
     { id: "followups", label: "Relances", badge: followups.length || undefined },
+    { id: "replies",   label: "Réponses" },
   ];
 
   const initials = (coach?.name ?? "?")[0].toUpperCase();
@@ -728,6 +970,12 @@ export default function Dashboard() {
         {tab === "followups" && (
           <div className="px-5 py-6 overflow-auto">
             <FollowupsTab />
+          </div>
+        )}
+
+        {tab === "replies" && (
+          <div className="px-5 py-6 overflow-auto">
+            <RepliesTab leads={leads} />
           </div>
         )}
       </div>

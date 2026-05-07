@@ -1,12 +1,21 @@
 """
 Reply Agent
-Generates a contextual follow-up reply that moves the conversation toward a booked call.
+Classifies a lead's reply and generates the perfect contextual response.
+Returns structured JSON with classification, reasoning, reply text, and Calendly flag.
 """
+import json
 import os
 
 import anthropic
 
 _client: anthropic.Anthropic | None = None
+
+CLASSIFICATIONS = {
+    "POSITIF":      "Intéressé·e, engage positivement, pose des questions",
+    "NEUTRE":       "Poli·e mais sans engagement clair",
+    "NEGATIF":      "Refuse ou demande à arrêter",
+    "SIGNAL_ACHAT": "Intention claire de réserver / acheter",
+}
 
 
 def _get_client() -> anthropic.Anthropic:
@@ -20,38 +29,59 @@ def generate_reply(
     lead_reply: str,
     conversation_history: str,
     coach_name: str,
+    coach_niche: str,
     coach_offer: str,
     calendly_link: str,
-) -> str:
-    """Returns the next reply the coach should send."""
-    prompt = f"""You are {coach_name}, an online coach having a DM conversation with a potential client.
+) -> dict:
+    """
+    Analyse la réponse du lead et génère la réponse parfaite.
+    Returns: {classification, reasoning, reply, inject_calendly}
+    """
+    history_block = f"\nHistorique :\n{conversation_history}\n" if conversation_history.strip() else ""
+    calendly_block = f"\nLien de réservation : {calendly_link}" if calendly_link else ""
 
-Your offer: {coach_offer}
-Your booking link: {calendly_link}
-
-Conversation so far:
-{conversation_history}
-
-Their latest message:
+    prompt = f"""Tu es {coach_name}, coach en {coach_niche}.
+Ton offre : {coach_offer}{calendly_block}
+{history_block}
+Message reçu du lead :
 "{lead_reply}"
 
-Write a reply that:
-1. Responds genuinely to what they said (no copy-paste vibes)
-2. Deepens rapport or addresses their objection
-3. If they show buying intent → share the Calendly link naturally
-4. If they're unsure → ask one targeted discovery question to surface the real pain
+Analyse ce message et génère la réponse idéale.
 
-Rules:
-- Under 80 words
-- Sound like a real human, not a sales script
-- Only share the Calendly link when there's clear interest
-- No emojis, no "Great question!"
+Classifications disponibles :
+- POSITIF      : Intéressé·e, engage positivement, pose des questions
+- NEUTRE       : Poli·e mais sans engagement clair
+- NEGATIF      : Refuse ou demande à arrêter
+- SIGNAL_ACHAT : Intention claire de réserver / acheter (demande prix, dispo, étapes)
 
-Return ONLY the reply text — nothing else."""
+Règles pour la réponse :
+- EN FRANÇAIS, comme une vraie personne — pas un script de vente
+- Sous 80 mots
+- SIGNAL_ACHAT + Calendly fourni → intègre le lien naturellement dans le texte
+- NEGATIF → remercie poliment, n'insiste pas
+- NEUTRE → pose UNE question ciblée pour débloquer la situation
+- POSITIF → approfondis ou propose naturellement la prochaine étape
+
+Retourne UNIQUEMENT ce JSON valide (zéro texte autour) :
+{{
+  "classification": "POSITIF" | "NEUTRE" | "NEGATIF" | "SIGNAL_ACHAT",
+  "reasoning": "une phrase expliquant la classification",
+  "reply": "le message exact à envoyer",
+  "inject_calendly": true | false
+}}"""
 
     msg = _get_client().messages.create(
         model="claude-opus-4-7",
-        max_tokens=256,
+        max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
-    return msg.content[0].text.strip()
+    text = msg.content[0].text.strip()
+    start, end = text.find("{"), text.rfind("}") + 1
+    data = json.loads(text[start:end])
+
+    if data.get("classification") not in CLASSIFICATIONS:
+        data["classification"] = "NEUTRE"
+    data.setdefault("reasoning", "")
+    data.setdefault("reply", "")
+    data.setdefault("inject_calendly", False)
+    return data

@@ -108,22 +108,39 @@ def reply(
     db: Session = Depends(get_db),
 ):
     lead = _get_lead_or_404(lead_id, coach, db)
-    calendly = coach.calendly_link or os.getenv("CALENDLY_LINK", "")
+    calendly = coach.calendly_link or ""
 
-    suggested = reply_agent.generate_reply(
+    result = reply_agent.generate_reply(
         lead_reply=req.lead_reply,
         conversation_history=req.conversation_history,
         coach_name=coach.name,
+        coach_niche=coach.niche or "",
         coach_offer=coach.offer_description or "",
         calendly_link=calendly,
     )
+
     lead.reply_received = req.lead_reply
     lead.reply_received_at = datetime.utcnow()
-    lead.suggested_reply = suggested
-    lead.stage = "replied"
+    lead.suggested_reply = result["reply"]
+
+    # Stage transitions based on classification
+    classification = result.get("classification", "NEUTRE")
+    if classification == "SIGNAL_ACHAT":
+        lead.stage = "booked"
+    elif classification == "NEGATIF":
+        lead.stage = "closed"
+    else:
+        lead.stage = "replied"
+
     db.commit()
 
-    return {"ok": True, "suggested_reply": suggested}
+    return {
+        "ok": True,
+        "classification": classification,
+        "reasoning": result.get("reasoning", ""),
+        "suggested_reply": result["reply"],
+        "inject_calendly": result.get("inject_calendly", False),
+    }
 
 
 class StageRequest(BaseModel):
