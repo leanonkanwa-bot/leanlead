@@ -5,8 +5,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans:    ["Inter", "system-ui", "sans-serif"],
-        heading: ["Syne", "system-ui", "sans-serif"],
+        sans:    ["Poppins", "system-ui", "sans-serif"],
+        heading: ["Poppins", "system-ui", "sans-serif"],
       },
       colors: {
         // Override slate with pure neutral blacks (no blue tint)
