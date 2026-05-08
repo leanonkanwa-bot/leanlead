@@ -20,6 +20,7 @@ class OnboardRequest(BaseModel):
     niche: str
     offer_description: str
     target_audience: str
+    icp_pain_points: list[str] | None = None
     calendly_link: str | None = None
     airtable_base_id: str | None = None
     airtable_api_key: str | None = None
@@ -65,6 +66,7 @@ class SettingsRequest(BaseModel):
     niche: str | None = None
     offer_description: str | None = None
     target_audience: str | None = None
+    icp_pain_points: list[str] | None = None
     calendly_link: str | None = None
     apify_api_key: str | None = None
     offer_price: float | None = None
@@ -76,9 +78,15 @@ def update_settings(
     coach: models.Coach = Depends(get_current_coach),
     db: Session = Depends(get_db),
 ):
+    import json as _json
     data = req.model_dump(exclude_unset=True)
     for field, value in data.items():
-        setattr(coach, field, value or None if field == "apify_api_key" else value)
+        if field == "icp_pain_points":
+            setattr(coach, field, _json.dumps(value) if value is not None else None)
+        elif field == "apify_api_key":
+            setattr(coach, field, value or None)
+        else:
+            setattr(coach, field, value)
     coach.onboarded = True
     db.commit()
     return {"ok": True}
@@ -86,6 +94,7 @@ def update_settings(
 
 @router.get("/me")
 def me(coach: models.Coach = Depends(get_current_coach)):
+    import json as _json
     return {
         "id": coach.id,
         "email": coach.email,
@@ -97,15 +106,19 @@ def me(coach: models.Coach = Depends(get_current_coach)):
         "onboarded": coach.onboarded,
         "has_apify_key": bool(coach.apify_api_key),
         "offer_price": coach.offer_price,
+        "icp_pain_points": _json.loads(coach.icp_pain_points) if coach.icp_pain_points else [],
     }
 
 
 @router.post("/onboard")
 def onboard(req: OnboardRequest, coach: models.Coach = Depends(get_current_coach), db: Session = Depends(get_db)):
+    import json as _json
     coach.niche = req.niche
     coach.offer_description = req.offer_description
     coach.target_audience = req.target_audience
     coach.calendly_link = req.calendly_link
+    if req.icp_pain_points is not None:
+        coach.icp_pain_points = _json.dumps(req.icp_pain_points)
     if req.airtable_base_id:
         coach.airtable_base_id = req.airtable_base_id
     if req.airtable_api_key:

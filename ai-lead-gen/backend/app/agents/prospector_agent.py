@@ -239,9 +239,18 @@ def prospect_by_url(profile_url: str, **kwargs) -> dict:
         }
 
 
-def suggest_hashtags(niche: str, target_audience: str) -> list[str]:
-    """Use Claude to generate relevant hashtags for prospecting."""
+def suggest_hashtags(
+    niche: str,
+    target_audience: str,
+    icp_pain_points: list[str] | None = None,
+) -> list[str]:
+    """Use Claude to generate pain-expression hashtags — people living the problem, not the solution."""
     import anthropic
+
+    pain_block = ""
+    if icp_pain_points:
+        formatted = "\n".join(f"  - {p}" for p in icp_pain_points)
+        pain_block = f"\nPains the coach's ideal client typically expresses:\n{formatted}\n"
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     msg = client.messages.create(
@@ -250,10 +259,12 @@ def suggest_hashtags(niche: str, target_audience: str) -> list[str]:
         messages=[
             {
                 "role": "user",
-                "content": f"""Suggest 8 Instagram/TikTok hashtags for finding ideal coaching clients.
+                "content": f"""Suggest 8 Instagram/TikTok hashtags that people use when they are VENTING, STRUGGLING, or EXPRESSING the problem that the coach below helps solve.
 
 Coach niche: {niche}
-Target audience: {target_audience}
+Target audience: {target_audience}{pain_block}
+
+IMPORTANT: These hashtags should be used by POTENTIAL CLIENTS who are LIVING the problem — NOT by coaches, consultants, or solution-providers. Think about what someone in pain would post, not what a coach would post.
 
 Return ONLY a JSON array of hashtag strings (without the # symbol), no explanation:
 ["hashtag1", "hashtag2", ...]""",

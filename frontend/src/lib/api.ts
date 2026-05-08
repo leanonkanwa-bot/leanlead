@@ -13,6 +13,7 @@ export interface Coach {
   id: number; email: string; name: string;
   niche?: string; offer_description?: string;
   target_audience?: string; calendly_link?: string;
+  icp_pain_points?: string[];
   onboarded: boolean; has_apify_key?: boolean;
   offer_price?: number | null;
 }
@@ -88,13 +89,14 @@ export const authApi = {
 
   updateSettings: (d: {
     niche?: string; offer_description?: string; target_audience?: string;
-    calendly_link?: string; apify_api_key?: string; offer_price?: number;
+    icp_pain_points?: string[]; calendly_link?: string;
+    apify_api_key?: string; offer_price?: number;
   }) => api.patch("/auth/settings", d),
 
   onboard: (d: {
     niche: string; offer_description: string; target_audience: string;
-    calendly_link?: string; airtable_base_id?: string;
-    airtable_api_key?: string; apify_api_key?: string;
+    icp_pain_points?: string[]; calendly_link?: string;
+    airtable_base_id?: string; airtable_api_key?: string; apify_api_key?: string;
   }) => api.post("/auth/onboard", d),
 };
 

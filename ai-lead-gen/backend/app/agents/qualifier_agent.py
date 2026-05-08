@@ -1,6 +1,10 @@
 """
 Qualifier Agent
-Scores a social-media profile 1-10 for fit with a coach's niche/offer using Claude.
+Scores a social-media profile 0-100 based on how intensely the person
+expresses a pain that the coach's ICP (ideal client profile) experiences.
+
+The goal is to find people who are LIVING the problem right now, not coaches
+or solution-providers.
 """
 import json
 import os
@@ -17,38 +21,56 @@ def _get_client() -> anthropic.Anthropic:
     return _client
 
 
-def qualify_lead(lead_data: dict, coach_niche: str, coach_offer: str) -> dict:
+def qualify_lead(
+    lead_data: dict,
+    coach_niche: str,
+    coach_offer: str,
+    icp_pain_points: list[str] | None = None,
+) -> dict:
     """
+    Scores how strongly this person is expressing a pain the coach solves.
+
     Returns:
         {
-          "score": int (1-10),
+          "score": int (0-100),
           "reason": str,
-          "pain_points": list[str],
-          "recommended_angle": str,
+          "pain_points": list[str],   # pains detected in their content
+          "recommended_angle": str,   # which pain to open with
         }
     """
-    prompt = f"""You are an expert lead qualifier for online coaches.
+    pains_block = ""
+    if icp_pain_points:
+        formatted = "\n".join(f"  - {p}" for p in icp_pain_points)
+        pains_block = f"\nPains the coach's ideal client typically expresses:\n{formatted}\n"
+
+    prompt = f"""You are an expert at identifying people who are actively struggling with a specific problem.
 
 Coach niche: {coach_niche}
-Coach offer: {coach_offer}
-
-Analyze this social media profile and score it 1-10 for likelihood of being a great coaching client.
-
-Profile:
+Coach offer: {coach_offer}{pains_block}
+Profile to analyze:
 - Name: {lead_data.get("name", "Unknown")}
 - Handle: @{lead_data.get("handle", "")}
 - Platform: {lead_data.get("platform", "instagram")}
-- Bio: {lead_data.get("bio", "No bio available")}
+- Bio: {lead_data.get("bio", "No bio")}
 - Followers: {lead_data.get("followers", 0):,}
-- Posts summary: {lead_data.get("posts_summary", "N/A")}
+- Recent posts / content summary: {lead_data.get("posts_summary", "N/A")}
+
+Your task: score 0-100 how strongly this person is EXPRESSING or LIVING one of the coach's target pains RIGHT NOW.
 
 Scoring guide:
-8-10 → Strong fit: pain points visible, engaged audience, niche overlap
-5-7  → Moderate fit: some signals, would benefit from nurturing
-1-4  → Weak fit: wrong niche, no engagement, or likely bot
+85-100 → Actively venting or posting about the struggle, explicit pain language, high emotional charge
+65-84  → Clear signals of the problem in bio or posts, not explicitly venting but clearly affected
+40-64  → Indirect signals — lifestyle or content suggests the pain but not stated
+15-39  → Weak alignment, possible fit but little evidence
+0-14   → Wrong audience, no alignment, influencer/brand account, or competitor
 
-Respond ONLY with valid JSON (no markdown):
-{{"score": <1-10>, "reason": "<2-3 sentence explanation>", "pain_points": ["<pain1>", "<pain2>"], "recommended_angle": "<what to lead with in outreach>"}}"""
+IMPORTANT DISQUALIFIERS (score ≤ 10):
+- They ARE a coach/consultant in the same niche (they sell solutions, not buy them)
+- They are a brand, business, or media account
+- No content signals at all
+
+Respond ONLY with valid JSON (no markdown, no extra text):
+{{"score": <0-100>, "reason": "<2-3 sentences: what specific signals justify the score>", "pain_points": ["<exact pain detected in their content>", ...], "recommended_angle": "<the single most resonant pain to open the conversation with>"}}"""
 
     msg = _get_client().messages.create(
         model="claude-opus-4-7",
@@ -57,4 +79,11 @@ Respond ONLY with valid JSON (no markdown):
     )
     text = msg.content[0].text
     start, end = text.find("{"), text.rfind("}") + 1
-    return json.loads(text[start:end])
+    result = json.loads(text[start:end])
+
+    # Normalise score to 0-100 int
+    result["score"] = max(0, min(100, int(result.get("score", 0))))
+    result.setdefault("reason", "")
+    result.setdefault("pain_points", [])
+    result.setdefault("recommended_angle", "")
+    return result

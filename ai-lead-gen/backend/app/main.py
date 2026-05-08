@@ -19,6 +19,7 @@ Base.metadata.create_all(bind=engine)
 # Lightweight additive migrations for columns added after initial deploy
 _migrations = [
     "ALTER TABLE coaches ADD COLUMN offer_price REAL",
+    "ALTER TABLE coaches ADD COLUMN icp_pain_points TEXT",
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:

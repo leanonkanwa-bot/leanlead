@@ -1,6 +1,7 @@
 """
 Writer Agent
-Crafts a short, personalized DM for a qualified lead using Claude.
+Crafts an empathetic opening DM that acknowledges the lead's pain and ends
+with a single discovery question. No pitch, no mention of services.
 """
 import os
 
@@ -23,35 +24,48 @@ def write_outreach_message(
     coach_offer: str,
     qualification: dict,
 ) -> str:
-    """Returns a ready-to-send DM string (under 100 words)."""
-    pain_points = ", ".join(qualification.get("pain_points", []))
+    """
+    Returns a ready-to-send DM (under 80 words).
+
+    The message must:
+    - Acknowledge the specific pain the person expressed (not generic flattery)
+    - Feel like it comes from a real human who noticed their content
+    - End with ONE open-ended discovery question that qualifies the lead
+    - Never mention coaching, services, offers, or a sales call
+    """
+    first_name = (lead_data.get("name") or "").split()[0] or "toi"
+    pain_points = qualification.get("pain_points", [])
     angle = qualification.get("recommended_angle", "")
+    bio = lead_data.get("bio", "")
+    posts = lead_data.get("posts_summary", "")
 
-    prompt = f"""You are an expert at writing Instagram DMs that book coaching calls without sounding salesy.
+    # Build the most specific context possible for Claude
+    pain_context = angle or (pain_points[0] if pain_points else "")
+    all_pains = ", ".join(pain_points) if pain_points else "inconnu"
 
-Coach: {coach_name}
-Coach niche: {coach_niche}
-Coach offer: {coach_offer}
+    prompt = f"""You are {coach_name}. You just came across someone's profile and genuinely want to understand their situation better.
 
-Lead:
-- First name: {lead_data.get("name", "").split()[0] if lead_data.get("name") else "there"}
-- Bio: {lead_data.get("bio", "")}
-- Pain points: {pain_points}
-- Best opening angle: {angle}
+Their profile:
+- First name: {first_name}
+- Bio: {bio}
+- Recent content: {posts}
+- Pain they're expressing: {all_pains}
+- Best angle to open with: {pain_context}
 
-Write a DM that:
-1. Opens with a genuine, specific observation about their content or bio (NOT "I love your content!")
-2. Names one pain point naturally (never use the word "pain point")
-3. Hints at a solution without pitching
-4. Ends with one low-commitment question
+Write a DM that does EXACTLY this:
+1. Open with one sentence that shows you genuinely noticed something SPECIFIC they expressed (not "I love your content")
+2. Acknowledge their struggle with empathy — make them feel SEEN, not sold to
+3. End with ONE open question that invites them to share more about their situation
 
-Rules:
-- Under 80 words
-- Conversational, no emojis
-- Use their first name once at the start
-- No hard sell, no "I help people like you"
+Hard rules:
+- Under 70 words total
+- NEVER mention coaching, programs, offers, strategy calls, or any service
+- NEVER say "I help people like you" or anything salesy
+- No emojis
+- Write as a real person, not a marketer
+- Use their first name once at the very start
 
-Return ONLY the DM text — nothing else."""
+Return ONLY the DM text — nothing else, no quotes, no preamble."""
 
     msg = _get_client().messages.create(
         model="claude-opus-4-7",

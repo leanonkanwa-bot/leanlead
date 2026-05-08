@@ -75,6 +75,7 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
 
             if req.auto_qualify and coach.niche and coach.offer_description:
                 try:
+                    icp_pains = json.loads(coach.icp_pain_points) if coach.icp_pain_points else None
                     result = qualifier_agent.qualify_lead(
                         lead_data={
                             "name": lead.name,
@@ -86,13 +87,12 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
                         },
                         coach_niche=coach.niche,
                         coach_offer=coach.offer_description,
+                        icp_pain_points=icp_pains,
                     )
                     lead.qualification_score = result.get("score", 0)
                     lead.qualification_reason = result.get("reason", "")
                     lead.pain_points = json.dumps(result.get("pain_points", []))
                     lead.recommended_angle = result.get("recommended_angle", "")
-                    if lead.qualification_score >= 6:
-                        lead.stage = "new"  # stays new, user decides to contact
                 except Exception:
                     pass  # qualification failure shouldn't abort the job
 
@@ -213,6 +213,7 @@ def prospect_from_url(
 
     if coach.niche and coach.offer_description:
         try:
+            icp_pains = json.loads(coach.icp_pain_points) if coach.icp_pain_points else None
             result = qualifier_agent.qualify_lead(
                 lead_data={
                     "name": lead.name, "handle": lead.handle, "platform": lead.platform,
@@ -221,6 +222,7 @@ def prospect_from_url(
                 },
                 coach_niche=coach.niche,
                 coach_offer=coach.offer_description,
+                icp_pain_points=icp_pains,
             )
             lead.qualification_score = result.get("score", 0)
             lead.qualification_reason = result.get("reason", "")
@@ -262,8 +264,10 @@ def suggest_hashtags(
 ):
     if not coach.niche:
         raise HTTPException(status_code=400, detail="Complete onboarding first")
+    icp_pains = json.loads(coach.icp_pain_points) if coach.icp_pain_points else None
     hashtags = prospector_agent.suggest_hashtags(
         niche=coach.niche,
         target_audience=coach.target_audience or "",
+        icp_pain_points=icp_pains,
     )
     return {"hashtags": hashtags}
