@@ -110,6 +110,52 @@ def me(coach: models.Coach = Depends(get_current_coach)):
     }
 
 
+class DetectNicheRequest(BaseModel):
+    description: str
+
+
+@router.post("/detect-niche")
+def detect_niche(req: DetectNicheRequest, coach: models.Coach = Depends(get_current_coach)):
+    """
+    Takes a free-text coaching description and returns AI-detected niche,
+    ICP pain points, and pain-expression hashtags. No DB write — caller confirms.
+    """
+    import json as _json
+    import os
+    import anthropic
+
+    if len(req.description.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Description trop courte")
+
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    msg = client.messages.create(
+        model="claude-opus-4-7",
+        max_tokens=600,
+        messages=[{
+            "role": "user",
+            "content": f"""You are an expert at analyzing coaching niches. A coach described their work in their own words.
+
+Description: "{req.description.strip()}"
+
+Your task — respond in the SAME LANGUAGE as the description:
+1. "niche": A precise 2-5 word category label (e.g. "Confiance en soi", "Business en ligne", "Remise en forme femmes 40+")
+2. "target_audience": 1-2 sentences describing exactly who this coach helps and what transformation they get
+3. "pain_points": Exactly 3 pains the ideal client expresses on social media — in first person, emotional, specific to this niche. These should sound like real posts, not marketing copy.
+4. "hashtags": 8-10 Instagram/TikTok hashtags used by POTENTIAL CLIENTS who are venting about this problem — NOT coaching hashtags, NOT solution hashtags. Think about what a struggling person posts.
+
+Respond ONLY with valid JSON, no markdown:
+{{"niche": "...", "target_audience": "...", "pain_points": ["...", "...", "..."], "hashtags": ["tag1", "tag2", ...]}}""",
+        }],
+    )
+    text = msg.content[0].text
+    start, end = text.find("{"), text.rfind("}") + 1
+    result = _json.loads(text[start:end])
+    # Enforce types
+    result["pain_points"] = result.get("pain_points", [])[:5]
+    result["hashtags"] = result.get("hashtags", [])[:10]
+    return result
+
+
 @router.post("/onboard")
 def onboard(req: OnboardRequest, coach: models.Coach = Depends(get_current_coach), db: Session = Depends(get_db)):
     import json as _json

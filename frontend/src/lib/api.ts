@@ -98,6 +98,14 @@ export const authApi = {
     icp_pain_points?: string[]; calendly_link?: string;
     airtable_base_id?: string; airtable_api_key?: string; apify_api_key?: string;
   }) => api.post("/auth/onboard", d),
+
+  detectNiche: (description: string) =>
+    api.post<{
+      niche: string;
+      target_audience: string;
+      pain_points: string[];
+      hashtags: string[];
+    }>("/auth/detect-niche", { description }),
 };
 
 /* ── Leads ── */
