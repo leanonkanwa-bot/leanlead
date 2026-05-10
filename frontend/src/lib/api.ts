@@ -1,6 +1,6 @@
 import axios from "axios";
 
-export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || "https://guidable-favorable-pasture.ngrok-free.dev" });
+export const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || "/api" });
 
 api.interceptors.request.use((cfg) => {
   const t = localStorage.getItem("ll_token");
@@ -15,6 +15,7 @@ export interface Coach {
   target_audience?: string; calendly_link?: string;
   onboarded: boolean; has_apify_key?: boolean;
   offer_price?: number | null;
+  icp_pain_points?: string[];
 }
 
 export interface AnalyticsData {
@@ -89,13 +90,23 @@ export const authApi = {
   updateSettings: (d: {
     niche?: string; offer_description?: string; target_audience?: string;
     calendly_link?: string; apify_api_key?: string; offer_price?: number;
+    icp_pain_points?: string[];
   }) => api.patch("/auth/settings", d),
 
   onboard: (d: {
     niche: string; offer_description: string; target_audience: string;
     calendly_link?: string; airtable_base_id?: string;
     airtable_api_key?: string; apify_api_key?: string;
+    icp_pain_points?: string[];
   }) => api.post("/auth/onboard", d),
+
+  detectNiche: (description: string) =>
+    api.post<{
+      niche: string;
+      target_audience: string;
+      pain_points: string[];
+      hashtags: string[];
+    }>("/auth/detect-niche", { description }),
 };
 
 /* ── Leads ── */
