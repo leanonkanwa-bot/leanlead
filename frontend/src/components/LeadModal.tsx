@@ -40,10 +40,10 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 animate-fade-in"
+      <div className="w-full max-w-xl bg-slate-900 border border-[#2a2a2a] rounded-2xl overflow-hidden shadow-2xl shadow-black/60 animate-fade-in"
         onClick={e => e.stopPropagation()}>
         {/* En-tête */}
-        <div className="flex items-start justify-between p-5 border-b border-slate-800">
+        <div className="flex items-start justify-between p-5 border-b border-[#2a2a2a]">
           <div>
             <h2 className="font-semibold text-white">{lead.name}</h2>
             <p className="text-sm text-slate-400">@{lead.handle} · {lead.platform}</p>
@@ -52,7 +52,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
         </div>
 
         {/* Onglets */}
-        <div className="flex border-b border-slate-800">
+        <div className="flex border-b border-[#2a2a2a]">
           {(["info", "dm", "reply"] as const).map(t => (
             <button key={t} onClick={() => setTab(t)}
               className={`flex-1 py-2.5 text-xs font-medium capitalize transition-colors border-b-2 ${
@@ -85,7 +85,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                   {lead.pain_points?.length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {lead.pain_points.map(p => (
-                        <span key={p} className="text-[10px] bg-brand-950 text-brand-400 border border-brand-900/60 px-2 py-0.5 rounded-full">{p}</span>
+                        <span key={p} className="text-[10px] bg-[#1a1a1a] text-brand-400 border border-white/[0.08] px-2 py-0.5 rounded-full">{p}</span>
                       ))}
                     </div>
                   )}
@@ -94,7 +94,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Notes</label>
                 <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500" />
+                  className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500" />
                 <button onClick={() => saveNotes.mutate()}
                   className="text-xs text-brand-400 hover:text-brand-300 mt-1 transition-colors">
                   {saveNotes.isPending ? "Enregistrement…" : "Enregistrer les notes"}
@@ -103,7 +103,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
               <div className="flex flex-wrap gap-2 pt-1">
                 <Btn label="🎯 Re-qualifier" pending={qualify.isPending} pendingLabel="Qualification…"
                   onClick={() => qualify.mutate()}
-                  className="bg-brand-950 hover:bg-brand-900 text-brand-300" />
+                  className="bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-brand-400" />
                 <button onClick={() => { if (confirm("Supprimer ce lead ?")) del.mutate(); }}
                   className="ml-auto px-3 py-2 bg-red-950 hover:bg-red-900 text-red-400 rounded-lg text-xs transition-colors">
                   Supprimer
@@ -154,13 +154,13 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Sa réponse</label>
                 <textarea value={replyText} onChange={e => setReplyText(e.target.value)} rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500"
+                  className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500"
                   placeholder="Collez leur message ici…" />
               </div>
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">Historique de la conversation <span className="text-slate-700">(facultatif)</span></label>
                 <textarea value={convHistory} onChange={e => setConvHistory(e.target.value)} rows={3}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500"
+                  className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-brand-500"
                   placeholder={"Vous : [votre DM]\nEux : [première réponse]\n…"} />
               </div>
               {lead.suggested_reply && (
