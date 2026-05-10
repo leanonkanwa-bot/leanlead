@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 
-// ── Decorative background orbs ───────────────────────────────────────────────
+// ── Decorative background orbs ────────────────────────────────────────────────
 function Orb({ className }: { className: string }) {
   return <div className={`absolute rounded-full blur-[120px] pointer-events-none ${className}`} />;
 }
 
-// ── Navigation ───────────────────────────────────────────────────────────────
+// ── Navigation ────────────────────────────────────────────────────────────────────────────
 function Nav() {
   return (
     <nav className="sticky top-0 z-50 border-b border-white/[0.04] bg-[#0a0a0a]/90 backdrop-blur-xl">
@@ -31,7 +31,7 @@ function Nav() {
   );
 }
 
-// ── Avatar stack for social proof ────────────────────────────────────────────
+// ── Avatar stack for social proof ────────────────────────────────────────────────────────────────────────────────────
 function AvatarStack() {
   const avatars = [
     { i: "ML", c: "bg-purple-600" },
@@ -61,7 +61,7 @@ function AvatarStack() {
   );
 }
 
-// ── Hero ─────────────────────────────────────────────────────────────────────
+// ── Hero ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 function Hero() {
   return (
     <section className="relative px-6 pt-24 pb-16 overflow-hidden">
@@ -87,7 +87,7 @@ function Hero() {
 
         {/* Subheadline */}
         <p className="text-lg sm:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed mb-10 font-light">
-          LeanLead trouve les personnes qui expriment vos douleurs cibles sur Instagram & TikTok,
+          LeanLead trouve les personnes qui expriment vos douleurs cibles sur Instagram &amp; TikTok,
           rédige des DMs empathiques ultra-personnalisés, et gère les relances jusqu'à la réservation.
           <span className="text-slate-300 font-medium"> Pendant que vous coachez.</span>
         </p>
@@ -157,7 +157,7 @@ function Hero() {
           <div className="flex gap-3 p-4 overflow-x-auto">
             {[
               { label: "NOUVEAU", color: "border-slate-700", count: 67 },
-              { label: "CONTACTÉ", color: "border-brand-800", count: 38 },
+              { label: "CONTACTÉ", color: "border-[#2a2a2a]", count: 38 },
               { label: "RÉPONDU", color: "border-brand-700", count: 14 },
               { label: "RÉSERVÉ", color: "border-emerald-800", count: 8 },
               { label: "CLÔTURÉ", color: "border-rose-900", count: 3 },
@@ -181,7 +181,7 @@ function Hero() {
                         </div>
                         <span className={`text-[11px] font-black ${c.score >= 80 ? "text-emerald-400" : "text-amber-400"}`}>{c.score}</span>
                       </div>
-                      <span className="text-[9px] bg-brand-950 border border-brand-900/40 text-brand-400 px-1.5 py-0.5 rounded-full font-medium">{c.tag}</span>
+                      <span className="text-[9px] bg-[#1a1a1a] border border-white/[0.06] text-brand-400 px-1.5 py-0.5 rounded-full font-medium">{c.tag}</span>
                     </div>
                   )) : (
                     <div className="h-16 rounded-lg border border-dashed border-white/[0.05] flex items-center justify-center">
@@ -198,7 +198,7 @@ function Hero() {
   );
 }
 
-// ── Stats bar ─────────────────────────────────────────────────────────────────
+// ── Stats bar ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 function Stats() {
   const items = [
     { value: "500+", label: "Coachs actifs" },
@@ -210,7 +210,7 @@ function Stats() {
     <div className="border-y border-white/[0.04] bg-white/[0.015] py-10 px-6">
       <div className="max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-8">
         {items.map((item, i) => (
-          <div key={item.label} className={`text-center ${i < items.length - 1 ? "sm:border-r border-white/[0.06]" : ""}`}>
+          <div key={item.label} className={`text-center ${i < items.length - 1 ? "sm:border-r border-white/[0.06]" : ""}` }>
             <p className="text-3xl font-black text-white mb-1">{item.value}</p>
             <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">{item.label}</p>
           </div>
@@ -220,7 +220,7 @@ function Stats() {
   );
 }
 
-// ── How it works ──────────────────────────────────────────────────────────────
+// ── How it works ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 function HowItWorks() {
   const steps = [
     {
@@ -260,9 +260,9 @@ function HowItWorks() {
 
         <div className="grid md:grid-cols-3 gap-6">
           {steps.map((s) => (
-            <div key={s.n} className="relative bg-[#111] border border-white/[0.06] rounded-2xl p-8 hover:border-brand-500/20 transition-all hover:-translate-y-1 group">
+            <div key={s.n} className="relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-8 hover:border-brand-500/20 transition-all hover:-translate-y-1 group">
               <div className="flex items-center justify-between mb-6">
-                <div className="w-12 h-12 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 text-xl font-black group-hover:bg-brand-500/15 transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-white text-xl font-black group-hover:bg-white/[0.09] transition-colors">
                   {s.icon}
                 </div>
                 <span className="text-4xl font-black text-white/[0.05]">{s.n}</span>
@@ -278,7 +278,7 @@ function HowItWorks() {
   );
 }
 
-// ── Features ──────────────────────────────────────────────────────────────────
+// ── Features ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 function Features() {
   const features = [
     {
@@ -326,8 +326,8 @@ function Features() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f) => (
-            <div key={f.title} className="bg-[#111] border border-white/[0.06] rounded-2xl p-7 hover:border-brand-500/25 transition-all hover:-translate-y-0.5 group">
-              <div className="w-12 h-12 bg-brand-500/10 rounded-xl flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
+            <div key={f.title} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-7 hover:border-brand-500/25 transition-all hover:-translate-y-0.5 group">
+              <div className="w-12 h-12 bg-white/[0.06] rounded-xl flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
                 {f.icon}
               </div>
               <h3 className="text-base font-bold text-white mb-2.5">{f.title}</h3>
@@ -340,7 +340,7 @@ function Features() {
   );
 }
 
-// ── Testimonials ──────────────────────────────────────────────────────────────
+// ── Testimonials ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 function Testimonials() {
   const testimonials = [
     {
@@ -384,7 +384,7 @@ function Testimonials() {
 
         <div className="grid sm:grid-cols-3 gap-6">
           {testimonials.map((t) => (
-            <div key={t.name} className="bg-[#111] border border-white/[0.06] rounded-2xl p-7 flex flex-col">
+            <div key={t.name} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-7 flex flex-col">
               {/* Stars */}
               <div className="flex gap-0.5 mb-5">
                 {Array(5).fill(0).map((_, i) => <span key={i} className="text-amber-400 text-sm">★</span>)}
@@ -405,7 +405,7 @@ function Testimonials() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-bold text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                  <p className="text-xs font-bold text-brand-400 bg-white/[0.05] border border-brand-500/30 px-2.5 py-1 rounded-lg whitespace-nowrap">
                     {t.result}
                   </p>
                 </div>
@@ -418,7 +418,7 @@ function Testimonials() {
   );
 }
 
-// ── Pricing ───────────────────────────────────────────────────────────────────
+// ── Pricing ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 function PricingCard({
   name, price, sub, features, hot, cta,
 }: {
@@ -428,7 +428,7 @@ function PricingCard({
     <div className={`relative rounded-2xl p-8 flex flex-col transition-all ${
       hot
         ? "bg-brand-500 border border-brand-400 shadow-[0_0_60px_rgba(255,117,31,0.20)] scale-[1.03]"
-        : "bg-[#111] border border-white/[0.06] hover:border-white/10"
+        : "bg-[#1a1a1a] border border-[#2a2a2a] hover:border-white/[0.12]"
     }`}>
       {hot && (
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-400 text-[#0a0a0a] text-[10px] font-black px-4 py-1.5 rounded-full tracking-widest uppercase shadow-lg">
@@ -535,7 +535,7 @@ function Pricing() {
   );
 }
 
-// ── Final CTA ─────────────────────────────────────────────────────────────────
+// ── Final CTA ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 function FinalCTA() {
   return (
     <section className="py-32 px-6">
@@ -569,7 +569,7 @@ function FinalCTA() {
   );
 }
 
-// ── Footer ────────────────────────────────────────────────────────────────────
+// ── Footer ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 function Footer() {
   return (
     <footer className="border-t border-white/[0.04] py-10 px-6">
@@ -587,7 +587,7 @@ function Footer() {
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Page ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 export default function Landing() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">
