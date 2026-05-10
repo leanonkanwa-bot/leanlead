@@ -25,7 +25,7 @@ export default function Register() {
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const inputCls = "w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all duration-150";
+  const inputCls = "w-full bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all duration-150";
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4"
@@ -37,7 +37,7 @@ export default function Register() {
           </span>
         </Link>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl shadow-black/60 animate-fade-in">
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-8 shadow-2xl shadow-black/60 animate-fade-in">
           <h1 className="font-heading text-xl font-bold text-white mb-1">Créez votre compte</h1>
           <p className="text-xs text-slate-500 mb-6">Gratuit — sans carte bancaire.</p>
 

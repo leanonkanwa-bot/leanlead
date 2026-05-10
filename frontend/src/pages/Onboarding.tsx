@@ -56,7 +56,7 @@ function PainChip({ text, onRemove, onEdit }: { text: string; onRemove: () => vo
   }
 
   return (
-    <div className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 hover:border-slate-600 rounded-lg px-2.5 py-1.5 text-sm group transition-colors">
+    <div className="flex items-center gap-1.5 bg-[#111] border border-[#2a2a2a] hover:border-slate-600 rounded-lg px-2.5 py-1.5 text-sm group transition-colors">
       <span className="flex-1 text-slate-200 cursor-pointer" onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.select(), 10); }}>{text}</span>
       <button
         onClick={() => { setEditing(true); setTimeout(() => inputRef.current?.select(), 10); }}
@@ -149,7 +149,7 @@ export default function Onboarding() {
       <div className="w-full max-w-lg">
         <StepBar step={step} />
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 animate-fade-in">
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-8 animate-fade-in">
 
           {/* ── Step 0 : Describe → AI detects ── */}
           {step === 0 && !analyzed && (
@@ -162,7 +162,7 @@ export default function Onboarding() {
                 value={description}
                 onChange={e => setDescription(e.target.value)}
                 rows={4}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
+                className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
                 placeholder="ex. J'aide les femmes à retrouver confiance en elles après une rupture amoureuse, pour qu'elles puissent attirer la bonne personne et construire la relation dont elles rêvent."
               />
               <div className="mt-2 flex flex-wrap gap-2">
@@ -172,7 +172,7 @@ export default function Onboarding() {
                   "J'aide les hommes à développer leur leadership",
                 ].map(ex => (
                   <button key={ex} onClick={() => setDescription(ex)}
-                    className="text-xs text-slate-600 hover:text-slate-400 border border-slate-800 hover:border-slate-700 rounded-lg px-2 py-1 transition-colors">
+                    className="text-xs text-slate-600 hover:text-slate-400 border border-[#2a2a2a] hover:border-slate-700 rounded-lg px-2 py-1 transition-colors">
                     {ex.length > 42 ? ex.slice(0, 42) + "…" : ex}
                   </button>
                 ))}
@@ -214,7 +214,7 @@ export default function Onboarding() {
                 <input
                   value={form.niche}
                   onChange={setField("niche")}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm font-medium text-brand-300 focus:outline-none focus:border-brand-500"
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm font-medium text-brand-300 focus:outline-none focus:border-brand-500"
                 />
               </div>
 
@@ -239,7 +239,7 @@ export default function Onboarding() {
                     value={painInput}
                     onChange={e => setPainInput(e.target.value)}
                     onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addPain(); } }}
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-500"
+                    className="flex-1 bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="Ajouter une douleur…"
                   />
                   <button onClick={addPain} disabled={!painInput.trim()}
@@ -258,7 +258,7 @@ export default function Onboarding() {
                   </label>
                   <div className="flex flex-wrap gap-1.5">
                     {suggestedHashtags.map(tag => (
-                      <span key={tag} className="text-xs bg-slate-800 border border-slate-700 text-slate-400 rounded-lg px-2 py-1">
+                      <span key={tag} className="text-xs bg-[#111] border border-[#2a2a2a] text-slate-400 rounded-lg px-2 py-1">
                         #{tag}
                       </span>
                     ))}
@@ -289,7 +289,7 @@ export default function Onboarding() {
                     value={form.offer_description}
                     onChange={setField("offer_description")}
                     rows={4}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
+                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
                     placeholder="ex. J'aide les femmes à reprendre confiance en elles après une rupture pour attirer la relation de leurs rêves en 90 jours."
                   />
                 </div>
@@ -298,7 +298,7 @@ export default function Onboarding() {
                   <input
                     value={form.calendly_link}
                     onChange={setField("calendly_link")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="https://calendly.com/yourname/30min"
                   />
                   <p className="text-xs text-slate-600 mt-1">Utilisé quand l'IA suggère de réserver un appel avec un lead.</p>
@@ -306,7 +306,7 @@ export default function Onboarding() {
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(0)}
-                  className="flex-1 py-2.5 border border-slate-700 hover:border-slate-600 rounded-xl text-sm transition-colors">
+                  className="flex-1 py-2.5 border border-[#2a2a2a] hover:border-slate-600 rounded-xl text-sm transition-colors">
                   ← Retour
                 </button>
                 <button onClick={() => setStep(2)} disabled={!form.offer_description}
@@ -326,27 +326,27 @@ export default function Onboarding() {
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Airtable Base ID</label>
                   <input value={form.airtable_base_id} onChange={setField("airtable_base_id")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-brand-500"
+                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-brand-500"
                     placeholder="appfdB2W41J5sVZ2U" />
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Jeton d'accès personnel Airtable</label>
                   <input type="password" value={form.airtable_api_key} onChange={setField("airtable_api_key")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="pat••••••••••••••••" />
                   <p className="text-xs text-slate-600 mt-1">airtable.com/create/tokens — nécessite la portée data.records:read + write</p>
                 </div>
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Clé API Apify <span className="text-slate-600">(pour le scraping Instagram/TikTok)</span></label>
                   <input type="password" value={form.apify_api_key} onChange={setField("apify_api_key")}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                     placeholder="apify_api_••••••••" />
                 </div>
               </div>
               {error && <p className="text-red-400 text-xs mt-4 bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2">{error}</p>}
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(1)}
-                  className="flex-1 py-2.5 border border-slate-700 hover:border-slate-600 rounded-xl text-sm transition-colors">
+                  className="flex-1 py-2.5 border border-[#2a2a2a] hover:border-slate-600 rounded-xl text-sm transition-colors">
                   ← Retour
                 </button>
                 <button onClick={finish} disabled={saving}

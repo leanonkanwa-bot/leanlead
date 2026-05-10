@@ -32,9 +32,9 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl overflow-hidden shadow-2xl shadow-black/60 animate-fade-in"
+      <div className="w-full max-w-lg bg-slate-900 border border-[#2a2a2a] rounded-2xl overflow-hidden shadow-2xl shadow-black/60 animate-fade-in"
         onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-slate-800">
+        <div className="flex items-center justify-between p-5 border-b border-[#2a2a2a]">
           <h2 className="font-semibold text-white">Ajouter un lead</h2>
           <button onClick={onClose} className="text-slate-500 hover:text-white text-2xl leading-none">×</button>
         </div>
@@ -44,7 +44,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Nom complet</label>
               <input value={f.name} onChange={set("name")}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                 placeholder="Jane Smith" />
             </div>
             <div>
@@ -52,7 +52,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
               <div className="flex">
                 <span className="bg-slate-700 border border-slate-600 border-r-0 rounded-l-xl px-2.5 text-slate-400 text-sm flex items-center">@</span>
                 <input value={f.handle} onChange={set("handle")} required
-                  className="flex-1 bg-slate-800 border border-slate-700 rounded-r-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                  className="flex-1 bg-slate-800 border border-[#2a2a2a] rounded-r-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                   placeholder="janesmith" />
               </div>
             </div>
@@ -62,7 +62,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Plateforme</label>
               <select value={f.platform} onChange={set("platform")}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500">
+                className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500">
                 <option value="instagram">📸 Instagram</option>
                 <option value="tiktok">🎵 TikTok</option>
                 <option value="twitter">𝕏 Twitter / X</option>
@@ -72,7 +72,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
             <div>
               <label className="text-xs text-slate-400 mb-1 block">Abonnés</label>
               <input type="number" value={f.followers} onChange={set("followers")}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                 placeholder="0" />
             </div>
           </div>
@@ -80,21 +80,21 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
           <div>
             <label className="text-xs text-slate-400 mb-1 block">URL du profil</label>
             <input value={f.profile_url} onChange={set("profile_url")}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+              className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
               placeholder="https://instagram.com/janesmith" />
           </div>
 
           <div>
             <label className="text-xs text-slate-400 mb-1 block">Bio <span className="text-slate-600">(collez la bio complète pour de meilleurs résultats IA)</span></label>
             <textarea value={f.bio} onChange={set("bio")} rows={3}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
+              className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
               placeholder="J'aide les mamans à perdre 10 kg en 12 semaines | DM pour mon guide gratuit…" />
           </div>
 
           <div>
             <label className="text-xs text-slate-400 mb-1 block">Notes sur les publications récentes <span className="text-slate-600">(facultatif)</span></label>
             <textarea value={f.posts_summary} onChange={set("posts_summary")} rows={2}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
+              className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
               placeholder="Publications sur la préparation des repas, 3x/semaine. Dernière légende : 'pourquoi j'ai arrêté de compter les calories'…" />
           </div>
 
@@ -111,7 +111,7 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
 
-        <div className="p-5 border-t border-slate-800">
+        <div className="p-5 border-t border-[#2a2a2a]">
           <button onClick={() => add.mutate()} disabled={add.isPending || !f.handle}
             className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
             {add.isPending
@@ -183,7 +183,7 @@ function ProspectsTab() {
   return (
     <div className="max-w-2xl mx-auto space-y-5">
       {/* ── Prospection par URL ── */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+      <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-6">
         <h2 className="font-semibold text-white mb-1">🚀 Lancer la prospection</h2>
         <p className="text-xs text-slate-500 mb-5">Collez l'URL d'un profil TikTok ou Instagram — l'IA le qualifie et rédige le DM automatiquement.</p>
 
@@ -192,7 +192,7 @@ function ProspectsTab() {
           <input
             value={profileUrl}
             onChange={e => { setProfileUrl(e.target.value); setUrlSuccess(null); fromUrl.reset(); }}
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors"
+            className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors"
             placeholder="https://tiktok.com/@nomduprofil ou https://instagram.com/nomduprofil"
           />
         </div>
@@ -224,7 +224,7 @@ function ProspectsTab() {
         </button>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+      <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-6">
         <h2 className="font-semibold text-white mb-1">Trouver de nouveaux leads</h2>
         <p className="text-xs text-slate-500 mb-5">Scraper des profils publics par hashtag et les qualifier automatiquement.</p>
 
@@ -236,7 +236,7 @@ function ProspectsTab() {
               <button key={v} onClick={() => setPlatform(v)}
                 className={`py-2.5 rounded-xl border text-sm font-medium transition-all ${
                   platform === v
-                    ? "bg-brand-900/40 border-brand-600 text-brand-300"
+                    ? "bg-white/[0.04] border-brand-600 text-brand-300"
                     : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"}`}>
                 {l}
               </button>
@@ -254,7 +254,7 @@ function ProspectsTab() {
             </button>
           </div>
           <div className="flex gap-2 mb-2">
-            <div className="flex flex-1 items-center bg-slate-800 border border-slate-700 rounded-xl overflow-hidden focus-within:border-brand-500 transition-colors">
+            <div className="flex flex-1 items-center bg-slate-800 border border-[#2a2a2a] rounded-xl overflow-hidden focus-within:border-brand-500 transition-colors">
               <span className="pl-3 text-slate-500 text-sm">#</span>
               <input value={tagInput} onChange={e => setTagInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addTag())}
@@ -267,9 +267,9 @@ function ProspectsTab() {
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {tags.map(t => (
-                <span key={t} className="flex items-center gap-1 bg-brand-950 border border-brand-900 text-brand-300 text-xs px-2.5 py-1 rounded-full">
+                <span key={t} className="flex items-center gap-1 bg-white/[0.05] border border-[#2a2a2a] text-brand-400 text-xs px-2.5 py-1 rounded-full">
                   #{t}
-                  <button onClick={() => setTags(p => p.filter(x => x !== t))} className="text-brand-500 hover:text-white">×</button>
+                  <button onClick={() => setTags(p => p.filter(x => x !== t))} className="text-slate-400 hover:text-white">×</button>
                 </span>
               ))}
             </div>
@@ -281,7 +281,7 @@ function ProspectsTab() {
           <div className="flex-1">
             <label className="text-xs text-slate-400 mb-1 block">Profils max</label>
             <select value={maxResults} onChange={e => setMaxResults(Number(e.target.value))}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500">
+              className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500">
               {[10,20,50,100].map(n => <option key={n} value={n}>{n} profils</option>)}
             </select>
           </div>
@@ -310,14 +310,14 @@ function ProspectsTab() {
       </div>
 
       {/* Historique des tâches */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+      <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-6">
         <h3 className="font-medium text-white mb-4 text-sm">Tâches récentes</h3>
         {jobs.length === 0 ? (
           <p className="text-xs text-slate-600 text-center py-6">Aucune tâche — lancez une recherche ci-dessus.</p>
         ) : (
           <div className="space-y-3">
             {jobs.map(j => (
-              <div key={j.id} className="flex items-center justify-between gap-4 py-3 border-b border-slate-800 last:border-0">
+              <div key={j.id} className="flex items-center justify-between gap-4 py-3 border-b border-[#2a2a2a] last:border-0">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-[10px] font-bold uppercase ${statusColors[j.status]}`}>
@@ -350,7 +350,7 @@ function ProspectsTab() {
 ════════════════════════════════════════════════════════════════════ */
 const DAY_CONFIG = {
   2: { label: "J+2", sublabel: "Rappel léger",       badge: "bg-amber-950/70 border-amber-800/60 text-amber-400", ring: "ring-amber-800/20" },
-  4: { label: "J+4", sublabel: "Valeur ajoutée",      badge: "bg-brand-950/70 border-brand-800/60 text-brand-400", ring: "ring-brand-800/20" },
+  4: { label: "J+4", sublabel: "Valeur ajoutée",      badge: "bg-[#1a1a1a] border-white/[0.10] text-brand-400", ring: "ring-white/[0.03]" },
   7: { label: "J+7", sublabel: "Dernière relance",    badge: "bg-rose-950/70 border-rose-900/60 text-rose-400",    ring: "ring-rose-900/20" },
 } as const;
 
@@ -391,7 +391,7 @@ function FollowupRow({ item }: { item: FollowupDue }) {
   });
 
   return (
-    <div className={`bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition-all ${
+    <div className={`bg-slate-900 border border-[#2a2a2a] rounded-2xl overflow-hidden transition-all ${
       open ? `ring-1 ${cfg.ring}` : ""
     }`}>
       {/* Header row */}
@@ -417,7 +417,7 @@ function FollowupRow({ item }: { item: FollowupDue }) {
 
       {/* Expanded content */}
       {open && (
-        <div className="border-t border-slate-800/60 px-5 pt-4 pb-5 space-y-4 animate-fade-in">
+        <div className="border-t border-[#2a2a2a]/60 px-5 pt-4 pb-5 space-y-4 animate-fade-in">
           {/* Original DM context */}
           {item.outreach_message && (
             <div>
@@ -444,7 +444,7 @@ function FollowupRow({ item }: { item: FollowupDue }) {
             </div>
 
             {localMessage ? (
-              <div className="bg-slate-800/60 border border-slate-700/40 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+              <div className="bg-slate-800/60 border border-[#2a2a2a]/40 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
                 {localMessage}
               </div>
             ) : (
@@ -516,7 +516,7 @@ function FollowupsTab() {
           {[1,2,3].map(i => <div key={i} className="h-16 bg-slate-900 rounded-2xl animate-pulse" />)}
         </div>
       ) : items.length === 0 ? (
-        <div className="text-center py-16 bg-slate-900 border border-slate-800 rounded-2xl">
+        <div className="text-center py-16 bg-slate-900 border border-[#2a2a2a] rounded-2xl">
           <p className="text-3xl mb-3">🎉</p>
           <p className="font-heading font-semibold text-white mb-1">File vide</p>
           <p className="text-xs text-slate-500 max-w-xs mx-auto">
@@ -531,7 +531,7 @@ function FollowupsTab() {
               const cfg = DAY_CONFIG[day];
               const count = byDay(day).length;
               return (
-                <div key={day} className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-center">
+                <div key={day} className="bg-slate-900 border border-[#2a2a2a] rounded-xl px-4 py-3 text-center">
                   <p className={`font-heading text-2xl font-black ${count > 0 ? cfg.badge.split(" ").find(c => c.startsWith("text-")) : "text-slate-700"}`}>
                     {count}
                   </p>
@@ -560,7 +560,7 @@ const CLASS_CONFIG: Record<Classification, { label: string; bg: string; border: 
   POSITIF:      { label: "Positif",        bg: "bg-emerald-950/60", border: "border-emerald-800/50", text: "text-emerald-400", icon: "↗" },
   NEUTRE:       { label: "Neutre",          bg: "bg-slate-800/60",   border: "border-slate-700/50",   text: "text-slate-400",   icon: "→" },
   NEGATIF:      { label: "Négatif",         bg: "bg-rose-950/60",    border: "border-rose-900/50",    text: "text-rose-400",    icon: "✕" },
-  SIGNAL_ACHAT: { label: "Signal d'achat!", bg: "bg-brand-950/60",   border: "border-brand-800/50",   text: "text-brand-400",   icon: "🎯" },
+  SIGNAL_ACHAT: { label: "Signal d'achat!", bg: "bg-white/[0.05]",   border: "border-brand-500/30",    text: "text-brand-400",   icon: "🎯" },
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -608,7 +608,7 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const inputCls = "w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all resize-none";
+  const inputCls = "w-full bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all resize-none";
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -621,15 +621,15 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-5">
         {/* ── Lead selector ── */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden flex flex-col" style={{ maxHeight: "72vh" }}>
-          <div className="px-4 pt-4 pb-3 border-b border-slate-800">
+        <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl overflow-hidden flex flex-col" style={{ maxHeight: "72vh" }}>
+          <div className="px-4 pt-4 pb-3 border-b border-[#2a2a2a]">
             <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-2">
               Leads contactés ({contactedLeads.length})
             </p>
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all"
+              className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all"
               placeholder="Rechercher…"
             />
           </div>
@@ -647,7 +647,7 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
                 onClick={() => selectLead(lead)}
                 className={`w-full text-left px-3 py-2.5 rounded-xl transition-all ${
                   selectedId === lead.id
-                    ? "bg-brand-950/60 border border-brand-800/50 shadow-glow-sm"
+                    ? "bg-white/[0.04] border border-[#2a2a2a] shadow-glow-sm"
                     : "hover:bg-slate-800/50 border border-transparent"
                 }`}
               >
@@ -668,7 +668,7 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
         {/* ── Reply composer ── */}
         <div className="space-y-4">
           {!selected ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl flex items-center justify-center" style={{ minHeight: "320px" }}>
+            <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl flex items-center justify-center" style={{ minHeight: "320px" }}>
               <div className="text-center px-8">
                 <p className="text-3xl mb-3">💬</p>
                 <p className="font-heading font-semibold text-slate-400 mb-1">Sélectionnez un lead</p>
@@ -678,7 +678,7 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
           ) : (
             <>
               {/* Lead info header */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl px-5 py-4">
+              <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl px-5 py-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-white">{selected.name || `@${selected.handle}`}</p>
@@ -694,7 +694,7 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
               </div>
 
               {/* Input form */}
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+              <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-5 space-y-4">
                 <div>
                   <label className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block mb-2">
                     Réponse reçue *
@@ -758,16 +758,16 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
                     </div>
 
                     {analysis.inject_calendly && (
-                      <div className="flex items-center gap-2 bg-brand-950/40 border border-brand-800/40 rounded-xl px-3 py-2">
-                        <span className="text-brand-400 text-sm">📅</span>
-                        <p className="text-xs text-brand-300">Lien Calendly injecté dans la réponse</p>
+                      <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2">
+                        <span className="text-slate-400 text-sm">📅</span>
+                        <p className="text-xs text-slate-400">Lien Calendly injecté dans la réponse</p>
                       </div>
                     )}
 
                     {/* Generated reply */}
                     <div>
                       <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-2">Réponse suggérée</p>
-                      <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+                      <div className="bg-slate-900/60 border border-[#2a2a2a]/40 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
                         {analysis.suggested_reply}
                       </div>
                     </div>
@@ -803,7 +803,7 @@ function StatCard({ label, value, sub, accent }: {
   label: string; value: string | number; sub?: string; accent?: string;
 }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col gap-1">
+    <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-5 flex flex-col gap-1">
       <p className="text-xs text-slate-500 uppercase tracking-wider">{label}</p>
       <p className={`text-3xl font-black ${accent ?? "text-white"}`}>{value}</p>
       {sub && <p className="text-xs text-slate-500">{sub}</p>}
@@ -926,7 +926,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
       {/* ── Hashtags + Follow-up perf ── */}
       <div className="grid sm:grid-cols-2 gap-4">
         {/* Top hashtags */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-5">
           <h3 className="font-heading font-bold text-sm text-white mb-4">Top hashtags</h3>
           {stats.top_hashtags.length === 0 ? (
             <p className="text-xs text-slate-500">Aucune campagne de prospection terminée.</p>
@@ -946,7 +946,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
         </div>
 
         {/* Follow-up conversions */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-5">
           <h3 className="font-heading font-bold text-sm text-white mb-1">Relances → réponses</h3>
           <p className="text-xs text-slate-500 mb-4">Quelle relance a déclenché la réponse ?</p>
           {stats.followup_conversions.every(c => c.count === 0) ? (
@@ -964,7 +964,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
               ))}
             </div>
           )}
-          <div className="mt-4 pt-4 border-t border-slate-800 flex gap-4 text-xs text-slate-500">
+          <div className="mt-4 pt-4 border-t border-[#2a2a2a] flex gap-4 text-xs text-slate-500">
             <span>Relances envoyées :</span>
             <span className="text-slate-300">D+2 <b>{stats.followup_sent.d2}</b></span>
             <span className="text-slate-300">D+4 <b>{stats.followup_sent.d4}</b></span>
@@ -976,7 +976,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
       {/* ── Revenue tracker + Checklist ── */}
       <div className="grid sm:grid-cols-2 gap-4">
         {/* Revenue */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-5 space-y-4">
           <h3 className="font-heading font-bold text-sm text-white">Projection de revenus</h3>
           <div>
             <label className="text-xs text-slate-400 mb-1.5 block">Prix de votre offre (€)</label>
@@ -987,7 +987,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
                 value={priceInput}
                 onChange={e => setPriceInput(e.target.value)}
                 placeholder="ex. 2000"
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm
+                className="flex-1 bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm
                            focus:outline-none focus:border-brand-500 transition-colors"
               />
               <button
@@ -1000,7 +1000,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
               </button>
             </div>
           </div>
-          <div className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4 flex items-center justify-between">
+          <div className="bg-slate-800/60 border border-[#2a2a2a]/50 rounded-xl p-4 flex items-center justify-between">
             <div>
               <p className="text-xs text-slate-500">Deals closés</p>
               <p className="text-2xl font-black text-white">{stats.closed_leads}</p>
@@ -1094,14 +1094,14 @@ export default function Dashboard() {
     <div className="min-h-screen bg-slate-950 flex flex-col">
       {/* ── Barre de navigation ── */}
       <nav className="sticky top-0 z-40 flex items-center justify-between gap-4 px-5 py-3
-                      border-b border-slate-800 bg-[#0a0a0a]/90 backdrop-blur-md">
+                      border-b border-[#2a2a2a] bg-[#0a0a0a]/90 backdrop-blur-md">
         <div className="flex items-center gap-4 min-w-0">
           <span className="font-heading font-extrabold text-lg flex-shrink-0">
             Lean<span className="text-brand-400">Lead</span>
           </span>
 
           {/* Sélecteur d'onglets */}
-          <div className="hidden sm:flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-xl p-1">
+          <div className="hidden sm:flex items-center gap-1 bg-slate-900 border border-[#2a2a2a] rounded-xl p-1">
             {TABS.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`relative px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
@@ -1121,7 +1121,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-3">
           {tab === "pipeline" && (
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher…"
-              className="hidden sm:block bg-slate-800 border border-slate-700 rounded-xl px-3 py-1.5
+              className="hidden sm:block bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-1.5
                          text-sm focus:outline-none focus:border-brand-500 w-36 transition-colors" />
           )}
           <button onClick={() => setShowAdd(true)}
@@ -1131,13 +1131,13 @@ export default function Dashboard() {
 
           {/* Menu compte */}
           <div className="relative group">
-            <button className="w-8 h-8 rounded-full bg-brand-900 border border-brand-800 flex items-center justify-center
-                               text-xs font-bold text-brand-300 hover:border-brand-600 transition-colors">
+            <button className="w-8 h-8 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center
+                               text-xs font-bold text-white hover:border-brand-500 transition-colors">
               {initials}
             </button>
-            <div className="absolute right-0 mt-2 w-44 bg-slate-800 border border-slate-700 rounded-xl overflow-hidden
+            <div className="absolute right-0 mt-2 w-44 bg-slate-800 border border-[#2a2a2a] rounded-xl overflow-hidden
                             shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all">
-              <div className="px-4 py-3 border-b border-slate-700">
+              <div className="px-4 py-3 border-b border-[#2a2a2a]">
                 <p className="text-xs font-semibold text-white truncate">{coach?.name}</p>
                 <p className="text-[10px] text-slate-500 truncate">{coach?.email}</p>
               </div>
@@ -1226,7 +1226,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Navigation mobile bas ── */}
-      <div className="sm:hidden flex border-t border-slate-800 bg-slate-950">
+      <div className="sm:hidden flex border-t border-[#2a2a2a] bg-slate-950">
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
             className={`relative flex-1 py-3 text-xs font-medium transition-colors ${

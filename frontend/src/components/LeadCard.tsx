@@ -29,7 +29,7 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}
       {...attributes} {...listeners}
       onClick={onClick}
-      className="bg-slate-800/80 border border-slate-700/60 hover:border-slate-600 hover:bg-slate-800 rounded-xl p-3.5 cursor-pointer select-none transition-all duration-150 group"
+      className="bg-slate-800/80 border border-[#2a2a2a]/60 hover:border-slate-600 hover:bg-slate-800 rounded-xl p-3.5 cursor-pointer select-none transition-all duration-150 group"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
@@ -50,7 +50,7 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
       {lead.pain_points?.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2.5">
           {lead.pain_points.slice(0, 2).map(p => (
-            <span key={p} className="text-[9px] bg-brand-950/60 text-brand-400/80 border border-brand-900/40 px-1.5 py-0.5 rounded-full">
+            <span key={p} className="text-[9px] bg-white/[0.04] text-brand-400/80 border border-white/[0.06] px-1.5 py-0.5 rounded-full">
               {p}
             </span>
           ))}

@@ -157,7 +157,7 @@ function Hero() {
           <div className="flex gap-3 p-4 overflow-x-auto">
             {[
               { label: "NOUVEAU", color: "border-slate-700", count: 67 },
-              { label: "CONTACTÉ", color: "border-brand-800", count: 38 },
+              { label: "CONTACTÉ", color: "border-[#2a2a2a]", count: 38 },
               { label: "RÉPONDU", color: "border-brand-700", count: 14 },
               { label: "RÉSERVÉ", color: "border-emerald-800", count: 8 },
               { label: "CLÔTURÉ", color: "border-rose-900", count: 3 },
@@ -181,7 +181,7 @@ function Hero() {
                         </div>
                         <span className={`text-[11px] font-black ${c.score >= 80 ? "text-emerald-400" : "text-amber-400"}`}>{c.score}</span>
                       </div>
-                      <span className="text-[9px] bg-brand-950 border border-brand-900/40 text-brand-400 px-1.5 py-0.5 rounded-full font-medium">{c.tag}</span>
+                      <span className="text-[9px] bg-[#1a1a1a] border border-white/[0.06] text-brand-400 px-1.5 py-0.5 rounded-full font-medium">{c.tag}</span>
                     </div>
                   )) : (
                     <div className="h-16 rounded-lg border border-dashed border-white/[0.05] flex items-center justify-center">
@@ -260,9 +260,9 @@ function HowItWorks() {
 
         <div className="grid md:grid-cols-3 gap-6">
           {steps.map((s) => (
-            <div key={s.n} className="relative bg-[#111] border border-white/[0.06] rounded-2xl p-8 hover:border-brand-500/20 transition-all hover:-translate-y-1 group">
+            <div key={s.n} className="relative bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-8 hover:border-brand-500/20 transition-all hover:-translate-y-1 group">
               <div className="flex items-center justify-between mb-6">
-                <div className="w-12 h-12 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 text-xl font-black group-hover:bg-brand-500/15 transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-white text-xl font-black group-hover:bg-white/[0.09] transition-colors">
                   {s.icon}
                 </div>
                 <span className="text-4xl font-black text-white/[0.05]">{s.n}</span>
@@ -326,8 +326,8 @@ function Features() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f) => (
-            <div key={f.title} className="bg-[#111] border border-white/[0.06] rounded-2xl p-7 hover:border-brand-500/25 transition-all hover:-translate-y-0.5 group">
-              <div className="w-12 h-12 bg-brand-500/10 rounded-xl flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
+            <div key={f.title} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-7 hover:border-brand-500/25 transition-all hover:-translate-y-0.5 group">
+              <div className="w-12 h-12 bg-white/[0.06] rounded-xl flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
                 {f.icon}
               </div>
               <h3 className="text-base font-bold text-white mb-2.5">{f.title}</h3>
@@ -384,7 +384,7 @@ function Testimonials() {
 
         <div className="grid sm:grid-cols-3 gap-6">
           {testimonials.map((t) => (
-            <div key={t.name} className="bg-[#111] border border-white/[0.06] rounded-2xl p-7 flex flex-col">
+            <div key={t.name} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-7 flex flex-col">
               {/* Stars */}
               <div className="flex gap-0.5 mb-5">
                 {Array(5).fill(0).map((_, i) => <span key={i} className="text-amber-400 text-sm">★</span>)}
@@ -405,7 +405,7 @@ function Testimonials() {
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-bold text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                  <p className="text-xs font-bold text-brand-400 bg-white/[0.05] border border-brand-500/30 px-2.5 py-1 rounded-lg whitespace-nowrap">
                     {t.result}
                   </p>
                 </div>
@@ -428,7 +428,7 @@ function PricingCard({
     <div className={`relative rounded-2xl p-8 flex flex-col transition-all ${
       hot
         ? "bg-brand-500 border border-brand-400 shadow-[0_0_60px_rgba(255,117,31,0.20)] scale-[1.03]"
-        : "bg-[#111] border border-white/[0.06] hover:border-white/10"
+        : "bg-[#1a1a1a] border border-[#2a2a2a] hover:border-white/[0.12]"
     }`}>
       {hot && (
         <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-amber-400 text-[#0a0a0a] text-[10px] font-black px-4 py-1.5 rounded-full tracking-widest uppercase shadow-lg">

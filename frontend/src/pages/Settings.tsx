@@ -51,7 +51,7 @@ export default function Settings() {
     },
   });
 
-  const inputCls = "w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all duration-150";
+  const inputCls = "w-full bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all duration-150";
 
   return (
     <div className="min-h-screen bg-slate-950" style={{ backgroundImage: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(255,117,31,0.05), transparent)" }}>
@@ -76,7 +76,7 @@ export default function Settings() {
         ) : (
           <div className="space-y-4">
             {/* Coaching info */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
               <p className="font-heading text-sm font-semibold text-white mb-5">Profil de coaching</p>
               <div className="space-y-4">
                 <Field label="Votre créneau">
@@ -101,9 +101,9 @@ export default function Settings() {
             </div>
 
             {/* Account info */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
               <p className="font-heading text-sm font-semibold text-white mb-4">Compte</p>
-              <div className="flex items-center justify-between py-2 border-b border-slate-800">
+              <div className="flex items-center justify-between py-2 border-b border-[#2a2a2a]">
                 <span className="text-xs text-slate-500">Nom</span>
                 <span className="text-sm text-slate-300">{coach?.name}</span>
               </div>

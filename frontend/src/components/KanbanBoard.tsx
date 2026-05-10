@@ -24,11 +24,11 @@ const STAGES: {
   glow: string;
   description: string;
 }[] = [
-  { id: "new",       label: "Nouveau",  border: "border-slate-800",   dotBg: "bg-slate-600",   glow: "",                           description: "Ajouté, pas encore contacté" },
-  { id: "contacted", label: "Contacté", border: "border-brand-900",   dotBg: "bg-brand-500",   glow: "shadow-[0_0_12px_rgba(255,117,31,0.1)]", description: "DM envoyé, en attente de réponse" },
-  { id: "replied",   label: "Répondu",  border: "border-brand-900",   dotBg: "bg-brand-400",   glow: "shadow-[0_0_12px_rgba(255,117,31,0.1)]", description: "Le lead a répondu" },
+  { id: "new",       label: "Nouveau",  border: "border-[#2a2a2a]",    dotBg: "bg-slate-600",   glow: "",                           description: "Ajouté, pas encore contacté" },
+  { id: "contacted", label: "Contacté", border: "border-[#2a2a2a]",   dotBg: "bg-brand-500",   glow: "",                                       description: "DM envoyé, en attente de réponse" },
+  { id: "replied",   label: "Répondu",  border: "border-[#2a2a2a]",   dotBg: "bg-brand-400",   glow: "",                                       description: "Le lead a répondu" },
   { id: "booked",    label: "Réservé",  border: "border-emerald-900", dotBg: "bg-emerald-500", glow: "",                           description: "Appel réservé sur Calendly" },
-  { id: "closed",    label: "Clôturé",  border: "border-slate-800",   dotBg: "bg-slate-500",   glow: "",                           description: "Affaire gagnée ou perdue" },
+  { id: "closed",    label: "Clôturé",  border: "border-[#2a2a2a]",    dotBg: "bg-slate-500",   glow: "",                           description: "Affaire gagnée ou perdue" },
 ];
 
 function Column({ stage, leads, onCardClick }: { stage: typeof STAGES[0]; leads: Lead[]; onCardClick: (l: Lead) => void }) {
@@ -39,8 +39,8 @@ function Column({ stage, leads, onCardClick }: { stage: typeof STAGES[0]; leads:
     : null;
 
   return (
-    <div className={`flex flex-col rounded-2xl border ${stage.border} ${stage.glow} bg-slate-900/60 min-w-[250px] w-[250px] flex-shrink-0 transition-shadow`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60">
+    <div className={`flex flex-col rounded-2xl border ${stage.border} ${stage.glow} bg-[#1a1a1a]/50 min-w-[250px] w-[250px] flex-shrink-0 transition-shadow`}>
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a2a2a]/60">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${stage.dotBg}`} />
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest font-heading">{stage.label}</span>
@@ -49,14 +49,14 @@ function Column({ stage, leads, onCardClick }: { stage: typeof STAGES[0]; leads:
           {avgScore && (
             <span className="text-[10px] text-slate-600 font-mono">{avgScore} moy</span>
           )}
-          <span className="text-[10px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full tabular-nums">{leads.length}</span>
+          <span className="text-[10px] bg-[#2a2a2a] text-slate-400 px-2 py-0.5 rounded-full tabular-nums">{leads.length}</span>
         </div>
       </div>
 
       <div
         ref={setNodeRef}
         className={`flex-1 p-3 space-y-2 min-h-[120px] rounded-b-2xl transition-all ${
-          isOver ? "bg-brand-950/30 ring-1 ring-inset ring-brand-800/30" : ""
+          isOver ? "bg-white/[0.03] ring-1 ring-inset ring-white/[0.05]" : ""
         }`}
       >
         <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
@@ -65,7 +65,7 @@ function Column({ stage, leads, onCardClick }: { stage: typeof STAGES[0]; leads:
           ))}
         </SortableContext>
         {leads.length === 0 && (
-          <div className="h-16 rounded-xl border border-dashed border-slate-800 flex items-center justify-center">
+          <div className="h-16 rounded-xl border border-dashed border-[#2a2a2a] flex items-center justify-center">
             <p className="text-[10px] text-slate-700">{stage.description}</p>
           </div>
         )}
