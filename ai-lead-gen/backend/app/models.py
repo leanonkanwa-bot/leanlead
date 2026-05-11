@@ -33,6 +33,7 @@ class Coach(Base):
     agent_dm_threshold = Column(Integer, default=70)
     agent_last_run_at = Column(DateTime)
     webhook_url = Column(String)
+    competitor_accounts = Column(Text)    # JSON list of {url, platform, handle}
 
     leads = relationship("Lead", back_populates="coach", cascade="all, delete-orphan")
     prospecting_jobs = relationship("ProspectingJob", back_populates="coach", cascade="all, delete-orphan")

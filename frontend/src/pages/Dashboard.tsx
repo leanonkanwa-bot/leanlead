@@ -191,6 +191,20 @@ function ProspectsTab() {
   const agentEnabled = agentStatus?.enabled ?? false;
   const agentRunning = agentStatus?.last_run?.status === "running";
   const lastRun = agentStatus?.last_run;
+  const competitors = agentStatus?.competitor_accounts ?? [];
+
+  const [competitorUrl, setCompetitorUrl] = useState("");
+  const [competitorPlatform, setCompetitorPlatform] = useState("instagram");
+  const [showCompetitors, setShowCompetitors] = useState(false);
+
+  const addCompetitor = useMutation({
+    mutationFn: () => agentApi.addCompetitor({ url: competitorUrl, platform: competitorPlatform }),
+    onSuccess: () => { refetchAgent(); setCompetitorUrl(""); },
+  });
+  const removeCompetitor = useMutation({
+    mutationFn: (handle: string) => agentApi.removeCompetitor(handle),
+    onSuccess: () => refetchAgent(),
+  });
 
   function formatNextRun(iso?: string): string {
     if (!iso) return "—";
@@ -303,6 +317,85 @@ function ProspectsTab() {
                 {(agentTrigger.error as any)?.response?.data?.detail || "Erreur"}
               </p>
             )}
+
+            {/* ── Competitor Audience Hijack ── */}
+            <div className="mt-4 pt-4 border-t border-[#2a2a2a]">
+              <button
+                onClick={() => setShowCompetitors(v => !v)}
+                className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors w-full"
+              >
+                <span className="text-base">🎯</span>
+                <span className="font-medium">Cibler l'audience des concurrents</span>
+                <span className="ml-auto text-slate-600">{showCompetitors ? "▲" : "▼"}</span>
+                {competitors.length > 0 && (
+                  <span className="bg-brand-500/20 text-brand-400 text-[10px] px-1.5 py-0.5 rounded-full">
+                    {competitors.length}
+                  </span>
+                )}
+              </button>
+
+              {showCompetitors && (
+                <div className="mt-3 space-y-3 animate-fade-in">
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    L'agent scrape les sections commentaires de ces comptes et contacte les personnes qui posent des questions ou interagissent.
+                  </p>
+
+                  {/* Competitor list */}
+                  {competitors.length > 0 && (
+                    <div className="space-y-1.5">
+                      {competitors.map(c => (
+                        <div key={c.handle} className="flex items-center justify-between bg-slate-800/60 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs">
+                              {c.platform === "instagram" ? "📸" : c.platform === "tiktok" ? "🎵" : c.platform === "twitter" ? "𝕏" : "💼"}
+                            </span>
+                            <span className="text-xs text-slate-300 truncate">@{c.handle}</span>
+                          </div>
+                          <button
+                            onClick={() => removeCompetitor.mutate(c.handle)}
+                            disabled={removeCompetitor.isPending}
+                            className="text-slate-600 hover:text-red-400 text-sm ml-2 transition-colors flex-shrink-0"
+                          >×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add competitor */}
+                  <div className="flex gap-2">
+                    <select
+                      value={competitorPlatform}
+                      onChange={e => setCompetitorPlatform(e.target.value)}
+                      className="bg-slate-800 border border-[#2a2a2a] rounded-lg px-2 py-2 text-xs focus:outline-none focus:border-brand-500 flex-shrink-0"
+                    >
+                      <option value="instagram">📸 IG</option>
+                      <option value="tiktok">🎵 TT</option>
+                      <option value="twitter">𝕏 TW</option>
+                      <option value="linkedin">💼 LI</option>
+                    </select>
+                    <input
+                      value={competitorUrl}
+                      onChange={e => setCompetitorUrl(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && competitorUrl && addCompetitor.mutate()}
+                      placeholder="instagram.com/concurrent ou @pseudo"
+                      className="flex-1 bg-slate-800 border border-[#2a2a2a] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-brand-500 min-w-0"
+                    />
+                    <button
+                      onClick={() => addCompetitor.mutate()}
+                      disabled={!competitorUrl.trim() || addCompetitor.isPending || competitors.length >= 10}
+                      className="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-xs transition-colors disabled:opacity-40 flex-shrink-0"
+                    >
+                      {addCompetitor.isPending ? "…" : "+"}
+                    </button>
+                  </div>
+                  {addCompetitor.isError && (
+                    <p className="text-red-400 text-[10px]">
+                      {(addCompetitor.error as any)?.response?.data?.detail || "Erreur"}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
 

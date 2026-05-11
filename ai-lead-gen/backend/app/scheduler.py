@@ -135,6 +135,8 @@ def _run_for_coach(coach_id: int):
         existing = db.query(models.Lead.handle).filter(models.Lead.coach_id == coach_id).all()
         existing_handles = {row[0] for row in existing if row[0]}
 
+        competitor_accounts = json.loads(getattr(coach, "competitor_accounts", None) or "[]") or None
+
         result = autonomous_agent.run_autonomous(
             coach_id=coach_id,
             coach_niche=coach.niche,
@@ -146,6 +148,7 @@ def _run_for_coach(coach_id: int):
             max_per_platform=max_per_platform,
             dm_threshold=dm_threshold,
             existing_handles=existing_handles,
+            competitor_accounts=competitor_accounts,
         )
 
         for lead_data in result.get("leads", []):

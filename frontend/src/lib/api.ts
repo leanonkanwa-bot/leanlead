@@ -150,6 +150,10 @@ export interface AgentRunSummary {
   started_at?: string; finished_at?: string;
 }
 
+export interface CompetitorAccount {
+  url: string; platform: string; handle: string;
+}
+
 export interface AgentStatus {
   enabled: boolean;
   frequency_hours: number;
@@ -160,6 +164,7 @@ export interface AgentStatus {
   last_run_at?: string;
   next_run_at?: string;
   last_run?: AgentRunSummary | null;
+  competitor_accounts: CompetitorAccount[];
 }
 
 export const agentApi = {
@@ -170,6 +175,10 @@ export const agentApi = {
   }>) => api.patch("/agent/settings", d),
   trigger: () => api.post<{ ok: boolean; message: string }>("/agent/trigger"),
   runs: () => api.get<AgentRunSummary[]>("/agent/runs"),
+  competitors: () => api.get<CompetitorAccount[]>("/agent/competitors"),
+  addCompetitor: (d: { url: string; platform: string }) =>
+    api.post<{ ok: boolean; handle: string; competitors: CompetitorAccount[] }>("/agent/competitors", d),
+  removeCompetitor: (handle: string) => api.delete(`/agent/competitors/${handle}`),
 };
 
 /* ── Prospecting ── */

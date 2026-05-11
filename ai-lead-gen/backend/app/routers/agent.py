@@ -54,6 +54,7 @@ def agent_status(
         getattr(coach, "agent_platforms", None) or
         '["instagram","tiktok","linkedin","twitter","reddit"]'
     )
+    competitors = json.loads(getattr(coach, "competitor_accounts", None) or "[]")
     return {
         "enabled": getattr(coach, "agent_enabled", False) or False,
         "frequency_hours": getattr(coach, "agent_frequency_hours", 6) or 6,
@@ -64,6 +65,7 @@ def agent_status(
         "last_run_at": coach.agent_last_run_at.isoformat() if getattr(coach, "agent_last_run_at", None) else None,
         "next_run_at": next_run.isoformat() if next_run else None,
         "last_run": _serialize_run(last_run) if last_run else None,
+        "competitor_accounts": competitors,
     }
 
 
@@ -151,3 +153,70 @@ def list_runs(
         .all()
     )
     return [_serialize_run(r) for r in runs]
+
+
+# ---------------------------------------------------------------------------
+# Competitor account management
+# ---------------------------------------------------------------------------
+
+class CompetitorRequest(BaseModel):
+    url: str
+    platform: str = "instagram"
+
+
+def _extract_handle(url: str) -> str:
+    h = url.strip().rstrip("/").split("@")[-1].split("?")[0]
+    if "/" in h:
+        h = h.split("/")[-1]
+    return h.lstrip("@").lower()
+
+
+@router.get("/competitors")
+def list_competitors(
+    coach: models.Coach = Depends(get_current_coach),
+):
+    accounts = json.loads(getattr(coach, "competitor_accounts", None) or "[]")
+    return accounts
+
+
+@router.post("/competitors", status_code=201)
+def add_competitor(
+    req: CompetitorRequest,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    valid_platforms = {"instagram", "tiktok", "twitter", "linkedin"}
+    if req.platform not in valid_platforms:
+        raise HTTPException(400, f"Platform must be one of: {', '.join(valid_platforms)}")
+
+    handle = _extract_handle(req.url)
+    if not handle:
+        raise HTTPException(400, "Could not extract handle from URL")
+
+    accounts: list[dict] = json.loads(getattr(coach, "competitor_accounts", None) or "[]")
+
+    if any(a["handle"] == handle for a in accounts):
+        raise HTTPException(409, f"Competitor @{handle} already added")
+
+    if len(accounts) >= 10:
+        raise HTTPException(400, "Maximum 10 competitor accounts")
+
+    accounts.append({"url": req.url, "platform": req.platform, "handle": handle})
+    coach.competitor_accounts = json.dumps(accounts)
+    db.commit()
+    return {"ok": True, "handle": handle, "competitors": accounts}
+
+
+@router.delete("/competitors/{handle}")
+def remove_competitor(
+    handle: str,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    accounts: list[dict] = json.loads(getattr(coach, "competitor_accounts", None) or "[]")
+    updated = [a for a in accounts if a["handle"] != handle.lower()]
+    if len(updated) == len(accounts):
+        raise HTTPException(404, f"Competitor @{handle} not found")
+    coach.competitor_accounts = json.dumps(updated)
+    db.commit()
+    return {"ok": True, "competitors": updated}

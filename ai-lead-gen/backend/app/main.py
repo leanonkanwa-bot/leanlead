@@ -30,6 +30,7 @@ _migrations = [
     "ALTER TABLE coaches ADD COLUMN agent_dm_threshold INTEGER DEFAULT 70",
     "ALTER TABLE coaches ADD COLUMN agent_last_run_at DATETIME",
     "ALTER TABLE coaches ADD COLUMN webhook_url TEXT",
+    "ALTER TABLE coaches ADD COLUMN competitor_accounts TEXT",
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:
