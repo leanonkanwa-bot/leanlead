@@ -182,6 +182,7 @@ def _run_for_coach(coach_id: int):
                 psychographic_profile=lead_data.get("psychographic_profile"),
                 response_probability=lead_data.get("response_probability"),
                 source_tag=lead_data.get("source_tag", "hashtag"),
+                predicted_objection=lead_data.get("predicted_objection"),
                 stage="new",
             )
             db.add(lead)

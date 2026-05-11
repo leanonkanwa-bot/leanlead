@@ -34,6 +34,7 @@ const WARMING_LABELS: Record<string, string> = {
 const SOURCE_BADGES: Record<string, { label: string; cls: string }> = {
   viral_post:          { label: "🔥 Post viral",      cls: "bg-orange-950/60 text-orange-400 border-orange-900/40" },
   competitor_audience: { label: "🎯 Concurrent",      cls: "bg-brand-950/60 text-brand-400 border-brand-900/40" },
+  community:           { label: "🌐 Communauté",      cls: "bg-sky-950/60 text-sky-400 border-sky-900/40" },
   direct:              { label: "➕ Ajout direct",    cls: "bg-slate-800 text-slate-400 border-slate-700" },
   hashtag:             { label: "# Hashtag",          cls: "bg-slate-800 text-slate-500 border-slate-700" },
 };

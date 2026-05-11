@@ -1,17 +1,34 @@
 """
-Qualifier Agent — v3
+Qualifier Agent — v4
 Scores 0-100 + psychographic profile + response probability in ONE Claude call.
 
 Pre-qualification signal boosts (deterministic, no API cost):
   • Buying intent (5 languages: FR/EN/ES/PT/AR) → +40
   • Life event trigger                           → +30
   • Ghost follower (follows coaches)             → +20
+  • Hot prospect (repeated engagement)           → +15
+  • Pain peak (maximum vulnerability)            → +25
+  • Failed purchase (burned buyer)               → +35
+  • Before/after seeker (transformation desire)  → +15
 """
 import json
+import logging
 import os
 import re
 
 import anthropic
+import httpx
+
+logger = logging.getLogger(__name__)
+
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    ),
+    "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+}
 
 _client: anthropic.Anthropic | None = None
 
@@ -102,6 +119,55 @@ _HOT_PROSPECT_RE = re.compile(
     re.IGNORECASE,
 )
 
+_PAIN_PEAK_RE = re.compile(
+    r'\b('
+    # French — maximum vulnerability expressions
+    r'je craque|je pète un câble|je suis à bout|j\'abandonne|j\'abandonne tout|'
+    r'j\'en ai ras le bol|plus la force|plus envie de rien|j\'ai tout essayé|'
+    r'je pleure|j\'ai pleuré|nuit blanche|2h du matin|3h du matin|4h du mat|'
+    r'au secours|help me|s\'il vous plaît aidez|quelqu\'un peut m\'aider|'
+    r'je ne sais plus quoi faire|je ne vois plus d\'issue|au fond du trou|'
+    r'rock bottom|breaking point|can\'t do this anymore|i give up|'
+    # English
+    r'i\'m done|i\'m broken|i can\'t go on|hit rock bottom|enough is enough|'
+    r'please someone help|i\'ve tried everything|nothing is working|'
+    r'i\'m desperate|last resort|i don\'t know what to do'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_FAILED_PURCHASE_RE = re.compile(
+    r'('
+    # French — bought coaching, got burned
+    r'j\'ai (acheté|payé|investi).{0,50}(coach|formation|programme|cours|masterclass)|'
+    r'(formation|programme|coaching|cours|masterclass).{0,40}(arnaque|marche pas|pas fonctionné|déçu|remboursement|nul|inutile)|'
+    r'(arnaqué|escroquerie|fraude).{0,30}(coach|formation)|'
+    r'perdu.{0,20}(€|euro|argent).{0,30}(coach|formation)|'
+    r'demandé.{0,10}remboursement|se faire rembourser|'
+    r'# English — failed buyer signals
+    r'wasted.{0,20}(money|\$|€).{0,30}(coach|program|course)|'
+    r'paid.{0,30}(coach|program|course).{0,30}(didn\'t|not|no result|waste|scam)|'
+    r'got scammed.{0,20}(coach|program)|coaching.{0,30}(scam|fraud|waste)|'
+    r'money back.{0,20}(coaching|program)|refund.{0,20}(coach|course)|'
+    r'coach.{0,30}(lied|fake|fraud|useless|waste of)'
+    r')',
+    re.IGNORECASE,
+)
+
+_BEFORE_AFTER_RE = re.compile(
+    r'\b('
+    # Actively seeking transformation
+    r'avant[/-]après|transformation|avant après|résultats comme|comme toi|comme ça|'
+    r'je veux (ça|ça aussi|ce résultat|ces résultats|ce corps|cette vie)|'
+    r'j\'aspire à|j\'aimerais (tellement|vraiment)|mon objectif|mes objectifs|'
+    r'before.?after|body goals|life goals|goals!|goals 🙌|i want this|'
+    r'this is my goal|i want results like|relationship goals|'
+    r'saving this|bookmarking this|pinned|saved for inspo|'
+    r'c\'est mon objectif|objectif atteint|objectif de vie'
+    r')\b',
+    re.IGNORECASE,
+)
+
 
 def _detect_signals(lead_data: dict) -> dict:
     text = f"{lead_data.get('bio', '')} {lead_data.get('posts_summary', '')}".strip()
@@ -110,6 +176,9 @@ def _detect_signals(lead_data: dict) -> dict:
         "life_event": bool(_LIFE_EVENT_RE.search(text)),
         "follows_coaches": bool(_FOLLOWS_COACHES_RE.search(text)),
         "hot_prospect": bool(_HOT_PROSPECT_RE.search(text)),
+        "pain_peak": bool(_PAIN_PEAK_RE.search(text)),
+        "failed_purchase": bool(_FAILED_PURCHASE_RE.search(text)),
+        "before_after_seeker": bool(_BEFORE_AFTER_RE.search(text)),
     }
 
 
@@ -151,6 +220,12 @@ def qualify_lead(
             detected.append("👁 FOLLOWS COACHES — references coaches/programs they watch")
         if signals["hot_prospect"]:
             detected.append("🔥 HOT PROSPECT — repeatedly engages with solution content")
+        if signals["pain_peak"]:
+            detected.append("🚨 PAIN PEAK — at maximum emotional vulnerability right now")
+        if signals["failed_purchase"]:
+            detected.append("💔 FAILED BUYER — bought coaching before, got burned; still wants results")
+        if signals["before_after_seeker"]:
+            detected.append("🎯 TRANSFORMATION SEEKER — actively looking for before/after results")
         signal_context = "\n\nPRE-DETECTED SIGNALS:\n" + "\n".join(detected) + "\n"
 
     prompt = f"""You are an expert at identifying people who are actively struggling with a problem and are likely to buy a coaching solution.
@@ -219,6 +294,75 @@ predicted_objection: infer from their communication style, awareness stage, and 
     if signals["hot_prospect"]:
         score = min(95, score + 15)
         result["pain_points"] = ["Prospect chaud"] + [p for p in result["pain_points"] if p != "Prospect chaud"]
+    if signals["pain_peak"]:
+        score = min(98, score + 25)
+        pain_points = result["pain_points"]
+        if "Pic de douleur" not in pain_points:
+            pain_points.insert(0, "Pic de douleur")
+        result["pain_points"] = pain_points
+    if signals["failed_purchase"]:
+        score = min(98, score + 35)
+        pain_points = result["pain_points"]
+        if "Acheteur raté" not in pain_points:
+            pain_points.insert(0, "Acheteur raté")
+        result["pain_points"] = pain_points
+    if signals["before_after_seeker"]:
+        score = min(95, score + 15)
+        pain_points = result["pain_points"]
+        if "Cherche transformation" not in pain_points:
+            pain_points.append("Cherche transformation")
+        result["pain_points"] = pain_points
 
     result["score"] = score
     return result
+
+
+# ---------------------------------------------------------------------------
+# Cross-platform identity matching
+# ---------------------------------------------------------------------------
+
+_PLATFORM_URL_MAP = {
+    "instagram": "instagram.com",
+    "tiktok": "tiktok.com",
+    "twitter": "twitter.com",
+    "linkedin": "linkedin.com",
+    "youtube": "youtube.com",
+    "reddit": "reddit.com",
+}
+
+
+def enrich_cross_platform(handle: str, base_platform: str) -> str:
+    """
+    Search for the same handle on other platforms via DDG.
+    Returns additional posts_summary context merged from other platforms.
+    Called before qualification to give Claude richer data — no extra API cost.
+    """
+    other_platforms = [p for p in _PLATFORM_URL_MAP if p != base_platform]
+    extra_snippets: list[str] = []
+
+    for platform in other_platforms[:3]:  # check up to 3 other platforms
+        site = _PLATFORM_URL_MAP[platform]
+        query = f'site:{site} "{handle}"'
+        try:
+            resp = httpx.get(
+                "https://html.duckduckgo.com/html/",
+                params={"q": query},
+                headers=BROWSER_HEADERS,
+                timeout=8,
+                follow_redirects=True,
+            )
+            # Extract first snippet that contains the exact handle
+            snippets = re.findall(
+                r'class="result__snippet">(.*?)</a>',
+                resp.text,
+                re.DOTALL,
+            )
+            for raw in snippets[:2]:
+                text = re.sub(r'<[^>]+>', '', raw).strip()
+                if handle.lower() in text.lower() and len(text) > 30:
+                    extra_snippets.append(f"[{platform}] {text[:200]}")
+                    break
+        except Exception:
+            pass
+
+    return " | ".join(extra_snippets) if extra_snippets else ""

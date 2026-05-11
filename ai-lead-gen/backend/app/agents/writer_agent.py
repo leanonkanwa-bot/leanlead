@@ -5,6 +5,7 @@ Writer Agent — v2
 - Warming comment generation (genuine, non-generic)
 """
 import os
+import re
 
 import anthropic
 
@@ -34,6 +35,44 @@ _PLATFORM_STYLE = {
     "twitter": "Punchy, direct, under 50 words.",
     "reddit": "Low-key, genuine, under 70 words. No sales energy.",
 }
+
+
+def _detect_writing_style(bio: str, posts: str) -> str:
+    """
+    Analyze lead's writing style to mirror in the DM.
+    Returns a one-line instruction for the writer prompt.
+    """
+    text = f"{bio} {posts}"
+    if not text.strip():
+        return ""
+
+    emoji_count = len(re.findall(r'[\U00010000-\U0010ffff]|[\U00002600-\U000027BF]', text))
+    word_count = max(len(text.split()), 1)
+    emoji_density = emoji_count / word_count
+
+    # Slang/informal markers (FR + EN)
+    slang = bool(re.search(r'\b(wsh|frr|ouf|bg|tkt|mdr|lol|omg|ngl|tbh|fr fr|imo|bruh|fam)\b', text, re.IGNORECASE))
+    formal = bool(re.search(r'\b(bonjour|cordialement|veuillez|je vous|madame|monsieur|dear|sincerely|regards)\b', text, re.IGNORECASE))
+    caps = bool(re.search(r'[A-Z]{4,}', text))  # ALL CAPS emphasis
+    ellipsis = text.count('...') + text.count('…') > 1
+    exclamation = text.count('!') > 2
+
+    if formal:
+        return "Mirror their formal style: use 'vous', full sentences, no contractions, professional tone."
+    if slang:
+        return "Mirror their slang: use informal speech, match their exact vocabulary and abbreviations, be casual."
+    style_notes = []
+    if emoji_density > 0.1:
+        style_notes.append("use 1-2 relevant emojis")
+    if caps:
+        style_notes.append("occasional CAPS for emphasis")
+    if ellipsis:
+        style_notes.append("trailing ellipsis for effect…")
+    if exclamation:
+        style_notes.append("enthusiastic punctuation!")
+    if style_notes:
+        return f"Mirror their style: {', '.join(style_notes)}."
+    return "Casual, natural tone — no emojis, no formality."
 
 
 def _build_social_proof_block(testimonials: list[dict] | None, pain_context: str) -> str:
@@ -76,6 +115,8 @@ def write_outreach_message(
     platform_style = _PLATFORM_STYLE.get(platform, _PLATFORM_STYLE["instagram"])
     proof_block = _build_social_proof_block(testimonials, pain_context)
     objection_block = f"\nPredicted objection to pre-empt subtly (don't name it directly): {objection}" if objection else ""
+    style_note = _detect_writing_style(bio, posts)
+    style_block = f"\nContent mirroring: {style_note}" if style_note else ""
 
     prompt = f"""You are {coach_name}. Write a DM to {first_name} in {lang_name}. {lang_note}
 
@@ -83,7 +124,7 @@ Their profile:
 - Bio: {bio}
 - Recent content: {posts}
 - Pain they express: {all_pains}
-- Best angle: {pain_context}{proof_block}{objection_block}
+- Best angle: {pain_context}{proof_block}{objection_block}{style_block}
 
 Platform: {platform} — Style: {platform_style}
 
@@ -92,10 +133,10 @@ Rules:
 2. Acknowledge their struggle with empathy — make them feel SEEN
 3. If a social proof is provided, reference it naturally in ONE sentence ("J'ai aidé quelqu'un dans ta situation exacte…")
 4. If a predicted objection is provided, subtly dissolve it without naming it
-5. End with ONE open question inviting them to share more
-6. NEVER mention coaching, programs, offers, calls, or services explicitly
-7. NEVER say "I help people like you"
-8. No emojis. Write as a real human, not a marketer.
+5. MIRROR their writing style exactly as instructed — match their vocabulary, tone, emoji usage
+6. End with ONE open question inviting them to share more
+7. NEVER mention coaching, programs, offers, calls, or services explicitly
+8. NEVER say "I help people like you"
 9. Use their first name once at the start.
 
 Return ONLY the DM text."""
@@ -134,13 +175,15 @@ def write_ab_variants(
     platform_style = _PLATFORM_STYLE.get(platform, _PLATFORM_STYLE["instagram"])
     proof_block = _build_social_proof_block(testimonials, pain)
     objection_block = f"\nPredicted objection to dissolve subtly in variant A: {objection}" if objection else ""
+    style_note = _detect_writing_style(bio, posts)
+    style_block = f"\nContent mirroring: {style_note}" if style_note else ""
 
     prompt = f"""You are {coach_name}. Generate TWO different DMs to {first_name} in {lang_name}. {lang_note}
 
 Profile:
 - Bio: {bio}
 - Content: {posts}
-- Pain: {pain}{proof_block}{objection_block}
+- Pain: {pain}{proof_block}{objection_block}{style_block}
 
 Platform: {platform} — Style: {platform_style}
 
@@ -149,6 +192,7 @@ VARIANT B — Curiosity: Ask about their dream/goal, create intrigue about what'
 
 Both variants must:
 - Be under 70 words
+- MIRROR their writing style exactly as instructed
 - NEVER mention coaching, programs, or services explicitly
 - Feel human and genuine
 - End with ONE open question

@@ -89,7 +89,7 @@ export interface Lead {
   dm_variant_sent?: "A" | "B";
   warming_status?: "none" | "comment_ready" | "commented" | "dm_ready";
   warming_comment?: string;
-  source_tag?: "viral_post" | "competitor_audience" | "direct" | "hashtag";
+  source_tag?: "viral_post" | "competitor_audience" | "direct" | "hashtag" | "community";
   // Intelligence fields v4
   predicted_objection?: string;
   score_delta?: number | null;

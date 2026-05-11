@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from . import prospector_agent, qualifier_agent, writer_agent, viral_hijacker_agent
+from . import prospector_agent, qualifier_agent, writer_agent, viral_hijacker_agent, community_agent
 
 logger = logging.getLogger(__name__)
 
@@ -224,6 +224,7 @@ def run_autonomous(
     existing_handles: set[str],
     competitor_accounts: list[dict] | None = None,
     viral_hijack_enabled: bool = True,
+    community_scan_enabled: bool = True,
 ) -> dict[str, Any]:
     """
     Run one full autonomous prospecting cycle for a coach.
@@ -255,7 +256,34 @@ def run_autonomous(
             except Exception as e:
                 logger.warning("Platform search failed: %s", e)
 
-    # 2. Viral post hijacker — find commenters on viral niche posts
+    # 2. Community infiltration — Reddit, YouTube comments, Google reviews
+    if community_scan_enabled and coach_niche:
+        try:
+            community_leads = community_agent.scan_communities(coach_niche, max_leads=25)
+            for lead in community_leads:
+                lead.setdefault("_source_tag", "community")
+            all_raw.extend(community_leads)
+            logger.info("Community scan found %d candidates", len(community_leads))
+        except Exception as e:
+            logger.warning("Community scan failed: %s", e)
+        try:
+            yt_leads = community_agent.scan_youtube_comments(coach_niche, max_leads=20)
+            all_raw.extend(yt_leads)
+            logger.info("YouTube comment scan found %d candidates", len(yt_leads))
+        except Exception as e:
+            logger.warning("YouTube scan failed: %s", e)
+        # Google reviews for competitor coaches
+        if competitor_accounts:
+            comp_names = [c.get("handle", "") for c in competitor_accounts if c.get("handle")]
+            if comp_names:
+                try:
+                    review_leads = community_agent.scan_google_reviews(comp_names, max_leads=15)
+                    all_raw.extend(review_leads)
+                    logger.info("Google reviews scan found %d candidates", len(review_leads))
+                except Exception as e:
+                    logger.warning("Google reviews scan failed: %s", e)
+
+    # 3. Viral post hijacker — find commenters on viral niche posts
     if viral_hijack_enabled and coach_niche:
         for platform in platforms[:2]:  # limit to first 2 platforms to save time
             try:
@@ -308,16 +336,20 @@ def run_autonomous(
             seen_handles.add(handle)
             unique_profiles.append(p)
 
-    # 4. Sort by signal strength (buying intent + life events first = max value per API $)
+    # Deduplicate renaming step number for clarity
+    # 4. Sort by signal strength (max value per API $ first)
     def _priority(p: dict) -> int:
         text = f"{p.get('bio', '')} {p.get('posts_summary', '')}"
         score = 0
         if _has_buying_intent(text):
-            score += 3
+            score += 4
         if _has_life_event(text):
-            score += 2
-        # Competitor audience leads get priority — they've already shown engagement
+            score += 3
+        if p.get("_is_failed_buyer"):
+            score += 5  # failed buyers are highest-value leads
         if p.get("_source", "").startswith("concurrent:"):
+            score += 2
+        if p.get("_source_tag") == "viral_post":
             score += 1
         return -score
 
@@ -328,13 +360,26 @@ def run_autonomous(
 
     for profile in unique_profiles:
         handle = (profile.get("handle") or "").strip().lower()
+        base_posts = profile.get("posts_summary", "") or ""
+
+        # Cross-platform enrichment: merge data from other platforms
+        cross_platform_context = ""
+        try:
+            cross_platform_context = qualifier_agent.enrich_cross_platform(
+                handle, profile.get("platform", "instagram")
+            )
+        except Exception:
+            pass
+
+        combined_posts = f"{base_posts} {cross_platform_context}".strip() if cross_platform_context else base_posts
+
         lead_data = {
             "name": profile.get("name", ""),
             "handle": handle,
             "platform": profile.get("platform", "unknown"),
             "bio": profile.get("bio", "") or "",
             "followers": profile.get("followers", 0),
-            "posts_summary": profile.get("posts_summary", "") or "",
+            "posts_summary": combined_posts,
         }
 
         qualification: dict[str, Any] = {
@@ -399,6 +444,7 @@ def run_autonomous(
             "language": language,
             "psychographic_profile": json.dumps(psycho) if psycho else None,
             "response_probability": qualification.get("response_probability", 0),
+            "predicted_objection": qualification.get("predicted_objection", ""),
             "source_tag": source_tag,
         })
         stats["leads_found"] += 1

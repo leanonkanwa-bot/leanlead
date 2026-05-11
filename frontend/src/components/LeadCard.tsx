@@ -7,10 +7,11 @@ const PLATFORM: Record<string, string> = {
 };
 
 const SOURCE_BADGES: Record<string, { label: string; cls: string }> = {
-  viral_post:          { label: "🔥 viral",      cls: "bg-orange-950/60 text-orange-400 border-orange-900/50" },
-  competitor_audience: { label: "🎯 concurrent",  cls: "bg-purple-950/60 text-purple-400 border-purple-900/50" },
-  hashtag:             { label: "#️⃣ hashtag",    cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
-  direct:              { label: "👤 direct",      cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
+  viral_post:          { label: "🔥 viral",       cls: "bg-orange-950/60 text-orange-400 border-orange-900/50" },
+  competitor_audience: { label: "🎯 concurrent",   cls: "bg-purple-950/60 text-purple-400 border-purple-900/50" },
+  community:           { label: "🌐 communauté",   cls: "bg-sky-950/60 text-sky-400 border-sky-900/50" },
+  hashtag:             { label: "#️⃣ hashtag",     cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
+  direct:              { label: "👤 direct",       cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
 };
 
 function Score({ v }: { v: number }) {
