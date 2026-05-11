@@ -197,7 +197,7 @@ function ICPPanel() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold text-white">Ideal Client Profile</h2>
-          {icp && <p className="text-xs text-slate-500 mt-0.5">Version {icp.version} · Generated {new Date(icp.generated_at).toLocaleDateString()}</p>}
+          {icp && <p className="text-xs text-slate-500 mt-0.5">Version {icp.version} · Generated {new Date(icp.generated_at ?? "").toLocaleDateString()}</p>}
         </div>
         <div className="flex gap-2">
           {icp && (
