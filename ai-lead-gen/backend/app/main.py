@@ -19,6 +19,9 @@ Base.metadata.create_all(bind=engine)
 # Lightweight additive migrations for columns added after initial deploy
 _migrations = [
     "ALTER TABLE coaches ADD COLUMN offer_price REAL",
+    "ALTER TABLE coaches ADD COLUMN icp_pain_points TEXT",
+    # Migrate existing scores from 0-10 scale to 0-100
+    "UPDATE leads SET qualification_score = qualification_score * 10 WHERE qualification_score > 0 AND qualification_score <= 10",
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:

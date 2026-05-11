@@ -21,6 +21,7 @@ class Coach(Base):
     airtable_api_key = Column(String)
     apify_api_key = Column(String)
     offer_price = Column(Float, nullable=True)
+    icp_pain_points = Column(Text)        # JSON array stored as string
     onboarded = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
