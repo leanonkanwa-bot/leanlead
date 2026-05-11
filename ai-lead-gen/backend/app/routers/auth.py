@@ -124,16 +124,19 @@ def detect_niche(req: DetectNicheRequest, coach: models.Coach = Depends(get_curr
     """
     import json as _json
     import os
+    import traceback
     import anthropic
 
     if len(req.description.strip()) < 10:
         raise HTTPException(status_code=400, detail="Description trop courte (minimum 10 caractères)")
 
     api_key = os.getenv("ANTHROPIC_API_KEY")
+    print(f"[detect-niche] api_key present={bool(api_key)} prefix={api_key[:12] if api_key else 'NONE'}...")
     if not api_key:
-        raise HTTPException(status_code=500, detail="Clé API Anthropic non configurée")
+        raise HTTPException(status_code=500, detail="Clé API Anthropic non configurée — ajoutez ANTHROPIC_API_KEY dans votre fichier .env")
 
     try:
+        print(f"[detect-niche] Calling claude-opus-4-7 ...")
         client = anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
             model="claude-opus-4-7",
@@ -155,17 +158,25 @@ Respond ONLY with valid JSON, no markdown:
             }],
         )
         text = msg.content[0].text.strip()
+        print(f"[detect-niche] Raw response (first 200 chars): {text[:200]}")
         start = text.find("{")
         end = text.rfind("}") + 1
         if start == -1 or end == 0:
-            raise ValueError(f"No JSON object in response: {text[:200]}")
+            raise ValueError(f"No JSON object in response: {text[:300]}")
         result = _json.loads(text[start:end])
-    except anthropic.AuthenticationError:
+        print(f"[detect-niche] Parsed niche={result.get('niche')}")
+    except anthropic.AuthenticationError as exc:
+        print(f"[detect-niche] AUTH ERROR: {exc}")
         raise HTTPException(status_code=500, detail="Clé API Anthropic invalide ou expirée")
-    except anthropic.APIConnectionError:
+    except anthropic.APIConnectionError as exc:
+        print(f"[detect-niche] CONNECTION ERROR: {exc}")
         raise HTTPException(status_code=503, detail="Impossible de joindre l'API Anthropic")
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Impossible d'analyser votre coaching : {exc}")
+        print(f"[detect-niche] UNEXPECTED ERROR: {type(exc).__name__}: {exc}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Impossible d'analyser votre coaching : {type(exc).__name__}: {exc}")
 
     result["pain_points"] = result.get("pain_points", [])[:5]
     result["hashtags"] = result.get("hashtags", [])[:10]

@@ -1,12 +1,27 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 
-# Load .env: prefer backend/.env if present, otherwise search up to repo root.
-# In production (Railway/Fly/Docker) env vars are injected directly — load_dotenv is a no-op.
-_backend_env = Path(__file__).parent.parent / ".env"
-load_dotenv(_backend_env if _backend_env.exists() else (find_dotenv(usecwd=False) or _backend_env))
+# Walk up from this file to find the nearest .env (works on Windows too).
+# Stops at backend/.env, ai-lead-gen/.env, or repo-root/.env.
+_here = Path(__file__).resolve()
+_env_file = None
+for _parent in _here.parents:
+    candidate = _parent / ".env"
+    if candidate.exists():
+        _env_file = candidate
+        break
+
+if _env_file:
+    load_dotenv(_env_file, override=False)
+    print(f"[env] Loaded .env from: {_env_file}")
+else:
+    print("[env] WARNING: no .env file found in any parent directory")
+
+# Debug: confirm the key is present (first 12 chars only)
+_key = os.getenv("ANTHROPIC_API_KEY", "")
+print(f"[env] ANTHROPIC_API_KEY present={bool(_key)} prefix={_key[:12]}...")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
