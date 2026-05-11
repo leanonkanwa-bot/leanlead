@@ -89,11 +89,13 @@ export interface Lead {
   dm_variant_sent?: "A" | "B";
   warming_status?: "none" | "comment_ready" | "commented" | "dm_ready";
   warming_comment?: string;
-  source_tag?: "viral_post" | "competitor_audience" | "direct" | "hashtag" | "community";
+  source_tag?: "viral_post" | "competitor_audience" | "direct" | "hashtag" | "community" | "micro_influencer";
   // Intelligence fields v4
   predicted_objection?: string;
   score_delta?: number | null;
   escalation_alert?: boolean;
+  // Intelligence fields v5
+  aspiration_gap_score?: number | null;
   created_at: string; updated_at: string;
 }
 

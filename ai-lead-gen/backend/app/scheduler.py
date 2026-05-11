@@ -183,6 +183,7 @@ def _run_for_coach(coach_id: int):
                 response_probability=lead_data.get("response_probability"),
                 source_tag=lead_data.get("source_tag", "hashtag"),
                 predicted_objection=lead_data.get("predicted_objection"),
+                aspiration_gap_score=lead_data.get("aspiration_gap_score", 0),
                 stage="new",
             )
             db.add(lead)

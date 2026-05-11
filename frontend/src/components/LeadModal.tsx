@@ -32,11 +32,12 @@ const WARMING_LABELS: Record<string, string> = {
   dm_ready: "Prêt pour le DM ✓✓",
 };
 const SOURCE_BADGES: Record<string, { label: string; cls: string }> = {
-  viral_post:          { label: "🔥 Post viral",      cls: "bg-orange-950/60 text-orange-400 border-orange-900/40" },
-  competitor_audience: { label: "🎯 Concurrent",      cls: "bg-brand-950/60 text-brand-400 border-brand-900/40" },
-  community:           { label: "🌐 Communauté",      cls: "bg-sky-950/60 text-sky-400 border-sky-900/40" },
-  direct:              { label: "➕ Ajout direct",    cls: "bg-slate-800 text-slate-400 border-slate-700" },
-  hashtag:             { label: "# Hashtag",          cls: "bg-slate-800 text-slate-500 border-slate-700" },
+  viral_post:          { label: "🔥 Post viral",       cls: "bg-orange-950/60 text-orange-400 border-orange-900/40" },
+  competitor_audience: { label: "🎯 Concurrent",       cls: "bg-brand-950/60 text-brand-400 border-brand-900/40" },
+  community:           { label: "🌐 Communauté",       cls: "bg-sky-950/60 text-sky-400 border-sky-900/40" },
+  micro_influencer:    { label: "⭐ Micro-influenceur", cls: "bg-indigo-950/60 text-indigo-400 border-indigo-900/40" },
+  direct:              { label: "➕ Ajout direct",     cls: "bg-slate-800 text-slate-400 border-slate-700" },
+  hashtag:             { label: "# Hashtag",           cls: "bg-slate-800 text-slate-500 border-slate-700" },
 };
 
 export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
@@ -173,6 +174,24 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                     <div className="mt-2 bg-amber-950/20 border border-amber-900/30 rounded-lg px-3 py-2">
                       <p className="text-[10px] text-amber-600 mb-0.5">Objection probable pré-emtée dans le DM</p>
                       <p className="text-xs text-amber-400 italic">"{lead.predicted_objection}"</p>
+                    </div>
+                  )}
+                  {lead.aspiration_gap_score != null && lead.aspiration_gap_score > 0 && (
+                    <div className="mt-2 bg-violet-950/20 border border-violet-900/30 rounded-lg px-3 py-2">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[10px] text-violet-500">🌟 Gap aspiration / réalité</p>
+                        <span className={`text-[11px] font-bold ${
+                          lead.aspiration_gap_score >= 80 ? "text-violet-300"
+                          : lead.aspiration_gap_score >= 60 ? "text-violet-400"
+                          : "text-violet-500"
+                        }`}>{lead.aspiration_gap_score}/100</span>
+                      </div>
+                      <div className="w-full bg-violet-950/60 rounded-full h-1.5">
+                        <div
+                          className="bg-violet-500 h-1.5 rounded-full transition-all"
+                          style={{ width: `${lead.aspiration_gap_score}%` }}
+                        />
+                      </div>
                     </div>
                   )}
                   <button

@@ -45,6 +45,8 @@ _migrations = [
     "ALTER TABLE leads ADD COLUMN score_delta REAL",
     "ALTER TABLE leads ADD COLUMN escalation_alert INTEGER DEFAULT 0",
     "ALTER TABLE coaches ADD COLUMN testimonials TEXT",
+    # Intelligence fields v5 — aspiration gap detector
+    "ALTER TABLE leads ADD COLUMN aspiration_gap_score REAL DEFAULT 0",
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:

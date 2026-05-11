@@ -7,11 +7,12 @@ const PLATFORM: Record<string, string> = {
 };
 
 const SOURCE_BADGES: Record<string, { label: string; cls: string }> = {
-  viral_post:          { label: "🔥 viral",       cls: "bg-orange-950/60 text-orange-400 border-orange-900/50" },
-  competitor_audience: { label: "🎯 concurrent",   cls: "bg-purple-950/60 text-purple-400 border-purple-900/50" },
-  community:           { label: "🌐 communauté",   cls: "bg-sky-950/60 text-sky-400 border-sky-900/50" },
-  hashtag:             { label: "#️⃣ hashtag",     cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
-  direct:              { label: "👤 direct",       cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
+  viral_post:          { label: "🔥 viral",        cls: "bg-orange-950/60 text-orange-400 border-orange-900/50" },
+  competitor_audience: { label: "🎯 concurrent",    cls: "bg-purple-950/60 text-purple-400 border-purple-900/50" },
+  community:           { label: "🌐 communauté",    cls: "bg-sky-950/60 text-sky-400 border-sky-900/50" },
+  micro_influencer:    { label: "⭐ micro-inf",     cls: "bg-indigo-950/60 text-indigo-400 border-indigo-900/50" },
+  hashtag:             { label: "#️⃣ hashtag",      cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
+  direct:              { label: "👤 direct",        cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
 };
 
 function Score({ v }: { v: number }) {
@@ -33,6 +34,7 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
   const sourceBadge = lead.source_tag ? SOURCE_BADGES[lead.source_tag] : null;
   const prob = lead.response_probability;
   const escalating = lead.escalation_alert && (lead.score_delta ?? 0) >= 10;
+  const gap = lead.aspiration_gap_score;
 
   return (
     <div
@@ -95,6 +97,11 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
           {followupDue && (
             <span className="text-[9px] bg-amber-950/60 text-amber-400 border border-amber-900/50 px-1.5 py-0.5 rounded-full">
               relance due
+            </span>
+          )}
+          {gap != null && gap >= 70 && (
+            <span className="text-[9px] bg-violet-950/60 text-violet-400 border border-violet-900/50 px-1.5 py-0.5 rounded-full">
+              🌟 gap {gap}
             </span>
           )}
         </div>

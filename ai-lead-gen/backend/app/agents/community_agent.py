@@ -196,6 +196,117 @@ def scan_google_reviews(competitor_names: list[str], max_leads: int = 20) -> lis
     return leads[:max_leads]
 
 
+def scan_podcast_listeners(niche: str, max_leads: int = 25) -> list[dict]:
+    """
+    Find people who listen to podcasts in the niche — warm, educated leads.
+    Mines Apple Podcasts/Spotify reviews + DDG searches for podcast mentions.
+    """
+    queries = [
+        f'site:podcasts.apple.com "{niche}" reviews (changed OR helped OR amazing OR loved)',
+        f'site:open.spotify.com podcast "{niche}" (episode OR review OR "j\'écoute")',
+        f'"{niche}" podcast (auditeur OR listener OR "j\'écoute" OR "i listen" OR "episode")',
+        f'"{niche}" podcast "j\'écoute" OR "je viens de finir l\'épisode" OR "loved this episode"',
+    ]
+
+    leads: list[dict] = []
+    seen: set[str] = set()
+
+    for query in queries:
+        results = _search_ddg(query, max_results=12)
+        for item in results:
+            text = f"{item['title']} {item['snippet']}"
+            handles = [h for groups in _HANDLE_RE.findall(text) for h in groups if h]
+            for handle in handles[:2]:
+                h = handle.lower()
+                if not h or h in seen:
+                    continue
+                seen.add(h)
+                leads.append({
+                    "handle": h,
+                    "name": handle,
+                    "platform": "instagram",
+                    "profile_url": f"https://instagram.com/{h}",
+                    "bio": "",
+                    "followers": 0,
+                    "posts_summary": f"[Auditeur podcast — niche {niche}] " + text[:300],
+                    "_source_tag": "community",
+                })
+        if len(leads) >= max_leads:
+            break
+
+    return leads[:max_leads]
+
+
+def scan_micro_influencer_followers(niche: str, max_leads: int = 30) -> list[dict]:
+    """
+    Find followers of micro-influencers (5k-50k) in the niche.
+    These followers are pre-qualified by association — they're already
+    interested in the niche and exposed to transformation content.
+    Strategy: find micro-influencer handles via DDG, then mine their comment sections.
+    """
+    # Step 1: find micro-influencer handles in the niche
+    micro_queries = [
+        f'site:instagram.com "{niche}" followers "5,000" OR "10,000" OR "20,000" OR "50,000"',
+        f'site:tiktok.com "{niche}" (coach OR expert OR créateur) followers',
+        f'instagram "{niche}" micro influencer 10k 50k',
+    ]
+
+    influencer_handles: list[tuple[str, str]] = []  # (handle, platform)
+    seen_inf: set[str] = set()
+
+    for query in micro_queries:
+        results = _search_ddg(query, max_results=10)
+        for item in results:
+            text = f"{item['title']} {item['snippet']}"
+            handles = [h for groups in _HANDLE_RE.findall(text) for h in groups if h]
+            platform = "tiktok" if "tiktok" in item["url"] else "instagram"
+            for h in handles[:2]:
+                h = h.lower()
+                if h and h not in seen_inf:
+                    seen_inf.add(h)
+                    influencer_handles.append((h, platform))
+
+    # Step 2: mine comment sections of found influencers
+    leads: list[dict] = []
+    seen_leads: set[str] = set()
+
+    for inf_handle, inf_platform in influencer_handles[:5]:
+        site = "tiktok.com" if inf_platform == "tiktok" else "instagram.com"
+        comment_queries = [
+            f'site:{site} "@{inf_handle}" (commentaire OR comment OR "j\'aimerais" OR "how do you")',
+            f'"@{inf_handle}" site:{site} followers engagement',
+        ]
+        for cq in comment_queries:
+            results = _search_ddg(cq, max_results=8)
+            for item in results:
+                text = f"{item['title']} {item['snippet']}"
+                if not _PAIN_SIGNAL_RE.search(text):
+                    continue
+                handles = [h for groups in _HANDLE_RE.findall(text) for h in groups if h]
+                for h in handles[:2]:
+                    h = h.lower()
+                    if not h or h in seen_leads or h == inf_handle:
+                        continue
+                    seen_leads.add(h)
+                    leads.append({
+                        "handle": h,
+                        "name": h,
+                        "platform": inf_platform,
+                        "profile_url": f"https://{site}/{h}",
+                        "bio": "",
+                        "followers": 0,
+                        "posts_summary": (
+                            f"[Follower de @{inf_handle} ({inf_platform}, niche {niche})] "
+                            + text[:300]
+                        ),
+                        "_source_tag": "micro_influencer",
+                    })
+        if len(leads) >= max_leads:
+            break
+
+    return leads[:max_leads]
+
+
 def scan_youtube_comments(niche: str, max_leads: int = 30) -> list[dict]:
     """
     Mine YouTube comment sections for people asking "does this really work?" —

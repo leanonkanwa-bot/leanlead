@@ -256,7 +256,7 @@ def run_autonomous(
             except Exception as e:
                 logger.warning("Platform search failed: %s", e)
 
-    # 2. Community infiltration — Reddit, YouTube comments, Google reviews
+    # 2. Community infiltration — Reddit, YouTube comments, Google reviews, podcasts, micro-influencers
     if community_scan_enabled and coach_niche:
         try:
             community_leads = community_agent.scan_communities(coach_niche, max_leads=25)
@@ -272,6 +272,18 @@ def run_autonomous(
             logger.info("YouTube comment scan found %d candidates", len(yt_leads))
         except Exception as e:
             logger.warning("YouTube scan failed: %s", e)
+        try:
+            podcast_leads = community_agent.scan_podcast_listeners(coach_niche, max_leads=20)
+            all_raw.extend(podcast_leads)
+            logger.info("Podcast listener scan found %d candidates", len(podcast_leads))
+        except Exception as e:
+            logger.warning("Podcast scan failed: %s", e)
+        try:
+            micro_leads = community_agent.scan_micro_influencer_followers(coach_niche, max_leads=25)
+            all_raw.extend(micro_leads)
+            logger.info("Micro-influencer follower scan found %d candidates", len(micro_leads))
+        except Exception as e:
+            logger.warning("Micro-influencer scan failed: %s", e)
         # Google reviews for competitor coaches
         if competitor_accounts:
             comp_names = [c.get("handle", "") for c in competitor_accounts if c.get("handle")]
@@ -351,6 +363,8 @@ def run_autonomous(
             score += 2
         if p.get("_source_tag") == "viral_post":
             score += 1
+        if p.get("_source_tag") == "micro_influencer":
+            score += 2
         return -score
 
     unique_profiles.sort(key=_priority)
@@ -427,7 +441,8 @@ def run_autonomous(
             stats["high_score_leads"] += 1
 
         # Determine source tag
-        source_tag = profile.get("_source_tag") or (
+        raw_source_tag = profile.get("_source_tag")
+        source_tag = raw_source_tag or (
             "competitor_audience" if profile.get("_source", "").startswith("concurrent:")
             else "hashtag"
         )
@@ -445,6 +460,7 @@ def run_autonomous(
             "psychographic_profile": json.dumps(psycho) if psycho else None,
             "response_probability": qualification.get("response_probability", 0),
             "predicted_objection": qualification.get("predicted_objection", ""),
+            "aspiration_gap_score": qualification.get("aspiration_gap", 0),
             "source_tag": source_tag,
         })
         stats["leads_found"] += 1

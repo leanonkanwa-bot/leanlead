@@ -81,6 +81,8 @@ def _serialize(lead: models.Lead) -> dict:
         "predicted_objection": getattr(lead, "predicted_objection", None),
         "score_delta": getattr(lead, "score_delta", None),
         "escalation_alert": bool(getattr(lead, "escalation_alert", False)),
+        # Intelligence fields v5
+        "aspiration_gap_score": getattr(lead, "aspiration_gap_score", None),
         "created_at": lead.created_at.isoformat() if lead.created_at else None,
         "updated_at": lead.updated_at.isoformat() if lead.updated_at else None,
     }

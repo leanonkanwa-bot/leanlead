@@ -1,5 +1,5 @@
 """
-Qualifier Agent — v4
+Qualifier Agent — v5
 Scores 0-100 + psychographic profile + response probability in ONE Claude call.
 
 Pre-qualification signal boosts (deterministic, no API cost):
@@ -10,6 +10,10 @@ Pre-qualification signal boosts (deterministic, no API cost):
   • Pain peak (maximum vulnerability)            → +25
   • Failed purchase (burned buyer)               → +35
   • Before/after seeker (transformation desire)  → +15
+  • Podcast listener (warm, educated lead)       → +20
+  • Book reader (development mindset)            → +25
+  • Course dropout (already bought, needs more) → +30
+  • Life transition (highest conversion window)  → +25
 """
 import json
 import logging
@@ -168,6 +172,85 @@ _BEFORE_AFTER_RE = re.compile(
     re.IGNORECASE,
 )
 
+_PODCAST_LISTENER_RE = re.compile(
+    r'\b('
+    # French
+    r'j\'[ée]coute (le |la |ce |un )?podcast|je viens de finir l\'[ée]pisode|'
+    r'[ée]cout[ée] l\'[ée]pisode|podcast de|dans le podcast|sur le podcast|'
+    r'j\'ai (entendu|[ée]cout[ée]).{0,20}podcast|dans l\'[ée]pisode de|'
+    r'mon podcast pr[ée]f[ée]r[ée]|je r[ée][ée]coute|cet [ée]pisode est|'
+    # English
+    r'i (listen|listened) to.{0,15}podcast|just finished.{0,15}episode|'
+    r'this episode|on the podcast|podcast listener|my favorite podcast|'
+    r'episode of|currently listening to|love this podcast|'
+    r'podcast changed my life|binge[- ]listening'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_BOOK_READER_RE = re.compile(
+    r'\b('
+    # French
+    r'je viens de finir (le livre|ce livre|atomic|the|un livre)|'
+    r'en train de lire|je lis (en ce moment|actuellement|ce livre)|'
+    r'lecture du moment|je recommande ce livre|lu ce livre|'
+    r'livre qui (a chang[ée]|m\'a chang[ée]|m\'a transform[ée])|'
+    r'ce livre est (incroyable|[ée]tonnant|puissant)|'
+    # English
+    r'just finished (reading|the book)|currently reading|'
+    r'this book (changed|is amazing|blew my mind|helped me)|'
+    r'highly recommend (this book|reading)|book review|'
+    r'reading (atomic habits|the alchemist|can\'t hurt me|mindset|the subtle art|'
+    r'rich dad|think and grow|ikigai|essentialism|deep work|'
+    r'l\'alchimiste|les quatre accords|l\'[ée]l[ée]ment|puissance|psycho-cybern|'
+    r'influence|obstacle is the way|man\'s search for meaning)'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_COURSE_DROPOUT_RE = re.compile(
+    r'('
+    # French — bought but didn't finish
+    r'j\'ai acheté la formation (mais|et|pourtant)|'
+    r'je me suis arrêt[ée] au module|j\'ai pas fini (la formation|le cours|le programme)|'
+    r'j\'ai lâch[ée] (la formation|le cours|le programme|la moitié)|'
+    r'j\'ai commenc[ée] (la formation|le cours|le programme) (mais|et puis)|'
+    r'formation (inachev[ée]|pas termin[ée]|abandon[ée]e)|'
+    r'j\'ai (achet[ée]|pay[ée]) (la formation|le cours|un programme).{0,50}(mais|jamais|fini|termin[ée])|'
+    # English — course dropout signals
+    r'bought (the course|a course|this course|the program).{0,50}(but|never|didn\'t|unfinished)|'
+    r'(didn\'t|never) finish(ed)?.{0,20}(course|program|module)|'
+    r'stopped at (module|chapter|week|lesson)|'
+    r'halfway through (the course|the program)|'
+    r'signed up (for|to).{0,20}(course|program).{0,30}(but|never completed|still haven\'t)|'
+    r'still haven\'t finished.{0,20}(course|program|training)'
+    r')',
+    re.IGNORECASE,
+)
+
+_LIFE_TRANSITION_RE = re.compile(
+    r'\b('
+    # French — change-mode states
+    r'nouveau (travail|boulot|job|poste)|nouvel emploi|pris(e)? un nouveau poste|'
+    r'je viens de d[ée]m[ée]nager|j\'ai d[ée]m[ée]nag[ée]|nouveau chez moi|'
+    r'je viens d\'emm[ée]nager|nouvelle ville|nouveau pays|nouvelle vie dans|'
+    r'c[ée]libataire (depuis|maintenant|à nouveau)|de nouveau c[ée]libataire|'
+    r'en couple (depuis|maintenant)|nouvelle relation|nouveau partenaire|'
+    r'vient d\'obtenir (son|mon) dipl[ôo]me|diplôm[ée]e? (cette ann[ée]|r[ée]cemment)|'
+    r'(vient de|je viens de) finir (mes|les) [ée]tudes|'
+    r'retraite (depuis|prochainement|bient[ôo]t)|je prends ma retraite|'
+    # English — life transition triggers
+    r'new job|just started (a new|my new) job|got (a new|the) job|'
+    r'just moved (to|into|here)|new city|new country|new apartment|'
+    r'single (again|now|since)|newly single|just broke up|'
+    r'new relationship|just started dating|in a new relationship|'
+    r'just graduated|graduated (this year|recently)|'
+    r'empty nest(er)?|kids (left|moved out)|'
+    r'retiring (soon|next|this year)|just retired'
+    r')\b',
+    re.IGNORECASE,
+)
+
 
 def _detect_signals(lead_data: dict) -> dict:
     text = f"{lead_data.get('bio', '')} {lead_data.get('posts_summary', '')}".strip()
@@ -179,6 +262,10 @@ def _detect_signals(lead_data: dict) -> dict:
         "pain_peak": bool(_PAIN_PEAK_RE.search(text)),
         "failed_purchase": bool(_FAILED_PURCHASE_RE.search(text)),
         "before_after_seeker": bool(_BEFORE_AFTER_RE.search(text)),
+        "podcast_listener": bool(_PODCAST_LISTENER_RE.search(text)),
+        "book_reader": bool(_BOOK_READER_RE.search(text)),
+        "course_dropout": bool(_COURSE_DROPOUT_RE.search(text)),
+        "life_transition": bool(_LIFE_TRANSITION_RE.search(text)),
     }
 
 
@@ -226,6 +313,14 @@ def qualify_lead(
             detected.append("💔 FAILED BUYER — bought coaching before, got burned; still wants results")
         if signals["before_after_seeker"]:
             detected.append("🎯 TRANSFORMATION SEEKER — actively looking for before/after results")
+        if signals["podcast_listener"]:
+            detected.append("🎙 PODCAST LISTENER — consumes audio content, educated and primed for coaching")
+        if signals["book_reader"]:
+            detected.append("📚 BOOK READER — reading self-development books, high growth mindset")
+        if signals["course_dropout"]:
+            detected.append("🎓 COURSE DROPOUT — bought a course but didn't finish, needs accountability/guidance")
+        if signals["life_transition"]:
+            detected.append("🔄 LIFE TRANSITION — in active change mode (job/move/relationship/graduation)")
         signal_context = "\n\nPRE-DETECTED SIGNALS:\n" + "\n".join(detected) + "\n"
 
     prompt = f"""You are an expert at identifying people who are actively struggling with a problem and are likely to buy a coaching solution.
@@ -254,7 +349,8 @@ Respond ONLY with valid JSON (no markdown):
     "language": "<fr|en|es|pt|ar|other>"
   }},
   "response_probability": <0-100 likelihood they reply to a personalized DM>,
-  "predicted_objection": "<their single most likely objection to buying, e.g. 'pas les moyens', 'pas le temps', 'déjà essayé', 'pas sûr que ça marche pour moi'>"
+  "predicted_objection": "<their single most likely objection to buying, e.g. 'pas les moyens', 'pas le temps', 'déjà essayé', 'pas sûr que ça marche pour moi'>",
+  "aspiration_gap": <0-100 score — distance between their expressed dream life and current reality; 0=no gap detectable, 100=extreme gap/strong transformation desire>
 }}
 
 Scoring guide: 85-100 actively venting/explicit pain · 65-84 clear signals · 40-64 indirect · 15-39 weak · 0-14 wrong audience/brand/competitor
@@ -278,7 +374,9 @@ predicted_objection: infer from their communication style, awareness stage, and 
     result.setdefault("psychographic", {})
     result.setdefault("response_probability", 50)
     result.setdefault("predicted_objection", "")
+    result.setdefault("aspiration_gap", 0)
     result["response_probability"] = max(0, min(100, int(result["response_probability"])))
+    result["aspiration_gap"] = max(0, min(100, int(result.get("aspiration_gap", 0))))
 
     # Deterministic signal boosts (applied after Claude scoring)
     if signals["buying_intent"]:
@@ -311,6 +409,30 @@ predicted_objection: infer from their communication style, awareness stage, and 
         pain_points = result["pain_points"]
         if "Cherche transformation" not in pain_points:
             pain_points.append("Cherche transformation")
+        result["pain_points"] = pain_points
+    if signals["podcast_listener"]:
+        score = min(95, score + 20)
+        pain_points = result["pain_points"]
+        if "Auditeur podcast" not in pain_points:
+            pain_points.append("Auditeur podcast")
+        result["pain_points"] = pain_points
+    if signals["book_reader"]:
+        score = min(95, score + 25)
+        pain_points = result["pain_points"]
+        if "Lecteur dev perso" not in pain_points:
+            pain_points.append("Lecteur dev perso")
+        result["pain_points"] = pain_points
+    if signals["course_dropout"]:
+        score = min(98, score + 30)
+        pain_points = result["pain_points"]
+        if "Dropout de formation" not in pain_points:
+            pain_points.insert(0, "Dropout de formation")
+        result["pain_points"] = pain_points
+    if signals["life_transition"]:
+        score = min(95, score + 25)
+        pain_points = result["pain_points"]
+        if "Transition de vie" not in pain_points:
+            pain_points.append("Transition de vie")
         result["pain_points"] = pain_points
 
     result["score"] = score

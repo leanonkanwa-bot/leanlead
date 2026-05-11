@@ -101,6 +101,8 @@ class Lead(Base):
     predicted_objection = Column(Text)          # #1 objection pre-empted in DM
     score_delta = Column(Float)                 # change in score since last rescan
     escalation_alert = Column(Boolean, default=False)  # True when pain is escalating
+    # Intelligence fields (v5) — aspiration gap
+    aspiration_gap_score = Column(Float, default=0.0)  # 0-100 gap between dreams and reality
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
