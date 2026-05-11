@@ -37,6 +37,21 @@ BROWSER_HEADERS = {
 
 _client: anthropic.Anthropic | None = None
 
+# Patterns that auto-disqualify without spending an API call
+_BRAND_RE = re.compile(
+    r'\b(llc|inc\b|corp\b|ltd\b|agency|studio|official|media|solutions|services|'
+    r'consulting|enterprises|group\b|brand\b|shop\b|store\b|boutique|company)\b',
+    re.IGNORECASE,
+)
+_COACH_RE = re.compile(
+    r'\b(certified coach|life coach|business coach|executive coach|health coach|'
+    r'fitness coach|mindset coach|nlp practitioner|mentor\b|consultant\b|trainer\b|'
+    r'helping (clients|people|entrepreneurs)|i help (clients|people)|'
+    r'book a call|free discovery|dm me to|click the link|work with me|'
+    r'coaching program|my program|join my|enroll now|limited spots)\b',
+    re.IGNORECASE,
+)
+
 
 def _get_client() -> anthropic.Anthropic:
     global _client

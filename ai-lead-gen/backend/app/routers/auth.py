@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+import json
+import os
 
 from ..auth import create_access_token, get_current_coach, hash_password, verify_password
 from ..database import get_db
@@ -25,6 +27,7 @@ class OnboardRequest(BaseModel):
     airtable_base_id: str | None = None
     airtable_api_key: str | None = None
     apify_api_key: str | None = None
+    icp_pain_points: list[str] | None = None
 
 
 class TokenResponse(BaseModel):
@@ -198,7 +201,46 @@ def onboard(req: OnboardRequest, coach: models.Coach = Depends(get_current_coach
         coach.airtable_api_key = req.airtable_api_key
     if req.apify_api_key:
         coach.apify_api_key = req.apify_api_key
+    if req.icp_pain_points is not None:
+        coach.icp_pain_points = json.dumps(req.icp_pain_points)
     coach.onboarded = True
     db.commit()
     db.refresh(coach)
     return {"ok": True, "onboarded": True}
+
+
+class DetectNicheRequest(BaseModel):
+    description: str
+
+
+@router.post("/detect-niche")
+def detect_niche(req: DetectNicheRequest):
+    """Use Claude to auto-detect niche, target audience, pain points, and hashtags from a free-form description."""
+    import anthropic as _anthropic
+
+    if not req.description or len(req.description.strip()) < 10:
+        raise HTTPException(status_code=400, detail="Description too short")
+
+    client = _anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    msg = client.messages.create(
+        model="claude-opus-4-7",
+        max_tokens=512,
+        messages=[{
+            "role": "user",
+            "content": f"""You are an expert at identifying coaching niches.
+
+From this description, extract:
+- niche: a concise 1-sentence niche description
+- target_audience: who the ideal client is (1-2 sentences)
+- pain_points: 4-6 specific pain points the ICP has (array of strings)
+- hashtags: 6 hashtags (without #) that POTENTIAL CLIENTS (not coaches) use
+
+Description: {req.description}
+
+Respond ONLY with valid JSON:
+{{"niche": "...", "target_audience": "...", "pain_points": ["..."], "hashtags": ["..."]}}""",
+        }],
+    )
+    text = msg.content[0].text
+    start, end = text.find("{"), text.rfind("}") + 1
+    return json.loads(text[start:end])

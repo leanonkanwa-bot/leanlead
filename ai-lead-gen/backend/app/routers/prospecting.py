@@ -1,8 +1,8 @@
 """
 Prospecting router
-POST /api/prospecting/run         – start an Apify scraping job (background task)
+POST /api/prospecting/run         – start a prospecting job (background task)
 GET  /api/prospecting/jobs        – list coach's prospecting jobs
-GET  /api/prospecting/suggest-hashtags – AI-suggest hashtags from niche
+GET  /api/prospecting/suggest-hashtags – AI-suggest search terms from niche
 """
 import json
 from datetime import datetime
@@ -21,14 +21,14 @@ router = APIRouter(prefix="/api/prospecting", tags=["prospecting"])
 
 
 class ProspectRequest(BaseModel):
-    platform: str = "instagram"     # instagram | tiktok
-    hashtags: list[str]
+    platform: str = "instagram"     # instagram | tiktok | linkedin | twitter | reddit
+    hashtags: list[str]             # hashtags (IG/TT), keywords (LI/TW), subreddits (Reddit)
     max_results: int = 20
     auto_qualify: bool = True
 
 
 def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
-    """Background task — runs Apify, qualifies leads, stores in DB."""
+    """Background task — searches profiles, qualifies leads, stores in DB."""
     from ..database import SessionLocal
     db = SessionLocal()
     try:
@@ -51,7 +51,6 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
             handle = (profile.get("handle") or "").strip().lower()
             if not handle:
                 continue
-            # Skip duplicates already in coach's pipeline
             exists = db.query(models.Lead).filter(
                 models.Lead.coach_id == coach_id,
                 models.Lead.handle == handle,
@@ -71,7 +70,7 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
                 stage="new",
             )
             db.add(lead)
-            db.flush()  # get lead.id
+            db.flush()
 
             if req.auto_qualify and coach.niche and coach.offer_description:
                 try:
@@ -94,7 +93,7 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
                     lead.pain_points = json.dumps(result.get("pain_points", []))
                     lead.recommended_angle = result.get("recommended_angle", "")
                 except Exception:
-                    pass  # qualification failure shouldn't abort the job
+                    pass
 
             added += 1
 
@@ -125,7 +124,7 @@ def run_prospecting(
     if req.max_results > 100:
         raise HTTPException(status_code=400, detail="max_results cannot exceed 100")
     if not req.hashtags:
-        raise HTTPException(status_code=400, detail="Provide at least one hashtag")
+        raise HTTPException(status_code=400, detail="Provide at least one term")
 
     job = models.ProspectingJob(
         coach_id=coach.id,
@@ -181,7 +180,7 @@ def prospect_from_url(
     coach: models.Coach = Depends(get_current_coach),
     db: Session = Depends(get_db),
 ):
-    """Synchronously scrape a single profile URL, qualify + write DM, save lead."""
+    """Synchronously scrape a single profile URL, qualify + write message, save lead."""
     profile = prospector_agent.prospect_by_url(
         profile_url=req.profile_url,
     )
@@ -260,6 +259,7 @@ def prospect_from_url(
 
 @router.get("/suggest-hashtags")
 def suggest_hashtags(
+    platform: str = "instagram",
     coach: models.Coach = Depends(get_current_coach),
 ):
     if not coach.niche:

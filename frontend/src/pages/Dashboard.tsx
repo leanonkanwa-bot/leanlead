@@ -127,6 +127,14 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 /* ════════════════════════════════════════════════════════════════════
    ONGLET PROSPECTION
 ════════════════════════════════════════════════════════════════════ */
+const PLATFORM_CONFIG: Record<string, { icon: string; label: string; termLabel: string; termPrefix: string; placeholder: string }> = {
+  instagram: { icon: "📸", label: "Instagram", termLabel: "Hashtags", termPrefix: "#", placeholder: "coachbusiness" },
+  tiktok:    { icon: "🎵", label: "TikTok",    termLabel: "Hashtags", termPrefix: "#", placeholder: "entrepreneuriat" },
+  twitter:   { icon: "𝕏",  label: "Twitter",   termLabel: "Mots-clés", termPrefix: "",  placeholder: "online business" },
+  linkedin:  { icon: "💼", label: "LinkedIn",  termLabel: "Mots-clés", termPrefix: "",  placeholder: "scale my business" },
+  reddit:    { icon: "💬", label: "Reddit",    termLabel: "Subreddits", termPrefix: "r/", placeholder: "Entrepreneur" },
+};
+
 function ProspectsTab() {
   const qc = useQueryClient();
   const [profileUrl, setProfileUrl] = useState("");
@@ -137,7 +145,7 @@ function ProspectsTab() {
     mutationFn: () => prospectingApi.fromUrl({ profile_url: profileUrl, auto_write: autoWrite }).then(r => r.data),
     onSuccess: (lead) => {
       qc.invalidateQueries({ queryKey: ["leads"] });
-      setUrlSuccess(`@${lead.handle} ajouté au pipeline${lead.outreach_message ? " avec DM généré" : ""} !`);
+      setUrlSuccess(`@${lead.handle} ajouté au pipeline${lead.outreach_message ? " avec message généré" : ""} !`);
       setProfileUrl("");
       setTimeout(() => setUrlSuccess(null), 6000);
     },
@@ -146,6 +154,7 @@ function ProspectsTab() {
   const [platform, setPlatform] = useState("instagram");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [maxResults, setMaxResults] = useState(20);
   const [autoQualify, setAutoQualify] = useState(true);
 
@@ -156,8 +165,8 @@ function ProspectsTab() {
   });
 
   const suggest = useMutation({
-    mutationFn: () => prospectingApi.suggestHashtags().then(r => r.data.hashtags),
-    onSuccess: t => setTags(t),
+    mutationFn: () => prospectingApi.suggestHashtags(platform).then(r => r.data.hashtags),
+    onSuccess: t => { setSuggestedTags(t); },
   });
 
   const run = useMutation({
@@ -222,6 +231,7 @@ function ProspectsTab() {
   }
 
   const running = jobs.some(j => j.status === "running" || j.status === "pending");
+  const cfg = PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.instagram;
 
   const statusColors: Record<string, string> = {
     pending: "text-amber-400", running: "text-brand-400", done: "text-emerald-400", error: "text-red-400",
@@ -425,7 +435,7 @@ function ProspectsTab() {
         <label className="flex items-center gap-2 cursor-pointer mb-5">
           <input type="checkbox" checked={autoWrite} onChange={e => setAutoWrite(e.target.checked)}
             className="w-4 h-4 accent-brand-500" />
-          <span className="text-sm text-slate-300">Générer le DM automatiquement</span>
+          <span className="text-sm text-slate-300">Générer le message automatiquement</span>
         </label>
 
         {fromUrl.isError && (
@@ -444,8 +454,8 @@ function ProspectsTab() {
           disabled={fromUrl.isPending || !profileUrl.trim()}
           className="w-full py-3 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
           {fromUrl.isPending
-            ? (autoWrite ? "Qualification + rédaction du DM…" : "Qualification en cours…")
-            : "🚀 Lancer la prospection"}
+            ? (autoWrite ? "Qualification + rédaction du message…" : "Qualification en cours…")
+            : "🚀 Qualifier ce profil"}
         </button>
       </div>
 
@@ -453,29 +463,30 @@ function ProspectsTab() {
         <h2 className="font-semibold text-white mb-1">Trouver de nouveaux leads</h2>
         <p className="text-xs text-slate-500 mb-5">Scraper des profils publics par hashtag et les qualifier automatiquement.</p>
 
-        {/* Plateforme */}
+        {/* Platform tabs */}
         <div className="mb-5">
           <label className="text-xs text-slate-400 mb-2 block">Plateforme</label>
-          <div className="grid grid-cols-2 gap-3">
-            {[["instagram","📸 Instagram"],["tiktok","🎵 TikTok"]].map(([v,l]) => (
+          <div className="grid grid-cols-5 gap-1.5">
+            {Object.entries(PLATFORM_CONFIG).map(([v, c]) => (
               <button key={v} onClick={() => setPlatform(v)}
-                className={`py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                className={`py-2 rounded-xl border text-xs font-medium transition-all flex flex-col items-center gap-0.5 ${
                   platform === v
                     ? "bg-white/[0.04] border-brand-600 text-brand-300"
                     : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"}`}>
-                {l}
+                <span className="text-base leading-none">{c.icon}</span>
+                <span className="hidden sm:block">{c.label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Hashtags */}
+        {/* AI suggestions — shown immediately */}
         <div className="mb-5">
-          <div className="flex justify-between mb-2">
-            <label className="text-xs text-slate-400">Hashtags *</label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-xs text-slate-400">{cfg.termLabel} *</label>
             <button onClick={() => suggest.mutate()} disabled={suggest.isPending}
               className="text-[10px] text-brand-400 hover:text-brand-300 transition-colors">
-              {suggest.isPending ? "Génération…" : "✦ Suggestions IA pour mon créneau"}
+              {suggest.isPending ? "Génération…" : "↺ Rafraîchir les suggestions IA"}
             </button>
           </div>
           <div className="flex gap-2 mb-2">
@@ -484,13 +495,15 @@ function ProspectsTab() {
               <input value={tagInput} onChange={e => setTagInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addTag())}
                 className="flex-1 bg-transparent px-2 py-2.5 text-sm focus:outline-none"
-                placeholder="coachbusiness" />
+                placeholder={cfg.placeholder} />
             </div>
-            <button onClick={addTag}
-              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-colors">Ajouter</button>
+            <button onClick={() => addTag()}
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-colors">+</button>
           </div>
+
+          {/* Selected tags */}
           {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 mt-2">
               {tags.map(t => (
                 <span key={t} className="flex items-center gap-1 bg-white/[0.05] border border-[#2a2a2a] text-brand-400 text-xs px-2.5 py-1 rounded-full">
                   #{t}
@@ -525,11 +538,11 @@ function ProspectsTab() {
 
         <button onClick={() => run.mutate()} disabled={run.isPending || !tags.length || running}
           className="w-full py-3 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
-          {run.isPending ? "Démarrage…" : running ? "Tâche en cours…" : `🔍 Trouver des leads sur ${platform}`}
+          {run.isPending ? "Démarrage…" : running ? "Recherche en cours…" : `🔍 Trouver des clients sur ${cfg.icon} ${cfg.label}`}
         </button>
         {running && (
           <p className="text-center text-xs text-amber-400 mt-2">
-            Scraping en arrière-plan — les leads apparaîtront dans votre pipeline une fois terminé.
+            Recherche en arrière-plan — les leads apparaîtront dans votre pipeline une fois terminé.
           </p>
         )}
       </div>
@@ -550,19 +563,13 @@ function ProspectsTab() {
                     </span>
                     <span className="text-xs text-slate-600 capitalize">{j.platform}</span>
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {j.hashtags.slice(0, 5).map(t => (
-                      <span key={t} className="text-[10px] text-slate-600">#{t}</span>
-                    ))}
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-semibold text-white">{j.leads_found} leads</p>
+                    <p className="text-[10px] text-slate-600">{j.started_at ? new Date(j.started_at).toLocaleTimeString() : ""}</p>
                   </div>
-                  {j.error_message && <p className="text-[10px] text-red-400 mt-1 truncate max-w-xs">{j.error_message}</p>}
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-white">{j.leads_found} leads</p>
-                  <p className="text-[10px] text-slate-600">{j.started_at ? new Date(j.started_at).toLocaleTimeString() : ""}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -604,7 +611,6 @@ function FollowupRow({ item }: { item: FollowupDue }) {
     onSuccess: ({ data }) => setLocalMessage(data.message),
   });
 
-  // Primary action: generate if needed → copy → mark sent
   const send = useMutation({
     mutationFn: () => followupsApi.send(item.lead_id, item.due_day),
     onSuccess: ({ data }) => {
@@ -619,7 +625,6 @@ function FollowupRow({ item }: { item: FollowupDue }) {
     <div className={`bg-slate-900 border border-[#2a2a2a] rounded-2xl overflow-hidden transition-all ${
       open ? `ring-1 ${cfg.ring}` : ""
     }`}>
-      {/* Header row */}
       <div
         className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-800/20 transition-colors"
         onClick={() => setOpen(o => !o)}
@@ -640,7 +645,6 @@ function FollowupRow({ item }: { item: FollowupDue }) {
         </div>
       </div>
 
-      {/* Expanded content */}
       {open && (
         <div className="border-t border-[#2a2a2a]/60 px-5 pt-4 pb-5 space-y-4 animate-fade-in">
           {/* Original DM context */}
@@ -653,7 +657,6 @@ function FollowupRow({ item }: { item: FollowupDue }) {
             </div>
           )}
 
-          {/* Follow-up message */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wider">Message de relance</p>
@@ -681,14 +684,12 @@ function FollowupRow({ item }: { item: FollowupDue }) {
             )}
           </div>
 
-          {/* Errors */}
           {(send.isError || generate.isError) && (
             <p className="text-red-400 text-xs bg-red-950/30 border border-red-900/40 rounded-xl px-3 py-2">
               {((send.error || generate.error) as any)?.response?.data?.detail || "Erreur lors de la génération"}
             </p>
           )}
 
-          {/* Actions */}
           {sent ? (
             <div className="flex items-center gap-2 py-2.5 px-4 bg-emerald-950/30 border border-emerald-900/40 rounded-xl">
               <span className="text-emerald-400 text-sm">✓</span>
@@ -723,7 +724,6 @@ function FollowupsTab() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h2 className="font-heading font-semibold text-white text-lg">File de relances</h2>
@@ -750,7 +750,6 @@ function FollowupsTab() {
         </div>
       ) : (
         <>
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
             {([2, 4, 7] as const).map(day => {
               const cfg = DAY_CONFIG[day];
@@ -766,7 +765,6 @@ function FollowupsTab() {
             })}
           </div>
 
-          {/* Rows — most urgent first (7 → 4 → 2) */}
           <div className="space-y-3">
             {[7, 4, 2].flatMap(day => byDay(day)).map(item => (
               <FollowupRow key={`${item.lead_id}-${item.due_day}`} item={item} />
@@ -890,7 +888,6 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
           </div>
         </div>
 
-        {/* ── Reply composer ── */}
         <div className="space-y-4">
           {!selected ? (
             <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl flex items-center justify-center" style={{ minHeight: "320px" }}>
@@ -960,7 +957,6 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
                 </button>
               </div>
 
-              {/* Analysis result */}
               {analysis && (() => {
                 const cfg = CLASS_CONFIG[analysis.classification];
                 const newStage = analysis.classification === "SIGNAL_ACHAT" ? "booked"
@@ -968,7 +964,6 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
                                : "replied";
                 return (
                   <div className={`border rounded-2xl p-5 space-y-4 animate-slide-up ${cfg.bg} ${cfg.border}`}>
-                    {/* Classification */}
                     <div className="flex items-start gap-3">
                       <div className={`flex-shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-xl border ${cfg.bg} ${cfg.border}`}>
                         <span className="text-base">{cfg.icon}</span>
@@ -989,7 +984,6 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
                       </div>
                     )}
 
-                    {/* Generated reply */}
                     <div>
                       <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-2">Réponse suggérée</p>
                       <div className="bg-slate-900/60 border border-[#2a2a2a]/40 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
@@ -997,7 +991,6 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
                       </div>
                     </div>
 
-                    {/* Copy CTA */}
                     <button
                       onClick={() => copy(analysis.suggested_reply)}
                       className={`w-full py-3 rounded-xl text-sm font-semibold transition-all duration-150 ${
@@ -1395,7 +1388,6 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
         />
       </div>
 
-      {/* ── Hashtags + Follow-up perf ── */}
       <div className="grid sm:grid-cols-2 gap-4">
         {/* Top hashtags */}
         <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-5">
@@ -1405,13 +1397,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
           ) : (
             <div className="space-y-3">
               {stats.top_hashtags.map(h => (
-                <MiniBar
-                  key={h.tag}
-                  label={`#${h.tag}`}
-                  value={Math.round(h.leads)}
-                  max={maxHashtag}
-                  color="bg-brand-500"
-                />
+                <MiniBar key={h.tag} label={`#${h.tag}`} value={Math.round(h.leads)} max={maxHashtag} color="bg-brand-500" />
               ))}
             </div>
           )}
@@ -1426,13 +1412,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
           ) : (
             <div className="space-y-3">
               {stats.followup_conversions.map((c, i) => (
-                <MiniBar
-                  key={c.label}
-                  label={c.label}
-                  value={c.count}
-                  max={maxConv}
-                  color={convColors[i] ?? "bg-slate-500"}
-                />
+                <MiniBar key={c.label} label={c.label} value={c.count} max={maxConv} color={convColors[i] ?? "bg-slate-500"} />
               ))}
             </div>
           )}
@@ -1445,7 +1425,6 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
         </div>
       </div>
 
-      {/* ── Revenue tracker + Checklist ── */}
       <div className="grid sm:grid-cols-2 gap-4">
         {/* Revenue */}
         <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-5 space-y-4">
@@ -1453,11 +1432,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
           <div>
             <label className="text-xs text-slate-400 mb-1.5 block">Prix de votre offre (€)</label>
             <div className="flex gap-2">
-              <input
-                type="number"
-                min="0"
-                value={priceInput}
-                onChange={e => setPriceInput(e.target.value)}
+              <input type="number" min="0" value={priceInput} onChange={e => setPriceInput(e.target.value)}
                 placeholder="ex. 2000"
                 className="flex-1 bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm
                            focus:outline-none focus:border-brand-500 transition-colors"
@@ -1488,9 +1463,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
             <div>
               <p className="text-xs text-slate-500">Revenus générés</p>
               <p className={`text-2xl font-black ${stats.projected_mrr > 0 ? "text-emerald-400" : "text-slate-600"}`}>
-                {stats.projected_mrr > 0
-                  ? `${stats.projected_mrr.toLocaleString("fr-FR")} €`
-                  : "—"}
+                {stats.projected_mrr > 0 ? `${stats.projected_mrr.toLocaleString("fr-FR")} €` : "—"}
               </p>
             </div>
           </div>
@@ -1586,7 +1559,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
-      {/* ── Barre de navigation ── */}
       <nav className="sticky top-0 z-40 flex items-center justify-between gap-4 px-5 py-3
                       border-b border-[#2a2a2a] bg-[#0a0a0a]/90 backdrop-blur-md">
         <div className="flex items-center gap-4 min-w-0">
@@ -1623,7 +1595,6 @@ export default function Dashboard() {
             + Ajouter un lead
           </button>
 
-          {/* Menu compte */}
           <div className="relative group">
             <button className="w-8 h-8 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center
                                text-xs font-bold text-white hover:border-brand-500 transition-colors">
@@ -1648,7 +1619,6 @@ export default function Dashboard() {
         </div>
       </nav>
 
-      {/* ── Barre de stats (pipeline uniquement) ── */}
       {tab === "pipeline" && (
         <div className="flex gap-6 px-6 py-3 border-b border-slate-900">
           {[
@@ -1670,17 +1640,14 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Contenu des onglets ── */}
       <div className="flex-1 min-h-0">
         {tab === "pipeline" && (
           <div className="h-full px-5 py-4 overflow-auto">
             {isLoading ? (
-              <div className="flex items-center justify-center h-64 text-slate-600 text-sm">
-                Chargement du pipeline…
-              </div>
+              <div className="flex items-center justify-center h-64 text-slate-600 text-sm">Chargement du pipeline…</div>
             ) : leads.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center">
-                <p className="text-4xl mb-3">📭</p>
+                <p className="text-4xl mb-3">💭</p>
                 <p className="text-sm font-semibold text-white mb-1">Aucun lead pour l'instant</p>
                 <p className="text-xs text-slate-500 mb-4">Ajoutez des leads manuellement ou utilisez l'onglet Prospection pour scraper Instagram/TikTok.</p>
                 <button onClick={() => setShowAdd(true)}
