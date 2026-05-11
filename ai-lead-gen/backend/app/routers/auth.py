@@ -27,7 +27,6 @@ class OnboardRequest(BaseModel):
     airtable_base_id: str | None = None
     airtable_api_key: str | None = None
     apify_api_key: str | None = None
-    icp_pain_points: list[str] | None = None
 
 
 class TokenResponse(BaseModel):
