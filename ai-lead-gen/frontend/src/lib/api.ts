@@ -227,6 +227,11 @@ export const authApi = {
     );
   },
   me: () => api.get<Coach>("/auth/me"),
+  detectNiche: (description: string) =>
+    api.post<{ niche: string; target_audience: string; pain_points: string[]; hashtags: string[] }>(
+      "/auth/detect-niche",
+      { description }
+    ),
   onboard: (data: {
     niche: string;
     offer_description: string;

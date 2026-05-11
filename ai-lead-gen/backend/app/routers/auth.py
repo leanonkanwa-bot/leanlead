@@ -127,15 +127,20 @@ def detect_niche(req: DetectNicheRequest, coach: models.Coach = Depends(get_curr
     import anthropic
 
     if len(req.description.strip()) < 10:
-        raise HTTPException(status_code=400, detail="Description trop courte")
+        raise HTTPException(status_code=400, detail="Description trop courte (minimum 10 caractères)")
 
-    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    msg = client.messages.create(
-        model="claude-opus-4-7",
-        max_tokens=600,
-        messages=[{
-            "role": "user",
-            "content": f"""You are an expert at analyzing coaching niches. A coach described their work in their own words.
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Clé API Anthropic non configurée")
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-opus-4-7",
+            max_tokens=600,
+            messages=[{
+                "role": "user",
+                "content": f"""You are an expert at analyzing coaching niches. A coach described their work in their own words.
 
 Description: "{req.description.strip()}"
 
@@ -147,12 +152,21 @@ Your task — respond in the SAME LANGUAGE as the description:
 
 Respond ONLY with valid JSON, no markdown:
 {{"niche": "...", "target_audience": "...", "pain_points": ["...", "...", "..."], "hashtags": ["tag1", "tag2", ...]}}""",
-        }],
-    )
-    text = msg.content[0].text
-    start, end = text.find("{"), text.rfind("}") + 1
-    result = _json.loads(text[start:end])
-    # Enforce types
+            }],
+        )
+        text = msg.content[0].text.strip()
+        start = text.find("{")
+        end = text.rfind("}") + 1
+        if start == -1 or end == 0:
+            raise ValueError(f"No JSON object in response: {text[:200]}")
+        result = _json.loads(text[start:end])
+    except anthropic.AuthenticationError:
+        raise HTTPException(status_code=500, detail="Clé API Anthropic invalide ou expirée")
+    except anthropic.APIConnectionError:
+        raise HTTPException(status_code=503, detail="Impossible de joindre l'API Anthropic")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Impossible d'analyser votre coaching : {exc}")
+
     result["pain_points"] = result.get("pain_points", [])[:5]
     result["hashtags"] = result.get("hashtags", [])[:10]
     return result

@@ -1,9 +1,12 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv(Path(__file__).parent.parent / ".env")
+# Load .env: prefer backend/.env if present, otherwise search up to repo root.
+# In production (Railway/Fly/Docker) env vars are injected directly — load_dotenv is a no-op.
+_backend_env = Path(__file__).parent.parent / ".env"
+load_dotenv(_backend_env if _backend_env.exists() else (find_dotenv(usecwd=False) or _backend_env))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
