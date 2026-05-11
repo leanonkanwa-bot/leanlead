@@ -563,13 +563,13 @@ function ProspectsTab() {
                     </span>
                     <span className="text-xs text-slate-600 capitalize">{j.platform}</span>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-semibold text-white">{j.leads_found} leads</p>
-                    <p className="text-[10px] text-slate-600">{j.started_at ? new Date(j.started_at).toLocaleTimeString() : ""}</p>
-                  </div>
                 </div>
-              );
-            })}
+                <div className="text-right flex-shrink-0">
+                  <p className="text-sm font-semibold text-white">{j.leads_found} leads</p>
+                  <p className="text-[10px] text-slate-600">{j.started_at ? new Date(j.started_at).toLocaleTimeString() : ""}</p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
