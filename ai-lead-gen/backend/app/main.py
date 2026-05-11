@@ -31,6 +31,15 @@ _migrations = [
     "ALTER TABLE coaches ADD COLUMN agent_last_run_at DATETIME",
     "ALTER TABLE coaches ADD COLUMN webhook_url TEXT",
     "ALTER TABLE coaches ADD COLUMN competitor_accounts TEXT",
+    # Intelligence fields v3
+    "ALTER TABLE leads ADD COLUMN language TEXT",
+    "ALTER TABLE leads ADD COLUMN psychographic_profile TEXT",
+    "ALTER TABLE leads ADD COLUMN response_probability REAL",
+    "ALTER TABLE leads ADD COLUMN dm_variant_b TEXT",
+    "ALTER TABLE leads ADD COLUMN dm_variant_sent TEXT",
+    "ALTER TABLE leads ADD COLUMN warming_status TEXT DEFAULT 'none'",
+    "ALTER TABLE leads ADD COLUMN warming_comment TEXT",
+    "ALTER TABLE leads ADD COLUMN source_tag TEXT",
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:

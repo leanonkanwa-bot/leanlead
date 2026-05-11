@@ -1020,6 +1020,208 @@ function RepliesTab({ leads }: { leads: Lead[] }) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   ONGLET WARMING SEQUENCE
+════════════════════════════════════════════════════════════════════ */
+const WARMING_STEPS = [
+  { key: "comment_ready", label: "Commentaire prêt",  icon: "✍️", desc: "Commentaire IA généré — à poster sur son contenu." },
+  { key: "commented",     label: "Commentaire posté", icon: "💬", desc: "Commentaire posté — attendre 24-48h avant d'envoyer le DM." },
+  { key: "dm_ready",      label: "Prêt pour le DM",   icon: "📩", desc: "Le lead est chauffé — envoyez le DM maintenant." },
+] as const;
+
+type WarmingKey = (typeof WARMING_STEPS)[number]["key"];
+
+function WarmingLeadCard({ lead, onUpdate }: { lead: Lead; onUpdate: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const warm = useMutation({
+    mutationFn: () => pipelineApi.warm(lead.id),
+    onSuccess: () => onUpdate(),
+  });
+
+  const markWarmed = useMutation({
+    mutationFn: (status: string) => pipelineApi.markWarmed(lead.id, status),
+    onSuccess: () => onUpdate(),
+  });
+
+  function copy(text: string) {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  const currentStep = WARMING_STEPS.findIndex(s => s.key === lead.warming_status);
+  const nextStep = WARMING_STEPS[currentStep + 1];
+  const isPending = warm.isPending || markWarmed.isPending;
+
+  return (
+    <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl overflow-hidden">
+      <div
+        className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-slate-800/20 transition-colors"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          {/* Step indicator */}
+          <div className="flex gap-1 flex-shrink-0">
+            {WARMING_STEPS.map((s, i) => (
+              <div key={s.key} className={`w-2 h-2 rounded-full transition-colors ${
+                i <= currentStep ? "bg-brand-500" : "bg-slate-700"
+              }`} />
+            ))}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-100 truncate">{lead.name || `@${lead.handle}`}</p>
+            <p className="text-[11px] text-slate-500">@{lead.handle} ·
+              <span className="ml-1 text-brand-400">
+                {currentStep >= 0 ? WARMING_STEPS[currentStep].label : "En cours"}
+              </span>
+            </p>
+          </div>
+        </div>
+        <span className="text-slate-700 text-xs ml-3 flex-shrink-0">{open ? "▲" : "▼"}</span>
+      </div>
+
+      {open && (
+        <div className="border-t border-[#2a2a2a]/60 px-5 pt-4 pb-5 space-y-4 animate-fade-in">
+          {/* Progress bar */}
+          <div className="space-y-2">
+            {WARMING_STEPS.map((s, i) => (
+              <div key={s.key} className={`flex items-start gap-3 ${i > currentStep ? "opacity-30" : ""}`}>
+                <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+                  i < currentStep ? "bg-brand-500/30 text-brand-400"
+                  : i === currentStep ? "bg-brand-500/20 border border-brand-500/50 text-brand-400"
+                  : "bg-slate-800 text-slate-600"
+                }`}>
+                  {i < currentStep ? "✓" : s.icon}
+                </span>
+                <div>
+                  <p className="text-xs font-medium text-slate-300">{s.label}</p>
+                  <p className="text-[11px] text-slate-600">{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Warming comment */}
+          {lead.warming_comment ? (
+            <div>
+              <p className="text-[10px] font-medium text-slate-600 uppercase tracking-wider mb-2">Commentaire warming</p>
+              <div className="bg-slate-800/60 border border-[#2a2a2a]/40 rounded-xl p-4 text-sm text-slate-200 leading-relaxed">
+                {lead.warming_comment}
+              </div>
+              <button
+                onClick={() => copy(lead.warming_comment!)}
+                className={`mt-2 w-full py-2 rounded-xl text-xs font-semibold transition-colors ${
+                  copied
+                    ? "bg-emerald-900/40 border border-emerald-800/50 text-emerald-400"
+                    : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                }`}
+              >
+                {copied ? "✓ Copié !" : "📋 Copier le commentaire"}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => warm.mutate()}
+              disabled={isPending}
+              className="w-full py-2.5 bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-400 text-sm rounded-xl transition-colors disabled:opacity-40"
+            >
+              {warm.isPending ? "Génération…" : "✍️ Générer le commentaire warming"}
+            </button>
+          )}
+
+          {warm.isError && (
+            <p className="text-red-400 text-xs">{(warm.error as any)?.response?.data?.detail || "Erreur"}</p>
+          )}
+
+          {/* Advance step */}
+          {nextStep && (
+            <button
+              onClick={() => markWarmed.mutate(nextStep.key)}
+              disabled={isPending}
+              className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors"
+            >
+              {markWarmed.isPending ? "Mise à jour…" : `${nextStep.icon} Marquer : ${nextStep.label}`}
+            </button>
+          )}
+
+          {/* Mark as DM sent (move to dm flow) */}
+          {lead.warming_status === "dm_ready" && (
+            <button
+              onClick={() => markWarmed.mutate("none")}
+              disabled={isPending}
+              className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs rounded-xl transition-colors disabled:opacity-40"
+            >
+              ✓ DM envoyé — retirer de la file
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WarmingTab({ leads }: { leads: Lead[] }) {
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ queryKey: ["leads"] });
+
+  const warmingLeads = leads.filter(l =>
+    l.warming_status && l.warming_status !== "none"
+  );
+
+  const byStatus = (key: WarmingKey) => warmingLeads.filter(l => l.warming_status === key);
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="font-heading font-semibold text-white text-lg">File de warming</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {warmingLeads.length === 0
+              ? "Aucun lead en cours de warming"
+              : `${warmingLeads.length} lead${warmingLeads.length > 1 ? "s" : ""} en séquence warming`}
+          </p>
+        </div>
+      </div>
+
+      {/* Stats */}
+      {warmingLeads.length > 0 && (
+        <div className="grid grid-cols-3 gap-3">
+          {WARMING_STEPS.map(s => {
+            const count = byStatus(s.key).length;
+            return (
+              <div key={s.key} className="bg-slate-900 border border-[#2a2a2a] rounded-xl px-4 py-3 text-center">
+                <p className="text-2xl font-black text-white">{count}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">{s.label}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {warmingLeads.length === 0 ? (
+        <div className="text-center py-16 bg-slate-900 border border-[#2a2a2a] rounded-2xl">
+          <p className="text-3xl mb-3">🔥</p>
+          <p className="font-heading font-semibold text-white mb-1">File vide</p>
+          <p className="text-xs text-slate-500 max-w-xs mx-auto">
+            Les leads entrent dans la file warming via le modal du lead (onglet Warming). L'agent autonome les ajoute automatiquement pour les profils à fort potentiel.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Order: dm_ready first, then commented, then comment_ready */}
+          {(["dm_ready", "commented", "comment_ready"] as WarmingKey[]).flatMap(key =>
+            byStatus(key).map(lead => (
+              <WarmingLeadCard key={lead.id} lead={lead} onUpdate={refresh} />
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
    ANALYTICS + ONBOARDING
 ════════════════════════════════════════════════════════════════════ */
 const pct = (n: number) => `${Math.round(n * 100)} %`;
@@ -1259,7 +1461,7 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
 /* ════════════════════════════════════════════════════════════════════
    TABLEAU DE BORD
 ════════════════════════════════════════════════════════════════════ */
-type Tab = "pipeline" | "prospects" | "followups" | "replies" | "analytics";
+type Tab = "pipeline" | "prospects" | "followups" | "warming" | "replies" | "analytics";
 
 export default function Dashboard() {
   const nav = useNavigate();
@@ -1305,10 +1507,13 @@ export default function Dashboard() {
     booked:    leads.filter(l => l.stage === "booked").length,
   };
 
+  const warmingCount = leads.filter(l => l.warming_status && l.warming_status !== "none").length;
+
   const TABS: { id: Tab; label: string; badge?: number }[] = [
     { id: "pipeline",  label: "Pipeline" },
     { id: "prospects", label: "Prospection" },
     { id: "followups", label: "Relances", badge: followups.length || undefined },
+    { id: "warming",   label: "Warming",  badge: warmingCount || undefined },
     { id: "replies",   label: "Réponses" },
     { id: "analytics", label: "Analytics" },
   ];
@@ -1434,6 +1639,12 @@ export default function Dashboard() {
         {tab === "followups" && (
           <div className="px-5 py-6 overflow-auto">
             <FollowupsTab />
+          </div>
+        )}
+
+        {tab === "warming" && (
+          <div className="px-5 py-6 overflow-auto">
+            <WarmingTab leads={leads} />
           </div>
         )}
 

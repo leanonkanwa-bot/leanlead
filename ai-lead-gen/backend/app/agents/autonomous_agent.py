@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from . import prospector_agent, qualifier_agent, writer_agent
+from . import prospector_agent, qualifier_agent, writer_agent, viral_hijacker_agent
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +223,7 @@ def run_autonomous(
     dm_threshold: int,
     existing_handles: set[str],
     competitor_accounts: list[dict] | None = None,
+    viral_hijack_enabled: bool = True,
 ) -> dict[str, Any]:
     """
     Run one full autonomous prospecting cycle for a coach.
@@ -254,7 +255,23 @@ def run_autonomous(
             except Exception as e:
                 logger.warning("Platform search failed: %s", e)
 
-    # 2. Scan competitor comment sections concurrently
+    # 2. Viral post hijacker — find commenters on viral niche posts
+    if viral_hijack_enabled and coach_niche:
+        for platform in platforms[:2]:  # limit to first 2 platforms to save time
+            try:
+                viral_leads = viral_hijacker_agent.scan_viral_posts(
+                    niche=coach_niche,
+                    platform=platform,
+                    max_commenters=20,
+                )
+                for lead in viral_leads:
+                    lead["_source_tag"] = "viral_post"
+                all_raw.extend(viral_leads)
+                logger.info("Viral hijacker found %d candidates on %s", len(viral_leads), platform)
+            except Exception as e:
+                logger.warning("Viral hijacker failed for %s: %s", platform, e)
+
+    # 3. Scan competitor comment sections concurrently
     if competitor_accounts:
         with ThreadPoolExecutor(max_workers=min(len(competitor_accounts), 4)) as exe:
             comp_futures = {
@@ -340,22 +357,35 @@ def run_autonomous(
         if qualification.get("disqualified"):
             continue
 
+        psycho = qualification.get("psychographic", {})
+        language = psycho.get("language", "fr") or "fr"
+
         outreach_message = None
+        dm_variant_b = None
         if qualification["score"] >= dm_threshold and coach_niche and coach_offer:
             try:
-                outreach_message = writer_agent.write_outreach_message(
+                va, vb = writer_agent.write_ab_variants(
                     lead_data=lead_data,
                     coach_name=coach_name,
                     coach_niche=coach_niche,
                     coach_offer=coach_offer,
                     qualification=qualification,
+                    language=language,
                 )
+                outreach_message = va
+                dm_variant_b = vb
                 stats["dms_generated"] += 1
             except Exception as e:
                 logger.warning("DM generation failed for %s: %s", handle, e)
 
         if qualification["score"] >= 70:
             stats["high_score_leads"] += 1
+
+        # Determine source tag
+        source_tag = profile.get("_source_tag") or (
+            "competitor_audience" if profile.get("_source", "").startswith("concurrent:")
+            else "hashtag"
+        )
 
         new_leads.append({
             **profile,
@@ -365,6 +395,11 @@ def run_autonomous(
             "pain_points": json.dumps(qualification.get("pain_points", [])),
             "recommended_angle": qualification.get("recommended_angle", ""),
             "outreach_message": outreach_message,
+            "dm_variant_b": dm_variant_b,
+            "language": language,
+            "psychographic_profile": json.dumps(psycho) if psycho else None,
+            "response_probability": qualification.get("response_probability", 0),
+            "source_tag": source_tag,
         })
         stats["leads_found"] += 1
 

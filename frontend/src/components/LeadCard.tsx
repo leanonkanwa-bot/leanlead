@@ -6,6 +6,13 @@ const PLATFORM: Record<string, string> = {
   instagram: "📸", tiktok: "🎵", twitter: "𝕏", linkedin: "💼",
 };
 
+const SOURCE_BADGES: Record<string, { label: string; cls: string }> = {
+  viral_post:          { label: "🔥 viral",      cls: "bg-orange-950/60 text-orange-400 border-orange-900/50" },
+  competitor_audience: { label: "🎯 concurrent",  cls: "bg-purple-950/60 text-purple-400 border-purple-900/50" },
+  hashtag:             { label: "#️⃣ hashtag",    cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
+  direct:              { label: "👤 direct",      cls: "bg-slate-800/60 text-slate-500 border-slate-700/50" },
+};
+
 function Score({ v }: { v: number }) {
   if (!v) return null;
   const cls = v >= 8 ? "text-emerald-400" : v >= 6 ? "text-amber-400" : "text-slate-500";
@@ -22,6 +29,8 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
 
   const followupDue = lead.stage === "contacted" && lead.messaged_at && !lead.reply_received;
+  const sourceBadge = lead.source_tag ? SOURCE_BADGES[lead.source_tag] : null;
+  const prob = lead.response_probability;
 
   return (
     <div
@@ -61,7 +70,21 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
         <span className="text-[10px] text-slate-600 tabular-nums">
           {lead.followers > 0 ? `${lead.followers.toLocaleString()} abonnés` : ""}
         </span>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-1.5 items-center flex-wrap justify-end">
+          {sourceBadge && (
+            <span className={`text-[9px] border px-1.5 py-0.5 rounded-full ${sourceBadge.cls}`}>
+              {sourceBadge.label}
+            </span>
+          )}
+          {prob != null && (
+            <span className={`text-[9px] border px-1.5 py-0.5 rounded-full tabular-nums ${
+              prob >= 70 ? "bg-emerald-950/60 text-emerald-400 border-emerald-900/50"
+              : prob >= 40 ? "bg-amber-950/60 text-amber-400 border-amber-900/50"
+              : "bg-slate-800/60 text-slate-500 border-slate-700/50"
+            }`}>
+              {prob}% rép.
+            </span>
+          )}
           {followupDue && (
             <span className="text-[9px] bg-amber-950/60 text-amber-400 border border-amber-900/50 px-1.5 py-0.5 rounded-full">
               relance due

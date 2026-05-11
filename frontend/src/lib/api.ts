@@ -50,6 +50,14 @@ export interface ReplyAnalysis {
   inject_calendly: boolean;
 }
 
+export interface Psychographic {
+  dominant_emotion?: "frustration" | "fear" | "hope" | "excitement" | "shame" | "anxiety";
+  awareness_stage?: "unaware" | "problem_aware" | "solution_aware" | "product_aware";
+  communication_style?: "casual" | "formal";
+  best_contact_time?: "morning" | "evening" | "weekend" | "anytime";
+  language?: string;
+}
+
 export interface Lead {
   id: number; coach_id: number;
   name: string; handle: string; platform: string;
@@ -63,6 +71,15 @@ export interface Lead {
   followup_d7_message?: string; followup_d7_sent_at?: string;
   reply_received?: string; suggested_reply?: string;
   notes?: string; airtable_record_id?: string;
+  // Intelligence fields v3
+  language?: string;
+  psychographic_profile?: Psychographic;
+  response_probability?: number;
+  dm_variant_b?: string;
+  dm_variant_sent?: "A" | "B";
+  warming_status?: "none" | "comment_ready" | "commented" | "dm_ready";
+  warming_comment?: string;
+  source_tag?: "viral_post" | "competitor_audience" | "direct" | "hashtag";
   created_at: string; updated_at: string;
 }
 
@@ -122,6 +139,13 @@ export const pipelineApi = {
   write:   (id: number) => api.post(`/pipeline/${id}/write`),
   reply:   (id: number, d: { lead_reply: string; conversation_history?: string }) =>
     api.post<ReplyAnalysis>(`/pipeline/${id}/reply`, d),
+  warm:    (id: number) => api.post<{ ok: boolean; comment: string }>(`/pipeline/${id}/warm`),
+  markWarmed: (id: number, status: string) =>
+    api.post(`/pipeline/${id}/mark-warmed`, { status }),
+  writeAb: (id: number) =>
+    api.post<{ ok: boolean; variant_a: string; variant_b: string }>(`/pipeline/${id}/write-ab`),
+  markVariant: (id: number, variant: "A" | "B") =>
+    api.post(`/pipeline/${id}/mark-variant`, { variant }),
 };
 
 /* ── Follow-ups ── */

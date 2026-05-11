@@ -85,6 +85,16 @@ class Lead(Base):
     notes = Column(Text)
     airtable_record_id = Column(String)
 
+    # Intelligence fields (v3)
+    language = Column(String)                   # fr|en|es|pt|ar|other
+    psychographic_profile = Column(Text)        # JSON: emotion, awareness_stage, style, language
+    response_probability = Column(Float)        # 0-100 predicted reply rate
+    dm_variant_b = Column(Text)                 # A/B test second variant
+    dm_variant_sent = Column(String)            # "A" or "B"
+    warming_status = Column(String, default="none")  # none|comment_ready|commented|dm_ready
+    warming_comment = Column(Text)              # AI-generated comment to post before DM
+    source_tag = Column(String)                 # viral_post|competitor_audience|direct|hashtag
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

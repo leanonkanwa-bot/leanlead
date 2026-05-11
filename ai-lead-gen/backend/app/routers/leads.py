@@ -30,6 +30,8 @@ class LeadUpdate(BaseModel):
     notes: str | None = None
     reply_received: str | None = None
     outreach_message: str | None = None
+    warming_status: str | None = None
+    dm_variant_sent: str | None = None
 
 
 def _serialize(lead: models.Lead) -> dict:
@@ -66,9 +68,27 @@ def _serialize(lead: models.Lead) -> dict:
         "suggested_reply": lead.suggested_reply,
         "notes": lead.notes,
         "airtable_record_id": lead.airtable_record_id,
+        # Intelligence fields v3
+        "language": getattr(lead, "language", None),
+        "psychographic_profile": _parse_json(getattr(lead, "psychographic_profile", None)),
+        "response_probability": getattr(lead, "response_probability", None),
+        "dm_variant_b": getattr(lead, "dm_variant_b", None),
+        "dm_variant_sent": getattr(lead, "dm_variant_sent", None),
+        "warming_status": getattr(lead, "warming_status", "none") or "none",
+        "warming_comment": getattr(lead, "warming_comment", None),
+        "source_tag": getattr(lead, "source_tag", None),
         "created_at": lead.created_at.isoformat() if lead.created_at else None,
         "updated_at": lead.updated_at.isoformat() if lead.updated_at else None,
     }
+
+
+def _parse_json(val: str | None) -> dict | list | None:
+    if not val:
+        return None
+    try:
+        return json.loads(val)
+    except Exception:
+        return None
 
 
 @router.get("")
@@ -135,6 +155,10 @@ def update_lead(
         lead.reply_received = req.reply_received
     if req.outreach_message is not None:
         lead.outreach_message = req.outreach_message
+    if req.warming_status is not None:
+        lead.warming_status = req.warming_status
+    if req.dm_variant_sent is not None:
+        lead.dm_variant_sent = req.dm_variant_sent
     db.commit()
     db.refresh(lead)
     return _serialize(lead)

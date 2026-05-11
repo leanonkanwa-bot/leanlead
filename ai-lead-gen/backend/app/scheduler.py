@@ -166,6 +166,11 @@ def _run_for_coach(coach_id: int):
                 pain_points=lead_data.get("pain_points", "[]"),
                 recommended_angle=lead_data.get("recommended_angle", ""),
                 outreach_message=lead_data.get("outreach_message"),
+                dm_variant_b=lead_data.get("dm_variant_b"),
+                language=lead_data.get("language", "fr"),
+                psychographic_profile=lead_data.get("psychographic_profile"),
+                response_probability=lead_data.get("response_probability"),
+                source_tag=lead_data.get("source_tag", "hashtag"),
                 stage="new",
             )
             db.add(lead)
