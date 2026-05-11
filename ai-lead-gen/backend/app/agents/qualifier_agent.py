@@ -164,7 +164,7 @@ _FAILED_PURCHASE_RE = re.compile(
     r'(arnaqué|escroquerie|fraude).{0,30}(coach|formation)|'
     r'perdu.{0,20}(€|euro|argent).{0,30}(coach|formation)|'
     r'demandé.{0,10}remboursement|se faire rembourser|'
-    r'# English — failed buyer signals
+    # English — failed buyer signals
     r'wasted.{0,20}(money|\$|€).{0,30}(coach|program|course)|'
     r'paid.{0,30}(coach|program|course).{0,30}(didn\'t|not|no result|waste|scam)|'
     r'got scammed.{0,20}(coach|program)|coaching.{0,30}(scam|fraud|waste)|'

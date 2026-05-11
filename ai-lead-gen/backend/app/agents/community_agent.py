@@ -34,7 +34,7 @@ _PAIN_SIGNAL_RE = re.compile(
     r'je galère|c\'est possible|je veux changer|j\'ai du mal|je lutte|'
     r'quelqu\'un a essayé|j\'ai acheté|j\'ai payé|a pas fonctionné|'
     r'arnaque|arnaqu[ée]|escroquerie|pas de résultats|aucun résultat|'
-    r'# English
+    # English
     r'anyone tried|does this work|i need help|looking for advice|'
     r'struggling with|can\'t seem to|nothing works|wasted money|'
     r'got scammed|didn\'t work|no results|i tried everything|'
