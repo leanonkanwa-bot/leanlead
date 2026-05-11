@@ -89,6 +89,13 @@ def _serialize(lead: models.Lead) -> dict:
         # Intelligence fields v6
         "churn_risk": getattr(lead, "churn_risk", None),
         "reengagement_message": getattr(lead, "reengagement_message", None),
+        # Intelligence fields v7
+        "enriched_data": _parse_json(getattr(lead, "enriched_data", None)),
+        "enriched_at": getattr(lead, "enriched_at", None) and lead.enriched_at.isoformat(),
+        "sales_script": _parse_json(getattr(lead, "sales_script", None)),
+        "nurture_sequence": _parse_json(getattr(lead, "nurture_sequence", None)),
+        "nurture_step": getattr(lead, "nurture_step", 0) or 0,
+        "converting_angle": getattr(lead, "converting_angle", None),
         "created_at": lead.created_at.isoformat() if lead.created_at else None,
         "updated_at": lead.updated_at.isoformat() if lead.updated_at else None,
     }

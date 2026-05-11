@@ -14,6 +14,7 @@ from sqlalchemy import text
 from .database import Base, engine
 from .routers import auth, leads, pipeline, prospecting, followups, analytics
 from .routers import agent as agent_router
+from .routers import icp as icp_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -55,6 +56,15 @@ _migrations = [
     "ALTER TABLE leads ADD COLUMN churn_risk REAL DEFAULT 0",
     "ALTER TABLE leads ADD COLUMN emotion_history TEXT",
     "ALTER TABLE leads ADD COLUMN reengagement_message TEXT",
+    # Intelligence fields v7 — CRM enrichment, sales scripts, nurture, attribution
+    "ALTER TABLE leads ADD COLUMN enriched_data TEXT",
+    "ALTER TABLE leads ADD COLUMN enriched_at DATETIME",
+    "ALTER TABLE leads ADD COLUMN sales_script TEXT",
+    "ALTER TABLE leads ADD COLUMN nurture_sequence TEXT",
+    "ALTER TABLE leads ADD COLUMN nurture_step INTEGER DEFAULT 0",
+    "ALTER TABLE leads ADD COLUMN converting_angle TEXT",
+    "ALTER TABLE leads ADD COLUMN predicted_close_date DATETIME",
+    # ICP and competitive intelligence tables (created via Base.metadata.create_all)
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:
@@ -81,6 +91,7 @@ app.include_router(prospecting.router)
 app.include_router(followups.router)
 app.include_router(analytics.router)
 app.include_router(agent_router.router)
+app.include_router(icp_router.router)
 
 
 @app.on_event("startup")

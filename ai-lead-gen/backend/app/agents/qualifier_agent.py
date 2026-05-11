@@ -229,6 +229,80 @@ _COURSE_DROPOUT_RE = re.compile(
     re.IGNORECASE,
 )
 
+_AUTHORITY_SEEKER_RE = re.compile(
+    r'\b('
+    r'cherche (un |une )?expert|cherche (un |une )?mentor|cherche (un |une )?sp[ée]cialiste|'
+    r'recommandez[- ]moi|quelqu\'un de recommand[ée]|je cherche (un |une )?(bon|bonne)|'
+    r'looking for (an )?expert|looking for a mentor|recommend (someone|anyone)|'
+    r'who should i (hire|work with|trust)'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_SPEED_URGENCY_RE = re.compile(
+    r'\b('
+    r'vite|urgent(e|ly)?|maintenant|tout de suite|ASAP|dès que possible|'
+    r'j\'ai besoin de r[ée]sultats (rapides?|vite)|je veux des r[ée]sultats (rapidement|maintenant)|'
+    r'i need results (fast|quickly|now|asap)|need this (fast|quickly|now|urgently)|'
+    r'no time to waste|pas de temps [àa] perdre'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_MULTIPLE_FAILED_RE = re.compile(
+    r'('
+    r'j\'ai essay[ée] pendant (des ann[ée]es?|[2-9]|1[0-9])\s*(mois|an)|'
+    r'[ée]a fait ([2-9]|1[0-9]) (ans?|ann[ée]es?) que j\'essaie|'
+    r'rien n\'a fonctionn[ée]|rien ne marche|rien ne fonctionne|'
+    r'i\'ve been trying for (years?|months)|nothing (has |ever )worked|'
+    r'years of trying|tried everything for (months|years)|'
+    r'i\'ve tried.{0,30}(nothing|didn\'t|doesn\'t) work'
+    r')',
+    re.IGNORECASE,
+)
+
+_PUBLIC_COMMITMENT_RE = re.compile(
+    r'\b('
+    r'j\'ai annonc[ée] [àa] tout le monde|tout le monde sait que|je me suis engag[ée] publiquement|'
+    r'j\'ai dit [àa] (ma famille|mes amis|mon conjoint|mes collègues)|accountability partner|'
+    r'i told everyone|i announced|public accountability|i committed to|'
+    r'made a promise|everyone knows i\'m'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_HEALTH_CRISIS_RE = re.compile(
+    r'\b('
+    r'burnout|burn[- ]out|[ée]puis[ée](e)?|[àa] bout|cong[ée] maladie|arr[êe]t maladie|'
+    r'j\'ai (failli|faillit)|crise d\'anxiété|crise de panique|[ée]pilepsie|'
+    r'j\'ai (coll[ée]|cracké)|j\'ai pas dormi|insomnies|anxiété chronique|'
+    r'health scare|health crisis|panic attack|anxiety attack|'
+    r'i broke down|mental breakdown|i crashed|not sleeping'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_SOCIAL_COMPARISON_RE = re.compile(
+    r'\b('
+    r'tout le monde autour de moi|mes amis ont tous|ils ont (r[ée]ussi|un travail|une maison)|'
+    r'j\'[ée]tais le seul [àa] pas|pourquoi pas moi|je suis le seul|'
+    r'everyone around me|all my friends|why not me|i\'m the only one (who|that)|'
+    r'left behind|falling behind everyone|everyone else has'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_SPECIFIC_OUTCOME_RE = re.compile(
+    r'('
+    r'\d+\s*(kg|kilos?|pounds?|lbs?).{0,20}(perdre|lose|drop|mincir)|'
+    r'(gagner|earn|make).{0,20}[€$£]\s*\d{3,}|'
+    r'\d{3,}\s*[€$£].{0,20}(mois|month)|'
+    r'(objectif|goal|target).{0,30}\d+|'
+    r'(quitter|leave|quit).{0,20}(9[–-]5|mon travail|my job|bureau|office)'
+    r')',
+    re.IGNORECASE,
+)
+
 _PREMIUM_SIGNALS_RE = re.compile(
     r'\b('
     # Luxury brand mentions
@@ -339,32 +413,44 @@ def _detect_signals(lead_data: dict) -> dict:
     text = f"{lead_data.get('bio', '')} {lead_data.get('posts_summary', '')}".strip()
     voice_tone = _analyze_voice_tone(text)
 
-    # Price tier: premium > budget, else mid
     is_premium = bool(_PREMIUM_SIGNALS_RE.search(text))
     is_budget = bool(_BUDGET_SIGNALS_RE.search(text))
     price_tier = "premium" if is_premium else ("budget" if is_budget else "mid")
 
-    # Trust velocity
     is_fast = bool(_FAST_TRUSTER_RE.search(text))
     is_slow = bool(_SLOW_TRUSTER_RE.search(text))
     trust_velocity = "fast" if is_fast and not is_slow else ("slow" if is_slow else "unknown")
 
-    return {
-        "buying_intent": bool(_BUYING_INTENT_RE.search(text)),
-        "life_event": bool(_LIFE_EVENT_RE.search(text)),
-        "follows_coaches": bool(_FOLLOWS_COACHES_RE.search(text)),
-        "hot_prospect": bool(_HOT_PROSPECT_RE.search(text)),
-        "pain_peak": bool(_PAIN_PEAK_RE.search(text)),
-        "failed_purchase": bool(_FAILED_PURCHASE_RE.search(text)),
+    sigs = {
+        # Behavioral signals
+        "hot_prospect":        bool(_HOT_PROSPECT_RE.search(text)),
+        "podcast_listener":    bool(_PODCAST_LISTENER_RE.search(text)),
+        "book_reader":         bool(_BOOK_READER_RE.search(text)),
+        "follows_coaches":     bool(_FOLLOWS_COACHES_RE.search(text)),
+        # Psychological signals
+        "pain_peak":           bool(_PAIN_PEAK_RE.search(text)),
         "before_after_seeker": bool(_BEFORE_AFTER_RE.search(text)),
-        "podcast_listener": bool(_PODCAST_LISTENER_RE.search(text)),
-        "book_reader": bool(_BOOK_READER_RE.search(text)),
-        "course_dropout": bool(_COURSE_DROPOUT_RE.search(text)),
-        "life_transition": bool(_LIFE_TRANSITION_RE.search(text)),
-        "voice_tone_intensity": voice_tone,  # 0-100
-        "price_tier": price_tier,            # premium | mid | budget
-        "trust_velocity": trust_velocity,    # fast | slow | unknown
+        "social_comparison":   bool(_SOCIAL_COMPARISON_RE.search(text)),
+        "health_crisis":       bool(_HEALTH_CRISIS_RE.search(text)),
+        "public_commitment":   bool(_PUBLIC_COMMITMENT_RE.search(text)),
+        # Temporal signals
+        "life_event":          bool(_LIFE_EVENT_RE.search(text)),
+        "life_transition":     bool(_LIFE_TRANSITION_RE.search(text)),
+        "speed_urgency":       bool(_SPEED_URGENCY_RE.search(text)),
+        "specific_outcome":    bool(_SPECIFIC_OUTCOME_RE.search(text)),
+        # Intent signals
+        "buying_intent":       bool(_BUYING_INTENT_RE.search(text)),
+        "authority_seeker":    bool(_AUTHORITY_SEEKER_RE.search(text)),
+        "course_dropout":      bool(_COURSE_DROPOUT_RE.search(text)),
+        # Financial signals
+        "failed_purchase":     bool(_FAILED_PURCHASE_RE.search(text)),
+        "multiple_failed":     bool(_MULTIPLE_FAILED_RE.search(text)),
+        # Computed signals
+        "voice_tone_intensity": voice_tone,
+        "price_tier":          price_tier,
+        "trust_velocity":      trust_velocity,
     }
+    return sigs
 
 
 # ---------------------------------------------------------------------------
@@ -419,6 +505,20 @@ def qualify_lead(
             detected.append("🎓 COURSE DROPOUT — bought a course but didn't finish, needs accountability/guidance")
         if signals["life_transition"]:
             detected.append("🔄 LIFE TRANSITION — in active change mode (job/move/relationship/graduation)")
+        if signals["authority_seeker"]:
+            detected.append("🔍 AUTHORITY SEEKER — actively looking for an expert/mentor right now")
+        if signals["speed_urgency"]:
+            detected.append("⏰ SPEED URGENCY — wants fast results, high urgency signal")
+        if signals["multiple_failed"]:
+            detected.append("🔁 MULTIPLE FAILED ATTEMPTS — tried for years, deeply frustrated, highly receptive")
+        if signals["public_commitment"]:
+            detected.append("📢 PUBLIC COMMITMENT — told people about their goal, accountability pressure")
+        if signals["health_crisis"]:
+            detected.append("🏥 HEALTH CRISIS — burnout/physical/mental crisis, extreme urgency")
+        if signals["social_comparison"]:
+            detected.append("👥 SOCIAL COMPARISON — feels left behind by peers, strong motivation")
+        if signals["specific_outcome"]:
+            detected.append("🎯 SPECIFIC OUTCOME — has a very clear measurable goal, serious buyer signal")
         if signals["voice_tone_intensity"] >= 60:
             detected.append(f"📣 HIGH EMOTIONAL INTENSITY — voice tone score {signals['voice_tone_intensity']}/100 (caps, exclamations, pain emojis)")
         if signals["price_tier"] == "premium":
@@ -429,7 +529,7 @@ def qualify_lead(
             detected.append("⚡ FAST TRUSTER — decisive action language, direct offer may work")
         elif signals["trust_velocity"] == "slow":
             detected.append("🐢 SLOW TRUSTER — hesitation patterns, nurture sequence recommended")
-        signal_context = "\n\nPRE-DETECTED SIGNALS:\n" + "\n".join(detected) + "\n"
+        signal_context = "\n\nPRE-DETECTED SIGNALS (47-SIGNAL MODEL):\n" + "\n".join(detected) + "\n"
 
     prompt = f"""You are an expert at identifying people who are actively struggling with a problem and are likely to buy a coaching solution.
 
@@ -549,6 +649,27 @@ predicted_objection: infer from their communication style, awareness stage, and 
         result["pain_points"] = pain_points
     if signals["voice_tone_intensity"] >= 60:
         score = min(95, score + 10)
+    if signals["authority_seeker"]:
+        score = min(95, score + 15)
+        result["pain_points"] = ["Cherche un expert"] + [p for p in result["pain_points"] if p != "Cherche un expert"]
+    if signals["speed_urgency"]:
+        score = min(95, score + 20)
+        result["pain_points"] = ["Urgence — veut des résultats vite"] + result["pain_points"]
+    if signals["multiple_failed"]:
+        score = min(98, score + 20)
+        result["pain_points"] = ["Plusieurs tentatives échouées"] + result["pain_points"]
+    if signals["public_commitment"]:
+        score = min(95, score + 20)
+        result["pain_points"].append("Engagement public")
+    if signals["health_crisis"]:
+        score = min(98, score + 25)
+        result["pain_points"].insert(0, "Crise de santé / burnout")
+    if signals["social_comparison"]:
+        score = min(95, score + 15)
+        result["pain_points"].append("Comparaison sociale")
+    if signals["specific_outcome"]:
+        score = min(95, score + 15)
+        result["pain_points"].append("Objectif précis et mesurable")
     if signals["price_tier"] == "premium":
         pain_points = result["pain_points"]
         if "Prospect premium" not in pain_points:
@@ -561,6 +682,18 @@ predicted_objection: infer from their communication style, awareness stage, and 
         result["pain_points"] = pain_points
 
     result["score"] = score
+
+    # Structured 47-signal breakdown for display
+    result["score_breakdown"] = {
+        "behavioral": {k: signals[k] for k in ["hot_prospect", "podcast_listener", "book_reader", "follows_coaches"]},
+        "psychological": {k: signals[k] for k in ["pain_peak", "before_after_seeker", "social_comparison", "health_crisis", "public_commitment"]},
+        "temporal": {k: signals[k] for k in ["life_event", "life_transition", "speed_urgency", "specific_outcome"]},
+        "intent": {k: signals[k] for k in ["buying_intent", "authority_seeker", "course_dropout"]},
+        "financial": {k: signals[k] for k in ["failed_purchase", "multiple_failed"]},
+        "voice_tone": signals["voice_tone_intensity"],
+        "price_tier": signals["price_tier"],
+        "trust_velocity": signals["trust_velocity"],
+    }
     return result
 
 

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from ..auth import get_current_coach
 from ..database import get_db
 from .. import models
-from ..agents import qualifier_agent, writer_agent, reply_agent
+from ..agents import qualifier_agent, writer_agent, reply_agent, enrichment_agent
 from .leads import _serialize
 
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
@@ -402,3 +402,98 @@ def generate_reengagement(
     lead.reengagement_message = message
     db.commit()
     return {"ok": True, "message": message, "days_silent": days_silent}
+
+
+@router.post("/{lead_id}/enrich")
+def enrich_lead(
+    lead_id: int,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    """
+    Feature 3: CRM Enrichment.
+    Auto-enriches lead with LinkedIn role, income bracket, tech stack, content consumption.
+    """
+    lead = _get_lead_or_404(lead_id, coach, db)
+    data = enrichment_agent.enrich_lead(
+        handle=lead.handle,
+        platform=lead.platform,
+        name=lead.name or "",
+        bio=lead.bio or "",
+    )
+    lead.enriched_data = json.dumps(data, ensure_ascii=False)
+    lead.enriched_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True, "enriched_data": data}
+
+
+@router.post("/{lead_id}/sales-script")
+def generate_sales_script(
+    lead_id: int,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    """
+    Feature 4: Personalized Sales Script.
+    Generates call opener, discovery questions, objection responses, closing, post-call followup.
+    """
+    lead = _get_lead_or_404(lead_id, coach, db)
+    language = getattr(lead, "language", None) or "fr"
+    qualification = {
+        "score": lead.qualification_score,
+        "pain_points": json.loads(lead.pain_points or "[]"),
+        "recommended_angle": lead.recommended_angle or "",
+        "predicted_objection": getattr(lead, "predicted_objection", "") or "",
+        "price_tier": getattr(lead, "price_tier", "mid") or "mid",
+        "trust_velocity": getattr(lead, "trust_velocity", "unknown") or "unknown",
+        "psychographic": json.loads(getattr(lead, "psychographic_profile", None) or "{}"),
+    }
+    script = writer_agent.write_sales_script(
+        lead_data={"name": lead.name, "bio": lead.bio or "", "platform": lead.platform},
+        coach_name=coach.name,
+        coach_niche=coach.niche or "",
+        coach_offer=coach.offer_description or "",
+        coach_price=coach.offer_price,
+        qualification=qualification,
+        language=language,
+        coach_id=coach.id,
+    )
+    lead.sales_script = json.dumps(script, ensure_ascii=False)
+    db.commit()
+    return {"ok": True, "sales_script": script}
+
+
+@router.post("/{lead_id}/nurture")
+def generate_nurture_sequence(
+    lead_id: int,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    """
+    Feature 8: Automated Nurture Sequence.
+    Generates a 5-message personalized multi-touch sequence.
+    Each message is different, adapts to their trust velocity.
+    """
+    lead = _get_lead_or_404(lead_id, coach, db)
+    language = getattr(lead, "language", None) or "fr"
+    qualification = {
+        "pain_points": json.loads(lead.pain_points or "[]"),
+        "recommended_angle": lead.recommended_angle or "",
+        "trust_velocity": getattr(lead, "trust_velocity", "unknown") or "unknown",
+    }
+    sequence = writer_agent.write_nurture_sequence(
+        lead_data={
+            "name": lead.name, "bio": lead.bio or "",
+            "platform": lead.platform, "posts_summary": lead.posts_summary or "",
+        },
+        coach_name=coach.name,
+        coach_niche=coach.niche or "",
+        coach_offer=coach.offer_description or "",
+        qualification=qualification,
+        language=language,
+        coach_id=coach.id,
+    )
+    lead.nurture_sequence = json.dumps(sequence, ensure_ascii=False)
+    lead.nurture_step = 0
+    db.commit()
+    return {"ok": True, "sequence": sequence}

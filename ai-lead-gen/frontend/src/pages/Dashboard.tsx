@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { authApi, leadsApi, pipelineApi, followupsApi, type Lead } from "../lib/api";
+import { authApi, leadsApi, pipelineApi, followupsApi, icpApi, analyticsApi, type Lead, type ICPData } from "../lib/api";
 import KanbanBoard from "../components/KanbanBoard";
 import ProspectingPanel from "../components/ProspectingPanel";
 import FollowupQueue from "../components/FollowupQueue";
@@ -162,8 +162,316 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+/* ─── ICP Panel ─────────────────────────────────────────────────── */
+function ICPPanel() {
+  const qc = useQueryClient();
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [showForm, setShowForm] = useState(false);
+
+  const { data: questions } = useQuery({
+    queryKey: ["icp-questions"],
+    queryFn: () => icpApi.getQuestions().then((r) => r.data.questions),
+  });
+  const { data: icp, isLoading: icpLoading } = useQuery({
+    queryKey: ["icp"],
+    queryFn: () => icpApi.get().then((r) => r.data),
+  });
+
+  const generate = useMutation({
+    mutationFn: () => {
+      const answersDict: Record<string, string> = {};
+      answers.forEach((a, i) => { answersDict[`q${i + 1}`] = a; });
+      return icpApi.generate({ answers: answersDict });
+    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["icp"] }); setShowForm(false); },
+  });
+  const learn = useMutation({
+    mutationFn: () => icpApi.learn(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["icp"] }),
+  });
+
+  const icpData = icp?.icp as ICPData | undefined;
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Ideal Client Profile</h2>
+          {icp && <p className="text-xs text-slate-500 mt-0.5">Version {icp.version} · Generated {new Date(icp.generated_at).toLocaleDateString()}</p>}
+        </div>
+        <div className="flex gap-2">
+          {icp && (
+            <button
+              onClick={() => learn.mutate()}
+              disabled={learn.isPending}
+              className="px-3 py-1.5 bg-emerald-900 hover:bg-emerald-800 text-emerald-300 rounded-lg text-xs font-medium transition-colors"
+            >
+              {learn.isPending ? "Learning…" : "🧠 Learn from conversions"}
+            </button>
+          )}
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-3 py-1.5 bg-sky-700 hover:bg-sky-600 text-white rounded-lg text-xs font-medium transition-colors"
+          >
+            {showForm ? "Cancel" : icp ? "Regenerate ICP" : "Generate ICP"}
+          </button>
+        </div>
+      </div>
+
+      {showForm && questions && (
+        <div className="bg-slate-900 border border-slate-700 rounded-xl p-5 space-y-4">
+          <p className="text-sm text-slate-300 font-medium">Answer these questions to build your ICP:</p>
+          {questions.map((q, i) => (
+            <div key={i}>
+              <label className="text-xs text-slate-400 mb-1 block">{q}</label>
+              <textarea
+                value={answers[i] || ""}
+                onChange={(e) => {
+                  const newAnswers = [...answers];
+                  newAnswers[i] = e.target.value;
+                  setAnswers(newAnswers);
+                }}
+                rows={2}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:border-sky-500"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => generate.mutate()}
+            disabled={generate.isPending}
+            className="w-full py-2.5 bg-sky-500 hover:bg-sky-400 disabled:opacity-40 rounded-lg text-sm font-medium transition-colors"
+          >
+            {generate.isPending ? "Generating ICP…" : "Generate ICP with Claude"}
+          </button>
+        </div>
+      )}
+
+      {icpLoading && <p className="text-slate-500 text-sm">Loading…</p>}
+
+      {icpData && (
+        <div className="space-y-4">
+          {icpData.summary && (
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+              <p className="text-xs text-slate-500 mb-1">Summary</p>
+              <p className="text-sm text-slate-200">{icpData.summary}</p>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4">
+            {icpData.pain_points && icpData.pain_points.length > 0 && (
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                <p className="text-xs font-medium text-orange-400 mb-2">Top Pain Points</p>
+                <ul className="space-y-1">
+                  {icpData.pain_points.slice(0, 5).map((p, i) => (
+                    <li key={i} className="text-xs text-slate-300">• {p}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {icpData.best_dm_angles && icpData.best_dm_angles.length > 0 && (
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                <p className="text-xs font-medium text-sky-400 mb-2">Best DM Angles</p>
+                <ul className="space-y-1">
+                  {icpData.best_dm_angles.slice(0, 5).map((a, i) => (
+                    <li key={i} className="text-xs text-slate-300">• {a}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {icpData.buying_triggers && icpData.buying_triggers.length > 0 && (
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                <p className="text-xs font-medium text-emerald-400 mb-2">Buying Triggers</p>
+                <ul className="space-y-1">
+                  {icpData.buying_triggers.slice(0, 4).map((t, i) => (
+                    <li key={i} className="text-xs text-slate-300">• {t}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {icpData.objections && icpData.objections.length > 0 && (
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                <p className="text-xs font-medium text-amber-400 mb-2">Common Objections</p>
+                <ul className="space-y-1">
+                  {icpData.objections.slice(0, 4).map((o, i) => (
+                    <li key={i} className="text-xs text-slate-300">• {o}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          {icpData.platforms_ranked && icpData.platforms_ranked.length > 0 && (
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+              <p className="text-xs font-medium text-violet-400 mb-2">Platforms (ranked)</p>
+              <div className="flex gap-2">
+                {icpData.platforms_ranked.map((p, i) => (
+                  <span key={i} className="text-xs bg-violet-950 text-violet-300 px-2 py-0.5 rounded-full">
+                    {i + 1}. {p}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!icpData && !icpLoading && !showForm && (
+        <div className="bg-slate-900 border border-slate-700 border-dashed rounded-xl p-8 text-center">
+          <p className="text-slate-400 mb-2">No ICP generated yet.</p>
+          <p className="text-slate-500 text-sm">Click "Generate ICP" to build your Ideal Client Profile with Claude.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Analytics Panel ───────────────────────────────────────────── */
+function AnalyticsPanel() {
+  const { data: roi } = useQuery({ queryKey: ["analytics-roi"], queryFn: () => analyticsApi.getRoi().then((r) => r.data) });
+  const { data: velocity } = useQuery({ queryKey: ["analytics-velocity"], queryFn: () => analyticsApi.getVelocity().then((r) => r.data) });
+  const { data: attribution } = useQuery({ queryKey: ["analytics-attribution"], queryFn: () => analyticsApi.getAttribution().then((r) => r.data) });
+  const { data: competitive } = useQuery({ queryKey: ["analytics-competitive"], queryFn: () => analyticsApi.getCompetitive().then((r) => r.data) });
+  const scanComp = useMutation({ mutationFn: () => analyticsApi.scanCompetitors() });
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      {/* ROI Widget */}
+      {roi && (
+        <div>
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">ROI vs Agency</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+              <p className="text-xs text-slate-500">Cost / Lead</p>
+              <p className="text-xl font-bold text-emerald-400">€0</p>
+              <p className="text-xs text-slate-600 mt-0.5">Agency: €{roi.cost_per_lead_agency_high / Math.max(roi.total_leads, 1)}</p>
+            </div>
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+              <p className="text-xs text-slate-500">Saved</p>
+              <p className="text-xl font-bold text-emerald-400">€{roi.savings_vs_agency.toLocaleString()}</p>
+              <p className="text-xs text-slate-600 mt-0.5">vs agency model</p>
+            </div>
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+              <p className="text-xs text-slate-500">LTV Prediction</p>
+              <p className="text-xl font-bold text-sky-400">€{roi.predicted_ltv_pipeline.toLocaleString()}</p>
+            </div>
+            <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+              <p className="text-xs text-slate-500">Pipeline Growth</p>
+              <p className="text-xl font-bold text-amber-400">{roi.pipeline_growth_rate > 0 ? "+" : ""}{roi.pipeline_growth_rate}%</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Velocity / Stuck Leads */}
+      {velocity && (
+        <div>
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Pipeline Velocity</h3>
+          {velocity.stuck_leads && velocity.stuck_leads.length > 0 && (
+            <div className="bg-amber-950/30 border border-amber-900 rounded-xl p-4 mb-4">
+              <p className="text-xs font-medium text-amber-400 mb-2">⚠ {velocity.stuck_leads.length} stuck lead{velocity.stuck_leads.length !== 1 ? "s" : ""}</p>
+              <div className="space-y-1">
+                {velocity.stuck_leads.slice(0, 5).map((l) => (
+                  <div key={l.lead_id} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300">@{l.handle}</span>
+                    <span className="text-slate-500">{l.stage} · {l.days_in_stage}d</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {velocity.focus_today && velocity.focus_today.length > 0 && (
+            <div className="bg-sky-950/30 border border-sky-900 rounded-xl p-4">
+              <p className="text-xs font-medium text-sky-400 mb-2">Focus today ({velocity.focus_today.length})</p>
+              <div className="space-y-1">
+                {velocity.focus_today.map((l) => (
+                  <div key={l.lead_id} className="flex items-center justify-between text-xs">
+                    <span className="text-slate-300">@{l.handle}</span>
+                    <span className="text-sky-500">{l.action}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Attribution */}
+      {attribution && (
+        <div>
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Multi-Touch Attribution</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {attribution.top_converting_angles && attribution.top_converting_angles.length > 0 && (
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                <p className="text-xs font-medium text-sky-400 mb-2">Top Converting Angles</p>
+                {attribution.top_converting_angles.slice(0, 5).map((a, i) => (
+                  <div key={i} className="flex justify-between text-xs py-0.5">
+                    <span className="text-slate-300 truncate">{a.angle}</span>
+                    <span className="text-sky-400 ml-2">{a.conversions}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {attribution.top_converting_pains && attribution.top_converting_pains.length > 0 && (
+              <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                <p className="text-xs font-medium text-orange-400 mb-2">Top Converting Pains</p>
+                {attribution.top_converting_pains.slice(0, 5).map((p, i) => (
+                  <div key={i} className="flex justify-between text-xs py-0.5">
+                    <span className="text-slate-300 truncate">{p.pain}</span>
+                    <span className="text-orange-400 ml-2">{p.conversions}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Competitive Intel */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Competitive Intelligence</h3>
+          <button
+            onClick={() => scanComp.mutate()}
+            disabled={scanComp.isPending}
+            className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition-colors"
+          >
+            {scanComp.isPending ? "Scanning…" : "🔍 Scan Competitors"}
+          </button>
+        </div>
+        {(competitive as any)?.report?.alert && (
+          <div className="bg-red-950/30 border border-red-900 rounded-xl p-4 mb-4">
+            <p className="text-xs font-medium text-red-400">Alert</p>
+            <p className="text-sm text-slate-300 mt-1">{(competitive as any).report.alert}</p>
+          </div>
+        )}
+        {(competitive as any)?.report?.market_gaps?.length > 0 && (
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 mb-3">
+            <p className="text-xs font-medium text-emerald-400 mb-2">Market Gaps You Can Own</p>
+            <ul className="space-y-1">
+              {(competitive as any).report.market_gaps.map((g: string, i: number) => (
+                <li key={i} className="text-xs text-slate-300">• {g}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {(competitive as any)?.report?.opportunities?.length > 0 && (
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+            <p className="text-xs font-medium text-sky-400 mb-2">Opportunities</p>
+            <ul className="space-y-1">
+              {(competitive as any).report.opportunities.map((o: string, i: number) => (
+                <li key={i} className="text-xs text-slate-300">• {o}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {!(competitive as any)?.report && (
+          <p className="text-sm text-slate-500 text-center py-6">No competitive data yet. Click "Scan Competitors" to start.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main dashboard ─────────────────────────────────────────────── */
-type Tab = "pipeline" | "prospects" | "followups";
+type Tab = "pipeline" | "prospects" | "followups" | "analytics" | "icp";
 
 export default function Dashboard() {
   const nav = useNavigate();
@@ -212,6 +520,8 @@ export default function Dashboard() {
     { id: "pipeline", label: "Pipeline" },
     { id: "prospects", label: "Prospects" },
     { id: "followups", label: "Follow-ups", badge: dueFollowups.length || undefined },
+    { id: "analytics", label: "Analytics" },
+    { id: "icp", label: "ICP" },
   ];
 
   return (
@@ -336,15 +646,27 @@ export default function Dashboard() {
             <FollowupQueue />
           </div>
         )}
+
+        {tab === "analytics" && (
+          <div className="px-5 py-6 overflow-auto">
+            <AnalyticsPanel />
+          </div>
+        )}
+
+        {tab === "icp" && (
+          <div className="px-5 py-6 overflow-auto">
+            <ICPPanel />
+          </div>
+        )}
       </div>
 
       {/* Mobile tab bar */}
-      <div className="sm:hidden flex border-t border-slate-800 bg-slate-950">
+      <div className="sm:hidden flex border-t border-slate-800 bg-slate-950 overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex-1 relative py-3 text-xs font-medium transition-colors ${
+            className={`flex-shrink-0 flex-1 relative py-3 text-[10px] font-medium transition-colors ${
               tab === t.id ? "text-sky-400" : "text-slate-600"
             }`}
           >

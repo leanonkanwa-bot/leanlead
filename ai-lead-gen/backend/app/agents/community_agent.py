@@ -303,6 +303,60 @@ def scan_social_network(handle: str, platform: str, max_leads: int = 20) -> list
     return leads[:max_leads]
 
 
+def scan_abm_targets(niche: str, target_audience: str = "", max_leads: int = 25) -> list[dict]:
+    """
+    Feature 5: Account Based Marketing (ABM).
+    Hyper-targeted campaigns no agency can match:
+    - Companies going through layoffs in the target sector
+    - People in specific life windows (economic events, age milestones)
+    - Industry-specific timing signals
+    """
+    queries = [
+        # Layoffs in target sector
+        f'site:reddit.com "{niche}" "j\'ai été licencié" OR "just got laid off" OR "restructuration" 2025',
+        f'site:linkedin.com "{niche}" "{target_audience}" layoff OR "looking for opportunities" OR "open to work"',
+        # Economic event targeting
+        f'"{niche}" "reconversion" OR "career change" OR "changer de vie" site:reddit.com OR site:forum',
+        # Life milestone targeting
+        f'"{niche}" ("30 ans" OR "40 ans" OR "turning 30" OR "turning 40") "changer" OR "avant"',
+        # Post-corporate escape
+        f'"{niche}" "quitter l\'entreprise" OR "quit corporate" OR "leave my 9-5" 2025',
+    ]
+
+    leads: list[dict] = []
+    seen: set[str] = set()
+
+    for query in queries:
+        results = _search_ddg(query, max_results=10)
+        for item in results:
+            text = f"{item['title']} {item['snippet']}"
+            if not _PAIN_SIGNAL_RE.search(text):
+                continue
+            handles = [h for groups in _HANDLE_RE.findall(text) for h in groups if h]
+            reddit_users = _REDDIT_USER_RE.findall(item.get("url", ""))
+            all_handles = list(reddit_users) + handles
+            platform = "reddit" if "reddit" in item.get("url", "") else "linkedin"
+            for h in all_handles[:2]:
+                h = h.lower()
+                if not h or h in seen or h in {"deleted", "automoderator"}:
+                    continue
+                seen.add(h)
+                leads.append({
+                    "handle": h,
+                    "name": h,
+                    "platform": platform,
+                    "profile_url": f"https://reddit.com/u/{h}" if platform == "reddit" else "",
+                    "bio": "",
+                    "followers": 0,
+                    "posts_summary": f"[ABM — {niche} transition] " + text[:300],
+                    "_source_tag": "community",
+                })
+        if len(leads) >= max_leads:
+            break
+
+    return leads[:max_leads]
+
+
 def scan_podcast_listeners(niche: str, max_leads: int = 25) -> list[dict]:
     """
     Find people who listen to podcasts in the niche — warm, educated leads.

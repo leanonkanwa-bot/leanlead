@@ -391,3 +391,163 @@ Return ONLY the comment text."""
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
+
+
+def write_sales_script(
+    lead_data: dict,
+    coach_name: str,
+    coach_niche: str,
+    coach_offer: str,
+    coach_price: float | None,
+    qualification: dict,
+    language: str = "fr",
+    coach_id: int | None = None,
+) -> dict:
+    """
+    Feature 4: Sales Script Generation.
+    Generates a complete personalized call script for this lead.
+    Agencies charge €500 for a generic script. This is personalized to each lead.
+    Returns: {opener, objections: [{objection, response}], closing, followup_sequence}
+    """
+    first_name = (lead_data.get("name") or "").split()[0] or "votre prospect"
+    pain = qualification.get("recommended_angle", "") or \
+           (qualification.get("pain_points", [""])[0] if qualification.get("pain_points") else "")
+    objection = qualification.get("predicted_objection", "")
+    all_pains = ", ".join(qualification.get("pain_points", [])[:5]) or "unknown"
+    trust_velocity = qualification.get("trust_velocity", "unknown")
+    price_tier = qualification.get("price_tier", "mid")
+    comm_style = (qualification.get("psychographic") or {}).get("communication_style", "casual")
+
+    lang_name, lang_note = _LANGUAGE_INSTRUCTIONS.get(language, _LANGUAGE_INSTRUCTIONS["fr"])
+
+    persona_block = ""
+    if coach_id:
+        persona = build_coach_persona(coach_id, coach_name, coach_niche, coach_offer)
+        persona_block = f"\nYour voice: {persona}"
+
+    price_block = f" Their budget tier: {price_tier}." if price_tier else ""
+    trust_block = (
+        " They're a FAST TRUSTER — be direct and decisive."
+        if trust_velocity == "fast"
+        else " They're a SLOW TRUSTER — be patient, ask questions, don't rush."
+        if trust_velocity == "slow"
+        else ""
+    )
+
+    prompt = f"""You are {coach_name}. Generate a complete personalized sales call script for {first_name} in {lang_name}.{persona_block}
+
+Lead profile:
+- Their main pain: {pain}
+- All pain points: {all_pains}
+- Predicted objection: {objection}
+- Communication style: {comm_style}{price_block}{trust_block}
+- Coach offer: {coach_offer}
+{f'- Price: €{int(coach_price)}' if coach_price else ''}
+
+Return ONLY valid JSON:
+{{
+  "opener": "<personalized call opener — reference something specific from their pain, under 30 words>",
+  "discovery_questions": [
+    "<3 deep questions to open them up — each specific to their pain, not generic>"
+  ],
+  "objections": [
+    {{"objection": "<exact objection text — use predicted objection first>", "response": "<perfect empathetic 1-2 sentence response>"}},
+    {{"objection": "<second common objection for this niche>", "response": "<response>"}},
+    {{"objection": "<price objection>", "response": "<response that reframes investment>"}}
+  ],
+  "closing": "<closing language that matches their style — direct for fast trustors, inviting for slow>",
+  "post_call_followup": "<what to send within 2 hours of the call — personalized to their situation>"
+}}"""
+
+    msg = _get_client().messages.create(
+        model="claude-opus-4-7",
+        max_tokens=800,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = msg.content[0].text
+    start, end = text.find("{"), text.rfind("}") + 1
+    import json as _json
+    try:
+        return _json.loads(text[start:end])
+    except Exception:
+        return {"opener": "", "discovery_questions": [], "objections": [], "closing": "", "post_call_followup": ""}
+
+
+def write_nurture_sequence(
+    lead_data: dict,
+    coach_name: str,
+    coach_niche: str,
+    coach_offer: str,
+    qualification: dict,
+    language: str = "fr",
+    num_messages: int = 5,
+    coach_id: int | None = None,
+) -> list[dict]:
+    """
+    Feature 8: Automated Nurture Sequences.
+    Generates a complete personalized multi-touch sequence — never the same message twice.
+    Each message references their specific situation. Adapts escalation based on stage.
+    Returns list of {day, trigger, message, angle}
+    """
+    first_name = (lead_data.get("name") or "").split()[0] or "toi"
+    pain = qualification.get("recommended_angle", "") or \
+           (qualification.get("pain_points", [""])[0] if qualification.get("pain_points") else "")
+    all_pains = ", ".join(qualification.get("pain_points", [])[:5]) or pain
+    trust_velocity = qualification.get("trust_velocity", "unknown")
+    lang_name, lang_note = _LANGUAGE_INSTRUCTIONS.get(language, _LANGUAGE_INSTRUCTIONS["fr"])
+    platform = lead_data.get("platform", "instagram")
+    platform_style = _PLATFORM_STYLE.get(platform, _PLATFORM_STYLE["instagram"])
+
+    persona_block = ""
+    if coach_id:
+        persona = build_coach_persona(coach_id, coach_name, coach_niche, coach_offer)
+        persona_block = f"\nYour voice: {persona}"
+
+    trust_note = (
+        "Fast truster: escalate toward call invitation by message 3."
+        if trust_velocity == "fast"
+        else "Slow truster: stay conversational through message 5, never push toward a call."
+        if trust_velocity == "slow"
+        else "Unknown trust speed: escalate gently, read their engagement."
+    )
+
+    prompt = f"""You are {coach_name}. Generate {num_messages} nurture messages for {first_name} in {lang_name}. {lang_note}
+{persona_block}
+
+Their situation:
+- Main pain: {pain}
+- All pain points: {all_pains}
+- Platform: {platform} — Style: {platform_style}
+- Trust pattern: {trust_note}
+
+Rules:
+- Each message uses a DIFFERENT angle (don't repeat the same pain twice)
+- Each references something SPECIFIC about their situation
+- Messages escalate naturally: conversation → insight → proof → invitation
+- NEVER mention coaching/programs/services until message 4-5
+- Each message is under 60 words
+- Each must feel like a human follow-up, not an automated sequence
+- Messages must NEVER sound like the previous one
+
+Return ONLY valid JSON array:
+[
+  {{
+    "day": <days after first contact>,
+    "trigger": "<what should prompt sending this — e.g. 'no reply after 2 days', 'engaged with story'>",
+    "angle": "<what this message focuses on>",
+    "message": "<the DM text>"
+  }}
+]"""
+
+    msg = _get_client().messages.create(
+        model="claude-opus-4-7",
+        max_tokens=1000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = msg.content[0].text
+    start, end = text.find("["), text.rfind("]") + 1
+    import json as _json
+    try:
+        return _json.loads(text[start:end])
+    except Exception:
+        return []
