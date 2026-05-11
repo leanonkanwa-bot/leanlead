@@ -7,7 +7,7 @@ from typing import Any
 
 import httpx
 
-from . import prospector_agent, qualifier_agent, writer_agent, viral_hijacker_agent, community_agent
+from . import prospector_agent, qualifier_agent, writer_agent, viral_hijacker_agent, community_agent, trends_agent
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +225,7 @@ def run_autonomous(
     competitor_accounts: list[dict] | None = None,
     viral_hijack_enabled: bool = True,
     community_scan_enabled: bool = True,
+    global_arbitrage_enabled: bool = True,
 ) -> dict[str, Any]:
     """
     Run one full autonomous prospecting cycle for a coach.
@@ -233,6 +234,32 @@ def run_autonomous(
     stats: dict[str, Any] = {
         "leads_found": 0, "leads_qualified": 0, "dms_generated": 0, "high_score_leads": 0,
     }
+
+    # Feature 1: Real-Time Intent Signals — inject trending terms into search
+    try:
+        trending = trends_agent.get_trending_pain_terms(coach_niche, icp_pain_points)
+        if trending:
+            for platform in platforms[:2]:
+                existing = search_terms_per_platform.get(platform, [])
+                # Prepend trending terms so they're prospected first
+                search_terms_per_platform[platform] = (trending[:3] + existing)[:8]
+            logger.info("Injected %d trending pain terms into prospecting", len(trending))
+    except Exception as e:
+        logger.warning("Trending terms injection failed: %s", e)
+
+    # Feature 8: Global Lead Arbitrage — expand to French-speaking markets
+    if global_arbitrage_enabled and coach_niche:
+        try:
+            global_terms = trends_agent.get_global_fr_search_terms(coach_niche)
+            for market, terms in global_terms.items():
+                # Add geo-specific terms to instagram/tiktok search
+                for platform in ["instagram", "tiktok"]:
+                    if platform in platforms:
+                        existing = search_terms_per_platform.get(platform, [])
+                        search_terms_per_platform[platform] = (existing + terms[:2])[:10]
+            logger.info("Global FR arbitrage: injected terms for %d markets", len(global_terms))
+        except Exception as e:
+            logger.warning("Global arbitrage injection failed: %s", e)
 
     max_terms = max(1, max(len(search_terms_per_platform.get(p, [])) for p in platforms) if platforms else 1)
     max_per_term = max(3, max_per_platform // max_terms)
@@ -284,6 +311,12 @@ def run_autonomous(
             logger.info("Micro-influencer follower scan found %d candidates", len(micro_leads))
         except Exception as e:
             logger.warning("Micro-influencer scan failed: %s", e)
+        try:
+            dark_leads = community_agent.scan_dark_social(coach_niche, max_leads=20)
+            all_raw.extend(dark_leads)
+            logger.info("Dark social scan found %d candidates", len(dark_leads))
+        except Exception as e:
+            logger.warning("Dark social scan failed: %s", e)
         # Google reviews for competitor coaches
         if competitor_accounts:
             comp_names = [c.get("handle", "") for c in competitor_accounts if c.get("handle")]
@@ -430,6 +463,7 @@ def run_autonomous(
                     coach_offer=coach_offer,
                     qualification=qualification,
                     language=language,
+                    coach_id=coach_id,
                 )
                 outreach_message = va
                 dm_variant_b = vb
@@ -461,6 +495,9 @@ def run_autonomous(
             "response_probability": qualification.get("response_probability", 0),
             "predicted_objection": qualification.get("predicted_objection", ""),
             "aspiration_gap_score": qualification.get("aspiration_gap", 0),
+            "price_tier": qualification.get("price_tier", "mid"),
+            "trust_velocity": qualification.get("trust_velocity", "unknown"),
+            "voice_tone_intensity": qualification.get("voice_tone_intensity", 0),
             "source_tag": source_tag,
         })
         stats["leads_found"] += 1

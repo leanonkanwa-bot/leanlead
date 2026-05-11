@@ -101,8 +101,15 @@ class Lead(Base):
     predicted_objection = Column(Text)          # #1 objection pre-empted in DM
     score_delta = Column(Float)                 # change in score since last rescan
     escalation_alert = Column(Boolean, default=False)  # True when pain is escalating
-    # Intelligence fields (v5) — aspiration gap
+    # Intelligence fields (v5) — aspiration gap, price, trust, voice
     aspiration_gap_score = Column(Float, default=0.0)  # 0-100 gap between dreams and reality
+    price_tier = Column(String, default="mid")          # premium | mid | budget
+    trust_velocity = Column(String, default="unknown")  # fast | slow | unknown
+    voice_tone_intensity = Column(Float, default=0.0)   # 0-100 emotional intensity score
+    # Intelligence fields (v6) — churn prevention, emotional trajectory
+    churn_risk = Column(Float, default=0.0)             # 0-1 risk of going cold
+    emotion_history = Column(Text)                      # JSON: [{ts, emotion, score}]
+    reengagement_message = Column(Text)                 # AI-generated re-engagement DM
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

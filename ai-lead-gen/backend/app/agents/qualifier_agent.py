@@ -14,6 +14,7 @@ Pre-qualification signal boosts (deterministic, no API cost):
   • Book reader (development mindset)            → +25
   • Course dropout (already bought, needs more) → +30
   • Life transition (highest conversion window)  → +25
+  • High voice tone intensity (emotional text)   → +10
 """
 import json
 import logging
@@ -228,6 +229,57 @@ _COURSE_DROPOUT_RE = re.compile(
     re.IGNORECASE,
 )
 
+_PREMIUM_SIGNALS_RE = re.compile(
+    r'\b('
+    # Luxury brand mentions
+    r'louis vuitton|gucci|prada|chanel|hermès|dior|rolex|omega|cartier|'
+    r'porsche|ferrari|lamborghini|tesla model s|model x|bentley|maserati|'
+    # Premium travel/lifestyle
+    r'première classe|business class|first class|private jet|yacht|villa privée|'
+    r'5 étoiles|five star|hôtel de luxe|resort|maldives|dubai|saint-barth|'
+    # Premium spending on self-development
+    r'mastermind|retraite de|retreat|vip day|private coaching|1-on-1|high[- ]ticket|'
+    # Financial success signals
+    r'chiffre d\'affaires|revenus passifs|liberté financière|indépendance financière|'
+    r'financial freedom|passive income|six figures|7 figures|mrr|arr'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_BUDGET_SIGNALS_RE = re.compile(
+    r'\b('
+    r'pas les moyens|trop cher pour moi|j\'ai pas l\'argent|budget serré|'
+    r'j\'économise pour|j\'arrive pas à joindre les deux bouts|'
+    r'can\'t afford|too expensive for me|broke right now|on a tight budget|'
+    r'saving up for|living paycheck'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_FAST_TRUSTER_RE = re.compile(
+    r'\b('
+    # Decisive action language
+    r'je l\'ai fait|je me suis lanc[ée]|j\'ai pris le risque|j\'y vais|c\'est parti|'
+    r'j\'ai saut[ée] le pas|j\'ai d[ée]cid[ée] (direct|sur le coup|immédiatement)|'
+    r'j\'ai pas h[ée]sit[ée]|d[ée]cision prise|coup de cœur|coup de t[eê]te|'
+    r'i did it|i went for it|i took the leap|just signed up|pulled the trigger|'
+    r'let\'s go|i\'m in|best decision|no regrets|i jumped in'
+    r')\b',
+    re.IGNORECASE,
+)
+
+_SLOW_TRUSTER_RE = re.compile(
+    r'\b('
+    # Overthinking, hesitation
+    r'j\'h[ée]site|je r[ée]fl[ée]chis encore|je suis pas s[uû]r(e)?|'
+    r'faut que je v[ée]rifie|j\'ai besoin de temps|c\'est une grosse d[ée]cision|'
+    r'je vais y r[ée]fl[ée]chir|peut-[eê]tre un jour|[ée]ventuellement|'
+    r'i\'m not sure|let me think about|need to research first|maybe someday|'
+    r'not ready yet|need more information|gotta think about it|i\'ll consider'
+    r')\b',
+    re.IGNORECASE,
+)
+
 _LIFE_TRANSITION_RE = re.compile(
     r'\b('
     # French — change-mode states
@@ -252,8 +304,51 @@ _LIFE_TRANSITION_RE = re.compile(
 )
 
 
+def _analyze_voice_tone(text: str) -> int:
+    """
+    Feature 5: Voice Tone Analysis.
+    Scores emotional intensity 0-100 purely from text signals.
+    High emotion = high pain = higher urgency lead.
+    """
+    if not text:
+        return 0
+    score = 0
+    words = text.split()
+
+    exclamations = text.count('!') + text.count('！')
+    score += min(exclamations * 5, 25)
+
+    caps_words = sum(1 for w in words if w.isupper() and len(w) > 2)
+    score += min(caps_words * 8, 30)
+
+    # Pain/distress emojis
+    pain_emojis = len(re.findall(r'[😭😢😤😰😩😫🥺💔😞😔🤦🤯😱😣😖]', text))
+    score += min(pain_emojis * 10, 25)
+
+    ellipsis = text.count('...') + text.count('…')
+    score += min(ellipsis * 4, 15)
+
+    # Repeated punctuation ?! indicates emotional state
+    repeated = len(re.findall(r'[?!]{2,}', text))
+    score += min(repeated * 8, 20)
+
+    return min(score, 100)
+
+
 def _detect_signals(lead_data: dict) -> dict:
     text = f"{lead_data.get('bio', '')} {lead_data.get('posts_summary', '')}".strip()
+    voice_tone = _analyze_voice_tone(text)
+
+    # Price tier: premium > budget, else mid
+    is_premium = bool(_PREMIUM_SIGNALS_RE.search(text))
+    is_budget = bool(_BUDGET_SIGNALS_RE.search(text))
+    price_tier = "premium" if is_premium else ("budget" if is_budget else "mid")
+
+    # Trust velocity
+    is_fast = bool(_FAST_TRUSTER_RE.search(text))
+    is_slow = bool(_SLOW_TRUSTER_RE.search(text))
+    trust_velocity = "fast" if is_fast and not is_slow else ("slow" if is_slow else "unknown")
+
     return {
         "buying_intent": bool(_BUYING_INTENT_RE.search(text)),
         "life_event": bool(_LIFE_EVENT_RE.search(text)),
@@ -266,6 +361,9 @@ def _detect_signals(lead_data: dict) -> dict:
         "book_reader": bool(_BOOK_READER_RE.search(text)),
         "course_dropout": bool(_COURSE_DROPOUT_RE.search(text)),
         "life_transition": bool(_LIFE_TRANSITION_RE.search(text)),
+        "voice_tone_intensity": voice_tone,  # 0-100
+        "price_tier": price_tier,            # premium | mid | budget
+        "trust_velocity": trust_velocity,    # fast | slow | unknown
     }
 
 
@@ -321,6 +419,16 @@ def qualify_lead(
             detected.append("🎓 COURSE DROPOUT — bought a course but didn't finish, needs accountability/guidance")
         if signals["life_transition"]:
             detected.append("🔄 LIFE TRANSITION — in active change mode (job/move/relationship/graduation)")
+        if signals["voice_tone_intensity"] >= 60:
+            detected.append(f"📣 HIGH EMOTIONAL INTENSITY — voice tone score {signals['voice_tone_intensity']}/100 (caps, exclamations, pain emojis)")
+        if signals["price_tier"] == "premium":
+            detected.append("💎 PREMIUM PROSPECT — luxury/high-spending signals detected")
+        elif signals["price_tier"] == "budget":
+            detected.append("⚠️ BUDGET SIGNALS — affordability concern likely")
+        if signals["trust_velocity"] == "fast":
+            detected.append("⚡ FAST TRUSTER — decisive action language, direct offer may work")
+        elif signals["trust_velocity"] == "slow":
+            detected.append("🐢 SLOW TRUSTER — hesitation patterns, nurture sequence recommended")
         signal_context = "\n\nPRE-DETECTED SIGNALS:\n" + "\n".join(detected) + "\n"
 
     prompt = f"""You are an expert at identifying people who are actively struggling with a problem and are likely to buy a coaching solution.
@@ -378,6 +486,11 @@ predicted_objection: infer from their communication style, awareness stage, and 
     result["response_probability"] = max(0, min(100, int(result["response_probability"])))
     result["aspiration_gap"] = max(0, min(100, int(result.get("aspiration_gap", 0))))
 
+    # Attach deterministic signals that writer/downstream agents need
+    result["price_tier"] = signals["price_tier"]
+    result["trust_velocity"] = signals["trust_velocity"]
+    result["voice_tone_intensity"] = signals["voice_tone_intensity"]
+
     # Deterministic signal boosts (applied after Claude scoring)
     if signals["buying_intent"]:
         score = min(95, score + 40)
@@ -433,6 +546,18 @@ predicted_objection: infer from their communication style, awareness stage, and 
         pain_points = result["pain_points"]
         if "Transition de vie" not in pain_points:
             pain_points.append("Transition de vie")
+        result["pain_points"] = pain_points
+    if signals["voice_tone_intensity"] >= 60:
+        score = min(95, score + 10)
+    if signals["price_tier"] == "premium":
+        pain_points = result["pain_points"]
+        if "Prospect premium" not in pain_points:
+            pain_points.append("Prospect premium")
+        result["pain_points"] = pain_points
+    if signals["trust_velocity"] == "fast":
+        pain_points = result["pain_points"]
+        if "Décideur rapide" not in pain_points:
+            pain_points.append("Décideur rapide")
         result["pain_points"] = pain_points
 
     result["score"] = score

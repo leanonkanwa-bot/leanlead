@@ -35,6 +35,7 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
   const prob = lead.response_probability;
   const escalating = lead.escalation_alert && (lead.score_delta ?? 0) >= 10;
   const gap = lead.aspiration_gap_score;
+  const churnRisk = lead.churn_risk ?? 0;
 
   return (
     <div
@@ -102,6 +103,21 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
           {gap != null && gap >= 70 && (
             <span className="text-[9px] bg-violet-950/60 text-violet-400 border border-violet-900/50 px-1.5 py-0.5 rounded-full">
               🌟 gap {gap}
+            </span>
+          )}
+          {lead.price_tier === "premium" && (
+            <span className="text-[9px] bg-yellow-950/60 text-yellow-400 border border-yellow-900/50 px-1.5 py-0.5 rounded-full">
+              💎 premium
+            </span>
+          )}
+          {lead.trust_velocity === "fast" && (
+            <span className="text-[9px] bg-emerald-950/60 text-emerald-400 border border-emerald-900/50 px-1.5 py-0.5 rounded-full">
+              ⚡ rapide
+            </span>
+          )}
+          {churnRisk >= 0.7 && lead.stage === "contacted" && !lead.reply_received && (
+            <span className="text-[9px] bg-rose-950/60 text-rose-400 border border-rose-900/50 px-1.5 py-0.5 rounded-full animate-pulse">
+              🧊 froid
             </span>
           )}
         </div>

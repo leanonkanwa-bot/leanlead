@@ -70,6 +70,17 @@ def schedule_coach(coach_id: int, frequency_hours: int = 6, run_immediately: boo
             replace_existing=True,
             next_run_time=datetime.utcnow() + timedelta(hours=3),
         )
+    # Daily churn prevention scan (staggered 6h after autonomous job)
+    churn_job_id = f"churn_{coach_id}"
+    if not s.get_job(churn_job_id):
+        s.add_job(
+            _churn_scan_for_coach,
+            trigger=IntervalTrigger(hours=24, timezone="UTC"),
+            id=churn_job_id,
+            args=[coach_id],
+            replace_existing=True,
+            next_run_time=datetime.utcnow() + timedelta(hours=6),
+        )
     logger.info("Scheduled autonomous job for coach %d every %d hours", coach_id, frequency_hours)
 
 
@@ -77,10 +88,10 @@ def unschedule_coach(coach_id: int):
     s = get_scheduler()
     if s is None:
         return
-    job_id = f"autonomous_{coach_id}"
-    if s.get_job(job_id):
-        s.remove_job(job_id)
-        logger.info("Removed autonomous job for coach %d", coach_id)
+    for job_id in [f"autonomous_{coach_id}", f"escalation_{coach_id}", f"churn_{coach_id}"]:
+        if s.get_job(job_id):
+            s.remove_job(job_id)
+    logger.info("Removed all jobs for coach %d", coach_id)
 
 
 def get_next_run(coach_id: int) -> datetime | None:
@@ -184,6 +195,9 @@ def _run_for_coach(coach_id: int):
                 source_tag=lead_data.get("source_tag", "hashtag"),
                 predicted_objection=lead_data.get("predicted_objection"),
                 aspiration_gap_score=lead_data.get("aspiration_gap_score", 0),
+                price_tier=lead_data.get("price_tier", "mid"),
+                trust_velocity=lead_data.get("trust_velocity", "unknown"),
+                voice_tone_intensity=lead_data.get("voice_tone_intensity", 0),
                 stage="new",
             )
             db.add(lead)
@@ -300,5 +314,71 @@ def _rescan_for_coach(coach_id: int):
                     pass
     except Exception as e:
         logger.exception("Escalation rescan failed for coach %d: %s", coach_id, e)
+    finally:
+        db.close()
+
+
+def _churn_scan_for_coach(coach_id: int):
+    """
+    Feature 6: Predictive Churn Prevention.
+    Detects leads going cold in the pipeline.
+    Leads contacted >5 days ago with no reply get a churn_risk score.
+    Leads >10 days silent get an auto-generated re-engagement message.
+    """
+    import json
+    from datetime import timedelta
+    from .database import SessionLocal
+    from . import models
+    from .agents import writer_agent
+
+    db = SessionLocal()
+    try:
+        coach = db.query(models.Coach).filter(models.Coach.id == coach_id).first()
+        if not coach or not coach.onboarded:
+            return
+
+        now = datetime.utcnow()
+        # Find all contacted leads with no reply
+        leads = db.query(models.Lead).filter(
+            models.Lead.coach_id == coach_id,
+            models.Lead.stage == "contacted",
+            models.Lead.reply_received.is_(None),
+            models.Lead.messaged_at.isnot(None),
+        ).all()
+
+        reengaged = 0
+        for lead in leads:
+            days_silent = (now - lead.messaged_at).days
+            # Progressive churn risk: 0 at day 0, 1.0 at day 14+
+            churn_risk = min(1.0, days_silent / 14.0)
+            lead.churn_risk = churn_risk
+
+            # Generate re-engagement message for leads going very cold (10+ days)
+            if days_silent >= 10 and not lead.reengagement_message:
+                try:
+                    msg = writer_agent.write_reengagement_message(
+                        lead_data={
+                            "name": lead.name,
+                            "bio": lead.bio or "",
+                            "recommended_angle": lead.recommended_angle or "",
+                            "notes": lead.notes or "",
+                        },
+                        coach_name=coach.name,
+                        coach_niche=coach.niche or "",
+                        days_silent=days_silent,
+                        language=getattr(lead, "language", None) or "fr",
+                        coach_id=coach_id,
+                    )
+                    lead.reengagement_message = msg
+                    reengaged += 1
+                except Exception as e:
+                    logger.warning("Re-engagement DM failed for lead %d: %s", lead.id, e)
+
+        db.commit()
+        if reengaged:
+            logger.info("Churn scan for coach %d: %d re-engagement DMs generated", coach_id, reengaged)
+
+    except Exception as e:
+        logger.exception("Churn scan failed for coach %d: %s", coach_id, e)
     finally:
         db.close()

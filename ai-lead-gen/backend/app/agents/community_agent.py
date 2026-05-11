@@ -196,6 +196,113 @@ def scan_google_reviews(competitor_names: list[str], max_leads: int = 20) -> lis
     return leads[:max_leads]
 
 
+def scan_dark_social(niche: str, max_leads: int = 30) -> list[dict]:
+    """
+    Feature 4: Dark Social Mining.
+    Mines private Facebook groups, Telegram channels, Discord communities.
+    These are the biggest untouched lead source — massive pain signals, zero competition.
+    Strategy: DDG-surface public previews of private group posts (FB indexes them).
+    """
+    queries = [
+        # Facebook groups (FB indexes group posts publicly in DDG)
+        f'site:facebook.com/groups "{niche}" (aide OR "j\'ai besoin" OR comment OR struggling OR help)',
+        f'site:facebook.com/groups "{niche}" (arnaque OR résultat OR "ça marche" OR testimonial OR "avant après")',
+        f'site:facebook.com/groups "{niche}" "je cherche" OR "quelqu\'un peut" OR "does anyone know"',
+        # Telegram public channels
+        f'site:t.me "{niche}" (coach OR formation OR aide OR help)',
+        # Discord (public server listing sites)
+        f'site:disboard.org "{niche}" OR site:discord.com/servers "{niche}"',
+    ]
+
+    leads: list[dict] = []
+    seen: set[str] = set()
+
+    for query in queries:
+        results = _search_ddg(query, max_results=12)
+        for item in results:
+            text = f"{item['title']} {item['snippet']}"
+            if not _PAIN_SIGNAL_RE.search(text):
+                continue
+            handles = [h for groups in _HANDLE_RE.findall(text) for h in groups if h]
+            for handle in handles[:2]:
+                h = handle.lower()
+                if not h or h in seen:
+                    continue
+                seen.add(h)
+                is_failed = bool(_FAILED_BUYER_RE.search(text))
+                platform = "facebook" if "facebook" in item["url"] else "telegram"
+                leads.append({
+                    "handle": h,
+                    "name": handle,
+                    "platform": platform,
+                    "profile_url": item["url"],
+                    "bio": "",
+                    "followers": 0,
+                    "posts_summary": (
+                        f"[{'Acheteur raté — ' if is_failed else ''}Groupe privé {platform} — {niche}] "
+                        + text[:300]
+                    ),
+                    "_source_tag": "community",
+                    "_is_failed_buyer": is_failed,
+                })
+        if len(leads) >= max_leads:
+            break
+
+    return leads[:max_leads]
+
+
+def scan_social_network(handle: str, platform: str, max_leads: int = 20) -> list[dict]:
+    """
+    Feature 3: Network Effect Multiplier.
+    When a lead converts (booked/closed), maps their social network.
+    Their friends have the same problems + social proof via association.
+    Extracts @mentions from their public posts — freinds who are likely similar profiles.
+    """
+    site_map = {
+        "instagram": "instagram.com",
+        "tiktok": "tiktok.com",
+        "twitter": "twitter.com",
+        "linkedin": "linkedin.com",
+    }
+    site = site_map.get(platform, "instagram.com")
+
+    queries = [
+        f'site:{site} "@{handle}"',
+        f'"@{handle}" site:{site} friends OR follower OR tags',
+    ]
+
+    leads: list[dict] = []
+    seen: set[str] = set([handle.lower()])
+
+    for query in queries:
+        results = _search_ddg(query, max_results=12)
+        for item in results:
+            text = f"{item['title']} {item['snippet']}"
+            handles = [h for groups in _HANDLE_RE.findall(text) for h in groups if h]
+            for h in handles[:3]:
+                h = h.lower()
+                if not h or h in seen:
+                    continue
+                seen.add(h)
+                leads.append({
+                    "handle": h,
+                    "name": h,
+                    "platform": platform,
+                    "profile_url": f"https://{site}/{h}",
+                    "bio": "",
+                    "followers": 0,
+                    "posts_summary": (
+                        f"[Réseau social de @{handle} — {platform}] "
+                        + text[:250]
+                    ),
+                    "_source_tag": "community",
+                })
+        if len(leads) >= max_leads:
+            break
+
+    return leads[:max_leads]
+
+
 def scan_podcast_listeners(niche: str, max_leads: int = 25) -> list[dict]:
     """
     Find people who listen to podcasts in the niche — warm, educated leads.

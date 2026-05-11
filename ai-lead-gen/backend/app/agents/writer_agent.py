@@ -1,8 +1,14 @@
 """
-Writer Agent — v2
+Writer Agent — v3
 - Multi-language DM (writes in lead's detected language)
 - A/B variant generation (two angles per lead)
 - Warming comment generation (genuine, non-generic)
+- Content mirroring (matches lead's exact writing style)
+- Social proof injection (matching testimonial)
+- Objection pre-emption
+- AI Coach Persona Builder (DMs sound like the coach)
+- Price-tier adaptive messaging (premium vs standard)
+- Trust-velocity adaptive approach (direct offer vs nurture sequence)
 """
 import os
 import re
@@ -35,6 +41,72 @@ _PLATFORM_STYLE = {
     "twitter": "Punchy, direct, under 50 words.",
     "reddit": "Low-key, genuine, under 70 words. No sales energy.",
 }
+
+
+_coach_persona_cache: dict[int, str] = {}
+
+
+def build_coach_persona(coach_id: int, coach_name: str, coach_niche: str, coach_offer: str,
+                        testimonials: list[dict] | None = None) -> str:
+    """
+    Feature 7: AI Coach Persona Builder.
+    Builds a reusable voice/style guide so every DM sounds like the coach wrote it personally.
+    Cached per coach_id to avoid repeated API calls.
+    """
+    if coach_id in _coach_persona_cache:
+        return _coach_persona_cache[coach_id]
+
+    testimonial_examples = ""
+    if testimonials:
+        examples = []
+        for t in testimonials[:3]:
+            examples.append(f"- Client: {t.get('name','')}, Situation: {t.get('situation','')}, Result: {t.get('result','')}")
+        testimonial_examples = "\nReal transformations this coach achieves:\n" + "\n".join(examples)
+
+    prompt = f"""Analyze this coach's profile and write a concise VOICE & STYLE GUIDE (under 80 words) that captures how they communicate in DMs.
+
+Coach name: {coach_name}
+Niche: {coach_niche}
+Offer: {coach_offer}{testimonial_examples}
+
+Based on their niche and offer, describe:
+1. Vocabulary they likely use (3-4 specific words/phrases)
+2. Tone (warm/direct/inspirational/no-nonsense?)
+3. One sentence they would NEVER say
+4. Their unique coaching promise in 10 words
+
+Return ONLY the style guide text, no headers."""
+
+    try:
+        msg = _get_client().messages.create(
+            model="claude-opus-4-7",
+            max_tokens=150,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        persona = msg.content[0].text.strip()
+    except Exception:
+        persona = f"Write as {coach_name}: warm, direct, focused on {coach_niche}. Genuine and human."
+
+    _coach_persona_cache[coach_id] = persona
+    return persona
+
+
+def _get_price_strategy(price_tier: str) -> str:
+    """Feature 9: Price-adaptive DM strategy."""
+    if price_tier == "premium":
+        return "This prospect shows premium spending signals. Position transformation as an exclusive investment, not a cost. Match their level of ambition."
+    if price_tier == "budget":
+        return "This prospect may have affordability concerns. Focus entirely on the transformation, never hint at price. Build desire first, discuss investment much later."
+    return ""
+
+
+def _get_trust_strategy(trust_velocity: str) -> str:
+    """Feature 10: Trust-velocity adaptive approach."""
+    if trust_velocity == "fast":
+        return "This is a FAST TRUSTER — decisive, action-oriented. End with a clear but soft invitation. They respond to directness. Do NOT over-explain."
+    if trust_velocity == "slow":
+        return "This is a SLOW TRUSTER — analytical, needs time. Ask a thoughtful open question only. Do NOT suggest any action or meeting. Just start a conversation."
+    return ""
 
 
 def _detect_writing_style(bio: str, posts: str) -> str:
@@ -97,6 +169,7 @@ def write_outreach_message(
     qualification: dict,
     language: str = "fr",
     testimonials: list[dict] | None = None,
+    coach_id: int | None = None,
 ) -> str:
     """
     Returns a ready-to-send DM in the lead's language.
@@ -111,12 +184,20 @@ def write_outreach_message(
     posts = lead_data.get("posts_summary", "")
     platform = lead_data.get("platform", "instagram")
 
+    price_tier = qualification.get("price_tier", "mid")
+    trust_velocity = qualification.get("trust_velocity", "unknown")
     lang_name, lang_note = _LANGUAGE_INSTRUCTIONS.get(language, _LANGUAGE_INSTRUCTIONS["fr"])
     platform_style = _PLATFORM_STYLE.get(platform, _PLATFORM_STYLE["instagram"])
     proof_block = _build_social_proof_block(testimonials, pain_context)
     objection_block = f"\nPredicted objection to pre-empt subtly (don't name it directly): {objection}" if objection else ""
     style_note = _detect_writing_style(bio, posts)
     style_block = f"\nContent mirroring: {style_note}" if style_note else ""
+    price_block = f"\nPricing strategy: {_get_price_strategy(price_tier)}" if price_tier != "mid" else ""
+    trust_block = f"\nTrust strategy: {_get_trust_strategy(trust_velocity)}" if trust_velocity != "unknown" else ""
+    persona_block = ""
+    if coach_id:
+        persona = build_coach_persona(coach_id, coach_name, coach_niche, coach_offer, testimonials)
+        persona_block = f"\nYour voice & style: {persona}"
 
     prompt = f"""You are {coach_name}. Write a DM to {first_name} in {lang_name}. {lang_note}
 
@@ -124,7 +205,7 @@ Their profile:
 - Bio: {bio}
 - Recent content: {posts}
 - Pain they express: {all_pains}
-- Best angle: {pain_context}{proof_block}{objection_block}{style_block}
+- Best angle: {pain_context}{proof_block}{objection_block}{style_block}{persona_block}{price_block}{trust_block}
 
 Platform: {platform} — Style: {platform_style}
 
@@ -134,10 +215,10 @@ Rules:
 3. If a social proof is provided, reference it naturally in ONE sentence ("J'ai aidé quelqu'un dans ta situation exacte…")
 4. If a predicted objection is provided, subtly dissolve it without naming it
 5. MIRROR their writing style exactly as instructed — match their vocabulary, tone, emoji usage
-6. End with ONE open question inviting them to share more
+6. Apply trust strategy for the ending (fast truster: soft CTA, slow truster: open question only)
 7. NEVER mention coaching, programs, offers, calls, or services explicitly
 8. NEVER say "I help people like you"
-9. Use their first name once at the start.
+9. Use their first name once at the start. Sound exactly like the voice guide.
 
 Return ONLY the DM text."""
 
@@ -157,6 +238,7 @@ def write_ab_variants(
     qualification: dict,
     language: str = "fr",
     testimonials: list[dict] | None = None,
+    coach_id: int | None = None,
 ) -> tuple[str, str]:
     """
     Returns (variant_a, variant_b):
@@ -167,6 +249,8 @@ def write_ab_variants(
     pain = qualification.get("recommended_angle", "") or \
            (qualification.get("pain_points", [""])[0] if qualification.get("pain_points") else "")
     objection = qualification.get("predicted_objection", "")
+    price_tier = qualification.get("price_tier", "mid")
+    trust_velocity = qualification.get("trust_velocity", "unknown")
     bio = lead_data.get("bio", "")
     posts = lead_data.get("posts_summary", "")
     platform = lead_data.get("platform", "instagram")
@@ -177,25 +261,31 @@ def write_ab_variants(
     objection_block = f"\nPredicted objection to dissolve subtly in variant A: {objection}" if objection else ""
     style_note = _detect_writing_style(bio, posts)
     style_block = f"\nContent mirroring: {style_note}" if style_note else ""
+    price_block = f"\nPricing strategy: {_get_price_strategy(price_tier)}" if price_tier != "mid" else ""
+    trust_block = f"\nTrust strategy: {_get_trust_strategy(trust_velocity)}" if trust_velocity != "unknown" else ""
+    persona_block = ""
+    if coach_id:
+        persona = build_coach_persona(coach_id, coach_name, coach_niche, coach_offer, testimonials)
+        persona_block = f"\nYour voice & style: {persona}"
 
     prompt = f"""You are {coach_name}. Generate TWO different DMs to {first_name} in {lang_name}. {lang_note}
 
 Profile:
 - Bio: {bio}
 - Content: {posts}
-- Pain: {pain}{proof_block}{objection_block}{style_block}
+- Pain: {pain}{proof_block}{objection_block}{style_block}{persona_block}{price_block}{trust_block}
 
 Platform: {platform} — Style: {platform_style}
 
-VARIANT A — Empathy + proof: Acknowledge their struggle, reference the social proof naturally if available ("J'ai aidé quelqu'un dans ta situation exacte…"), subtly dissolve their predicted objection.
-VARIANT B — Curiosity: Ask about their dream/goal, create intrigue about what's possible.
+VARIANT A — Empathy + proof: Acknowledge their struggle, reference the social proof if available, subtly dissolve their predicted objection. Apply trust strategy for closing.
+VARIANT B — Curiosity: Ask about their dream/goal, create intrigue about what's possible. Adapt for their price tier.
 
 Both variants must:
 - Be under 70 words
 - MIRROR their writing style exactly as instructed
+- Sound exactly like the coach's voice guide
 - NEVER mention coaching, programs, or services explicitly
 - Feel human and genuine
-- End with ONE open question
 
 Return ONLY valid JSON (no markdown):
 {{"variant_a": "<DM text>", "variant_b": "<DM text>"}}"""
@@ -213,6 +303,52 @@ Return ONLY valid JSON (no markdown):
     except Exception:
         pass
     return data["variant_a"].strip(), data["variant_b"].strip()
+
+
+def write_reengagement_message(
+    lead_data: dict,
+    coach_name: str,
+    coach_niche: str,
+    days_silent: int,
+    language: str = "fr",
+    coach_id: int | None = None,
+) -> str:
+    """
+    Feature 6: Predictive Churn Prevention.
+    Generates a re-engagement DM for a lead going cold.
+    Designed to reignite the conversation without being pushy.
+    """
+    first_name = (lead_data.get("name") or "").split()[0] or "toi"
+    pain = lead_data.get("recommended_angle") or lead_data.get("notes") or ""
+    bio = lead_data.get("bio", "")
+    lang_name, lang_note = _LANGUAGE_INSTRUCTIONS.get(language, _LANGUAGE_INSTRUCTIONS["fr"])
+
+    persona_block = ""
+    if coach_id:
+        persona = build_coach_persona(coach_id, coach_name, coach_niche, "", None)
+        persona_block = f"\nYour voice: {persona}"
+
+    prompt = f"""You are {coach_name}. You sent a DM to {first_name} about {days_silent} days ago but got no reply.
+Write a SHORT re-engagement message in {lang_name}. {lang_note}
+
+Their context: {bio or pain}{persona_block}
+
+Rules:
+- Under 40 words
+- Do NOT reference the previous message
+- Show you're thinking of them because of something specific (not generic "just checking in")
+- No pressure, no selling, no urgency
+- One question that's easy to answer (yes/no or one word)
+- Sound like a human who genuinely cares, not a salesperson
+
+Return ONLY the message text."""
+
+    msg = _get_client().messages.create(
+        model="claude-opus-4-7",
+        max_tokens=120,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    return msg.content[0].text.strip()
 
 
 def write_warming_comment(

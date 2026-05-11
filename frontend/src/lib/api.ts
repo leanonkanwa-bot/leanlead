@@ -96,6 +96,12 @@ export interface Lead {
   escalation_alert?: boolean;
   // Intelligence fields v5
   aspiration_gap_score?: number | null;
+  price_tier?: "premium" | "mid" | "budget";
+  trust_velocity?: "fast" | "slow" | "unknown";
+  voice_tone_intensity?: number | null;
+  // Intelligence fields v6
+  churn_risk?: number | null;
+  reengagement_message?: string | null;
   created_at: string; updated_at: string;
 }
 
@@ -165,6 +171,8 @@ export const pipelineApi = {
     api.post(`/pipeline/${id}/mark-variant`, { variant }),
   rescan: (id: number) =>
     api.post<{ ok: boolean; old_score: number; new_score: number; delta: number; escalation_alert: boolean }>(`/pipeline/${id}/rescan`),
+  reengage: (id: number) =>
+    api.post<{ ok: boolean; message: string; days_silent: number }>(`/pipeline/${id}/reengage`),
 };
 
 /* ── Follow-ups ── */

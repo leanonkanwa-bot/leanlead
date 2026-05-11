@@ -51,8 +51,9 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
 
   const refetch = () => qc.invalidateQueries({ queryKey: ["leads"] });
 
-  const qualify   = useMutation({ mutationFn: () => pipelineApi.qualify(lead.id), onSuccess: refetch });
-  const rescan    = useMutation({ mutationFn: () => pipelineApi.rescan(lead.id), onSuccess: refetch });
+  const qualify    = useMutation({ mutationFn: () => pipelineApi.qualify(lead.id), onSuccess: refetch });
+  const rescan     = useMutation({ mutationFn: () => pipelineApi.rescan(lead.id), onSuccess: refetch });
+  const reengage   = useMutation({ mutationFn: () => pipelineApi.reengage(lead.id), onSuccess: refetch });
   const writeAb   = useMutation({ mutationFn: () => pipelineApi.writeAb(lead.id), onSuccess: refetch });
   const warm      = useMutation({ mutationFn: () => pipelineApi.warm(lead.id), onSuccess: refetch });
   const markWarmed = useMutation({
@@ -75,7 +76,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
     setCopied(key); setTimeout(() => setCopied(null), 1500);
   }
 
-  const busy = qualify.isPending || rescan.isPending || writeAb.isPending || reply.isPending || warm.isPending;
+  const busy = qualify.isPending || rescan.isPending || writeAb.isPending || reply.isPending || warm.isPending || reengage.isPending;
   const psycho = lead.psychographic_profile;
   const sourceBadge = lead.source_tag ? SOURCE_BADGES[lead.source_tag] : null;
 
@@ -194,13 +195,71 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                       </div>
                     </div>
                   )}
-                  <button
-                    onClick={() => rescan.mutate()}
-                    disabled={rescan.isPending}
-                    className="mt-3 text-[10px] text-slate-600 hover:text-slate-400 transition-colors disabled:opacity-40"
-                  >
-                    {rescan.isPending ? "⟳ Rescan…" : "⟳ Rescan douleur"}
-                  </button>
+                  {/* Price tier + Trust velocity row */}
+                  {(lead.price_tier || lead.trust_velocity) && (
+                    <div className="mt-2 flex gap-2 flex-wrap">
+                      {lead.price_tier === "premium" && (
+                        <span className="text-[10px] bg-yellow-950/30 text-yellow-400 border border-yellow-900/40 px-2 py-0.5 rounded-full">
+                          💎 Prospect premium — DM haut de gamme
+                        </span>
+                      )}
+                      {lead.price_tier === "budget" && (
+                        <span className="text-[10px] bg-slate-800 text-slate-500 border border-slate-700 px-2 py-0.5 rounded-full">
+                          ⚠️ Signaux budget — ne pas parler de prix
+                        </span>
+                      )}
+                      {lead.trust_velocity === "fast" && (
+                        <span className="text-[10px] bg-emerald-950/30 text-emerald-400 border border-emerald-900/40 px-2 py-0.5 rounded-full">
+                          ⚡ Décideur rapide — CTA direct possible
+                        </span>
+                      )}
+                      {lead.trust_velocity === "slow" && (
+                        <span className="text-[10px] bg-blue-950/30 text-blue-400 border border-blue-900/40 px-2 py-0.5 rounded-full">
+                          🐢 Décideur lent — séquence nurture recommandée
+                        </span>
+                      )}
+                      {lead.voice_tone_intensity != null && lead.voice_tone_intensity >= 60 && (
+                        <span className="text-[10px] bg-orange-950/30 text-orange-400 border border-orange-900/40 px-2 py-0.5 rounded-full">
+                          📣 Intensité émotionnelle {lead.voice_tone_intensity}/100
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => rescan.mutate()}
+                      disabled={rescan.isPending}
+                      className="text-[10px] text-slate-600 hover:text-slate-400 transition-colors disabled:opacity-40"
+                    >
+                      {rescan.isPending ? "⟳ Rescan…" : "⟳ Rescan douleur"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Churn risk + re-engagement */}
+              {lead.stage === "contacted" && !lead.reply_received && (lead.churn_risk ?? 0) >= 0.5 && (
+                <div className="bg-rose-950/20 border border-rose-900/30 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-rose-400 font-medium">🧊 Lead en train de refroidir</p>
+                    <span className="text-[10px] text-rose-500">{Math.round((lead.churn_risk ?? 0) * 100)}% risque</span>
+                  </div>
+                  {lead.reengagement_message ? (
+                    <div>
+                      <p className="text-[10px] text-slate-500 mb-1.5">Message de relance IA</p>
+                      <p className="text-xs text-slate-300 bg-slate-800 rounded-lg p-2.5 leading-relaxed">
+                        {lead.reengagement_message}
+                      </p>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => reengage.mutate()}
+                      disabled={reengage.isPending}
+                      className="text-xs bg-rose-950/40 text-rose-400 border border-rose-900/50 px-3 py-1.5 rounded-lg hover:bg-rose-950/60 transition-colors disabled:opacity-40"
+                    >
+                      {reengage.isPending ? "⟳ Génération…" : "⟳ Générer relance IA"}
+                    </button>
+                  )}
                 </div>
               )}
 

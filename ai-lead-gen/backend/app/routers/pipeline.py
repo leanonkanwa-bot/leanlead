@@ -69,6 +69,14 @@ def qualify(
         lead.response_probability = result["response_probability"]
     if result.get("predicted_objection"):
         lead.predicted_objection = result["predicted_objection"]
+    if result.get("aspiration_gap") is not None:
+        lead.aspiration_gap_score = result["aspiration_gap"]
+    if result.get("price_tier"):
+        lead.price_tier = result["price_tier"]
+    if result.get("trust_velocity"):
+        lead.trust_velocity = result["trust_velocity"]
+    if result.get("voice_tone_intensity") is not None:
+        lead.voice_tone_intensity = result["voice_tone_intensity"]
     db.commit()
     db.refresh(lead)
 
@@ -94,13 +102,21 @@ def write(
         "predicted_objection": getattr(lead, "predicted_objection", "") or "",
     }
     message = writer_agent.write_outreach_message(
-        lead_data={"name": lead.name, "bio": lead.bio or ""},
+        lead_data={
+            "name": lead.name, "bio": lead.bio or "",
+            "posts_summary": lead.posts_summary or "", "platform": lead.platform,
+        },
         coach_name=coach.name,
         coach_niche=coach.niche or "",
         coach_offer=coach.offer_description or "",
-        qualification=qualification,
+        qualification={
+            **qualification,
+            "price_tier": getattr(lead, "price_tier", "mid") or "mid",
+            "trust_velocity": getattr(lead, "trust_velocity", "unknown") or "unknown",
+        },
         language=getattr(lead, "language", None) or "fr",
         testimonials=testimonials,
+        coach_id=coach.id,
     )
     lead.outreach_message = message
     lead.stage = "contacted"
@@ -253,9 +269,14 @@ def write_ab_variants(
         coach_name=coach.name,
         coach_niche=coach.niche or "",
         coach_offer=coach.offer_description or "",
-        qualification=qualification,
+        qualification={
+            **qualification,
+            "price_tier": getattr(lead, "price_tier", "mid") or "mid",
+            "trust_velocity": getattr(lead, "trust_velocity", "unknown") or "unknown",
+        },
         language=language,
         testimonials=testimonials,
+        coach_id=coach.id,
     )
     lead.outreach_message = va
     lead.dm_variant_b = vb
@@ -328,6 +349,14 @@ def rescan_lead(
         lead.response_probability = result["response_probability"]
     if result.get("predicted_objection"):
         lead.predicted_objection = result["predicted_objection"]
+    if result.get("aspiration_gap") is not None:
+        lead.aspiration_gap_score = result["aspiration_gap"]
+    if result.get("price_tier"):
+        lead.price_tier = result["price_tier"]
+    if result.get("trust_velocity"):
+        lead.trust_velocity = result["trust_velocity"]
+    if result.get("voice_tone_intensity") is not None:
+        lead.voice_tone_intensity = result["voice_tone_intensity"]
     db.commit()
     db.refresh(lead)
 
@@ -339,3 +368,37 @@ def rescan_lead(
         "escalation_alert": lead.escalation_alert,
         "lead": _serialize(lead),
     }
+
+
+@router.post("/{lead_id}/reengage")
+def generate_reengagement(
+    lead_id: int,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    """
+    Feature 6: Predictive Churn Prevention.
+    Generates a re-engagement DM for a lead going cold.
+    """
+    lead = _get_lead_or_404(lead_id, coach, db)
+    days_silent = 0
+    if lead.messaged_at:
+        from datetime import datetime
+        days_silent = (datetime.utcnow() - lead.messaged_at).days
+
+    message = writer_agent.write_reengagement_message(
+        lead_data={
+            "name": lead.name,
+            "bio": lead.bio or "",
+            "recommended_angle": lead.recommended_angle or "",
+            "notes": lead.notes or "",
+        },
+        coach_name=coach.name,
+        coach_niche=coach.niche or "",
+        days_silent=days_silent,
+        language=getattr(lead, "language", None) or "fr",
+        coach_id=coach.id,
+    )
+    lead.reengagement_message = message
+    db.commit()
+    return {"ok": True, "message": message, "days_silent": days_silent}

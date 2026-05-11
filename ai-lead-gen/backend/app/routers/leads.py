@@ -83,6 +83,12 @@ def _serialize(lead: models.Lead) -> dict:
         "escalation_alert": bool(getattr(lead, "escalation_alert", False)),
         # Intelligence fields v5
         "aspiration_gap_score": getattr(lead, "aspiration_gap_score", None),
+        "price_tier": getattr(lead, "price_tier", "mid") or "mid",
+        "trust_velocity": getattr(lead, "trust_velocity", "unknown") or "unknown",
+        "voice_tone_intensity": getattr(lead, "voice_tone_intensity", None),
+        # Intelligence fields v6
+        "churn_risk": getattr(lead, "churn_risk", None),
+        "reengagement_message": getattr(lead, "reengagement_message", None),
         "created_at": lead.created_at.isoformat() if lead.created_at else None,
         "updated_at": lead.updated_at.isoformat() if lead.updated_at else None,
     }

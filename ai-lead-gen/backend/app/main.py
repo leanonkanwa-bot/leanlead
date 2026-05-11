@@ -47,6 +47,14 @@ _migrations = [
     "ALTER TABLE coaches ADD COLUMN testimonials TEXT",
     # Intelligence fields v5 — aspiration gap detector
     "ALTER TABLE leads ADD COLUMN aspiration_gap_score REAL DEFAULT 0",
+    # Intelligence fields v5 — price tier, trust velocity, voice tone
+    "ALTER TABLE leads ADD COLUMN price_tier TEXT DEFAULT 'mid'",
+    "ALTER TABLE leads ADD COLUMN trust_velocity TEXT DEFAULT 'unknown'",
+    "ALTER TABLE leads ADD COLUMN voice_tone_intensity REAL DEFAULT 0",
+    # Intelligence fields v6 — churn prevention, emotional trajectory
+    "ALTER TABLE leads ADD COLUMN churn_risk REAL DEFAULT 0",
+    "ALTER TABLE leads ADD COLUMN emotion_history TEXT",
+    "ALTER TABLE leads ADD COLUMN reengagement_message TEXT",
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:
