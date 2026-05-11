@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { authApi } from "../lib/api";
+import { authApi, type Testimonial } from "../lib/api";
 
 const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div>
@@ -22,6 +22,9 @@ export default function Settings() {
   });
   const [apifyKey, setApifyKey] = useState("");
   const [saved, setSaved] = useState(false);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [newT, setNewT] = useState<Testimonial>({ name: "", situation: "", result: "" });
+  const [testimonialSaved, setTestimonialSaved] = useState(false);
 
   useEffect(() => {
     if (coach) {
@@ -31,6 +34,7 @@ export default function Settings() {
         target_audience:   coach.target_audience   || "",
         calendly_link:     coach.calendly_link     || "",
       });
+      setTestimonials(coach.testimonials || []);
     }
   }, [coach]);
 
@@ -39,9 +43,9 @@ export default function Settings() {
 
   const save = useMutation({
     mutationFn: () => {
-      const payload: Record<string, string> = { ...form };
+      const payload: Record<string, unknown> = { ...form };
       if (apifyKey) payload.apify_api_key = apifyKey;
-      return authApi.updateSettings(payload);
+      return authApi.updateSettings(payload as Parameters<typeof authApi.updateSettings>[0]);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
@@ -50,6 +54,21 @@ export default function Settings() {
       setTimeout(() => setSaved(false), 3000);
     },
   });
+
+  const saveTestimonials = useMutation({
+    mutationFn: () => authApi.updateSettings({ testimonials }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["me"] });
+      setTestimonialSaved(true);
+      setTimeout(() => setTestimonialSaved(false), 2000);
+    },
+  });
+
+  function addTestimonial() {
+    if (!newT.situation && !newT.result) return;
+    setTestimonials(t => [...t, { ...newT, name: newT.name || "Client anonyme" }]);
+    setNewT({ name: "", situation: "", result: "" });
+  }
 
   const inputCls = "w-full bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 focus:shadow-glow-sm transition-all duration-150";
 
@@ -98,6 +117,74 @@ export default function Settings() {
                     placeholder="https://calendly.com/yourname/30min" />
                 </Field>
               </div>
+            </div>
+
+            {/* Social Proof Testimonials */}
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+              <p className="font-heading text-sm font-semibold text-white mb-1">Témoignages clients</p>
+              <p className="text-[11px] text-slate-500 mb-4">
+                L'IA référence naturellement le témoignage le plus pertinent dans les DMs pour augmenter la confiance.
+              </p>
+
+              {/* Existing testimonials */}
+              {testimonials.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  {testimonials.map((t, i) => (
+                    <div key={i} className="bg-slate-900 border border-[#2a2a2a] rounded-xl px-4 py-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-slate-200 truncate">{t.name}</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                          {t.situation} → {t.result}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setTestimonials(ts => ts.filter((_, j) => j !== i))}
+                        className="text-slate-600 hover:text-red-400 text-lg leading-none flex-shrink-0 transition-colors"
+                      >×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add new testimonial */}
+              <div className="space-y-2 border border-dashed border-slate-700/50 rounded-xl p-3">
+                <p className="text-[10px] text-slate-600 font-medium">Ajouter un témoignage</p>
+                <input
+                  value={newT.name}
+                  onChange={e => setNewT(t => ({ ...t, name: e.target.value }))}
+                  placeholder="Prénom du client (ex. Sarah)"
+                  className="w-full bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-brand-500 transition-colors text-slate-200 placeholder-slate-600"
+                />
+                <input
+                  value={newT.situation}
+                  onChange={e => setNewT(t => ({ ...t, situation: e.target.value }))}
+                  placeholder="Situation initiale (ex. coach sans clients, stressée, 2 ans d'échecs)"
+                  className="w-full bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-brand-500 transition-colors text-slate-200 placeholder-slate-600"
+                />
+                <input
+                  value={newT.result}
+                  onChange={e => setNewT(t => ({ ...t, result: e.target.value }))}
+                  placeholder="Résultat obtenu (ex. 5 clients premium en 60 jours, +8k€/mois)"
+                  className="w-full bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-brand-500 transition-colors text-slate-200 placeholder-slate-600"
+                />
+                <button
+                  onClick={addTestimonial}
+                  disabled={!newT.situation && !newT.result}
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-40 rounded-xl text-xs font-medium text-slate-300 transition-colors"
+                >
+                  + Ajouter
+                </button>
+              </div>
+
+              {testimonials.length > 0 && (
+                <button
+                  onClick={() => saveTestimonials.mutate()}
+                  disabled={saveTestimonials.isPending}
+                  className="mt-3 w-full py-2 bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-400 text-xs rounded-xl transition-colors disabled:opacity-40"
+                >
+                  {testimonialSaved ? "✓ Sauvegardé" : saveTestimonials.isPending ? "Enregistrement…" : "Enregistrer les témoignages"}
+                </button>
+              )}
             </div>
 
             {/* Account info */}

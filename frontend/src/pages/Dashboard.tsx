@@ -1328,9 +1328,54 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
   const maxConv    = Math.max(...stats.followup_conversions.map(c => c.count), 1);
   const convColors = ["bg-slate-500", "bg-sky-500", "bg-brand-500", "bg-amber-500"];
 
+  const forecast = stats.pipeline_forecast;
+  const timingReady = stats.timing_ready ?? [];
+  const escalations = stats.escalation_alerts ?? [];
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <h2 className="font-heading font-extrabold text-2xl text-white">Analytics</h2>
+
+      {/* ── Intelligence alerts ── */}
+      {(timingReady.length > 0 || escalations.length > 0) && (
+        <div className="grid sm:grid-cols-2 gap-4">
+          {/* Timing ready */}
+          {timingReady.length > 0 && (
+            <div className="bg-slate-900 border border-brand-900/40 rounded-2xl p-4">
+              <p className="text-xs font-semibold text-brand-400 mb-2">🕐 Contacter maintenant</p>
+              <p className="text-[11px] text-slate-500 mb-3">Ces leads sont actifs à cette heure-ci.</p>
+              <div className="space-y-2">
+                {timingReady.slice(0, 5).map(l => (
+                  <div key={l.lead_id} className="flex items-center justify-between">
+                    <span className="text-xs text-slate-300 truncate">{l.name}</span>
+                    <span className="text-[10px] text-slate-500 ml-2 flex-shrink-0">
+                      score {l.score.toFixed(0)} · {l.best_contact_time}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Escalation alerts */}
+          {escalations.length > 0 && (
+            <div className="bg-slate-900 border border-red-900/40 rounded-2xl p-4">
+              <p className="text-xs font-semibold text-red-400 mb-2">⚡ Douleur en escalade</p>
+              <p className="text-[11px] text-slate-500 mb-3">Ces leads postent plus de signaux de douleur — contacter maintenant.</p>
+              <div className="space-y-2">
+                {escalations.slice(0, 5).map(l => (
+                  <div key={l.lead_id} className="flex items-center justify-between">
+                    <span className="text-xs text-slate-300 truncate">{l.name}</span>
+                    <span className="text-[10px] text-red-400 ml-2 flex-shrink-0">
+                      +{l.score_delta?.toFixed(0)} pts
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── KPIs ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -1450,6 +1495,25 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
             </div>
           </div>
         </div>
+
+        {/* Pipeline forecast */}
+        {forecast && forecast.active_leads > 0 && (
+          <div className="bg-slate-900 border border-brand-900/30 rounded-2xl p-5 space-y-3 col-span-full sm:col-span-1">
+            <h3 className="font-heading font-bold text-sm text-white">Prévision pipeline</h3>
+            <p className="text-[11px] text-slate-500">
+              Valeur pondérée des {forecast.active_leads} leads actifs selon leur score et le taux de conversion historique.
+            </p>
+            <div className="flex items-end gap-2">
+              <p className={`text-3xl font-black ${forecast.weighted_value > 0 ? "text-brand-400" : "text-slate-600"}`}>
+                {forecast.weighted_value > 0 ? `${forecast.weighted_value.toLocaleString("fr-FR")} €` : "—"}
+              </p>
+              <p className="text-xs text-slate-500 mb-1">potentiel estimé</p>
+            </div>
+            <p className="text-[10px] text-slate-600">
+              Basé sur : score ≥80 → 30% · 60-79 → 15% · 40-59 → 7% · &lt;40 → 2%
+            </p>
+          </div>
+        )}
 
         {/* Onboarding checklist */}
         <OnboardingChecklist ob={stats.onboarding} />

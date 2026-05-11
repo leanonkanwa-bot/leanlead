@@ -40,6 +40,11 @@ _migrations = [
     "ALTER TABLE leads ADD COLUMN warming_status TEXT DEFAULT 'none'",
     "ALTER TABLE leads ADD COLUMN warming_comment TEXT",
     "ALTER TABLE leads ADD COLUMN source_tag TEXT",
+    # Intelligence fields v4 — objection pre-emption, pain escalation, social proof
+    "ALTER TABLE leads ADD COLUMN predicted_objection TEXT",
+    "ALTER TABLE leads ADD COLUMN score_delta REAL",
+    "ALTER TABLE leads ADD COLUMN escalation_alert INTEGER DEFAULT 0",
+    "ALTER TABLE coaches ADD COLUMN testimonials TEXT",
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:

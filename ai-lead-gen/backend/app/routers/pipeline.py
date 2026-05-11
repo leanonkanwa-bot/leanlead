@@ -1,9 +1,10 @@
 """
 Pipeline router – runs agents on a lead and updates the DB.
-POST /api/pipeline/{lead_id}/qualify   → qualifier_agent
-POST /api/pipeline/{lead_id}/write     → writer_agent (sets stage=contacted + messaged_at)
-POST /api/pipeline/{lead_id}/reply     → reply_agent  (sets stage=replied)
-PATCH /api/pipeline/{lead_id}/stage   → manual stage override
+POST /api/pipeline/{lead_id}/qualify    → qualifier_agent
+POST /api/pipeline/{lead_id}/write      → writer_agent (sets stage=contacted + messaged_at)
+POST /api/pipeline/{lead_id}/reply      → reply_agent  (sets stage=replied)
+PATCH /api/pipeline/{lead_id}/stage     → manual stage override
+POST /api/pipeline/{lead_id}/rescan     → re-qualify and detect pain escalation
 """
 import json
 from datetime import datetime
@@ -66,6 +67,8 @@ def qualify(
         lead.language = psycho.get("language", "fr")
     if result.get("response_probability") is not None:
         lead.response_probability = result["response_probability"]
+    if result.get("predicted_objection"):
+        lead.predicted_objection = result["predicted_objection"]
     db.commit()
     db.refresh(lead)
 
@@ -82,11 +85,13 @@ def write(
     if not lead.qualification_reason:
         raise HTTPException(status_code=400, detail="Qualify this lead first")
 
+    testimonials = json.loads(getattr(coach, "testimonials", None) or "[]") or None
     qualification = {
         "score": lead.qualification_score,
         "reason": lead.qualification_reason,
         "pain_points": json.loads(lead.pain_points or "[]"),
         "recommended_angle": lead.recommended_angle or "",
+        "predicted_objection": getattr(lead, "predicted_objection", "") or "",
     }
     message = writer_agent.write_outreach_message(
         lead_data={"name": lead.name, "bio": lead.bio or ""},
@@ -94,6 +99,8 @@ def write(
         coach_niche=coach.niche or "",
         coach_offer=coach.offer_description or "",
         qualification=qualification,
+        language=getattr(lead, "language", None) or "fr",
+        testimonials=testimonials,
     )
     lead.outreach_message = message
     lead.stage = "contacted"
@@ -230,11 +237,13 @@ def write_ab_variants(
         raise HTTPException(400, "Qualify this lead first")
 
     language = getattr(lead, "language", None) or "fr"
+    testimonials = json.loads(getattr(coach, "testimonials", None) or "[]") or None
     qualification = {
         "score": lead.qualification_score,
         "reason": lead.qualification_reason,
         "pain_points": json.loads(lead.pain_points or "[]"),
         "recommended_angle": lead.recommended_angle or "",
+        "predicted_objection": getattr(lead, "predicted_objection", "") or "",
     }
     va, vb = writer_agent.write_ab_variants(
         lead_data={
@@ -246,6 +255,7 @@ def write_ab_variants(
         coach_offer=coach.offer_description or "",
         qualification=qualification,
         language=language,
+        testimonials=testimonials,
     )
     lead.outreach_message = va
     lead.dm_variant_b = vb
@@ -273,3 +283,59 @@ def mark_variant_sent(
     lead.messaged_at = lead.messaged_at or datetime.utcnow()
     db.commit()
     return {"ok": True, "variant_sent": req.variant}
+
+
+@router.post("/{lead_id}/rescan")
+def rescan_lead(
+    lead_id: int,
+    coach: models.Coach = Depends(get_current_coach),
+    db: Session = Depends(get_db),
+):
+    """
+    Re-qualifies a lead to detect pain escalation.
+    If score increases by ≥10 points, sets escalation_alert=True.
+    """
+    if not coach.niche or not coach.offer_description:
+        raise HTTPException(400, "Complete onboarding before rescanning leads")
+    lead = _get_lead_or_404(lead_id, coach, db)
+
+    old_score = lead.qualification_score or 0
+
+    result = qualifier_agent.qualify_lead(
+        lead_data={
+            "name": lead.name, "handle": lead.handle, "platform": lead.platform,
+            "bio": lead.bio or "", "followers": lead.followers,
+            "posts_summary": lead.posts_summary or "",
+        },
+        coach_niche=coach.niche,
+        coach_offer=coach.offer_description,
+    )
+
+    new_score = result.get("score", 0)
+    delta = new_score - old_score
+
+    lead.qualification_score = new_score
+    lead.qualification_reason = result.get("reason", "")
+    lead.pain_points = json.dumps(result.get("pain_points", []))
+    lead.recommended_angle = result.get("recommended_angle", "")
+    lead.score_delta = delta
+    lead.escalation_alert = delta >= 10
+    psycho = result.get("psychographic", {})
+    if psycho:
+        lead.psychographic_profile = json.dumps(psycho)
+        lead.language = psycho.get("language", lead.language or "fr")
+    if result.get("response_probability") is not None:
+        lead.response_probability = result["response_probability"]
+    if result.get("predicted_objection"):
+        lead.predicted_objection = result["predicted_objection"]
+    db.commit()
+    db.refresh(lead)
+
+    return {
+        "ok": True,
+        "old_score": old_score,
+        "new_score": new_score,
+        "delta": delta,
+        "escalation_alert": lead.escalation_alert,
+        "lead": _serialize(lead),
+    }

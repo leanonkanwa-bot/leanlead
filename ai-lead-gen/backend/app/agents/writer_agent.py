@@ -36,6 +36,20 @@ _PLATFORM_STYLE = {
 }
 
 
+def _build_social_proof_block(testimonials: list[dict] | None, pain_context: str) -> str:
+    """Pick the most relevant testimonial and format it for injection."""
+    if not testimonials:
+        return ""
+    # Use the first testimonial as a fallback; ideally Claude picks the best match
+    t = testimonials[0]
+    name = t.get("name", "un client")
+    situation = t.get("situation", "")
+    result = t.get("result", "")
+    if not situation and not result:
+        return ""
+    return f'\nSocial proof (weave naturally if relevant — ONE brief mention max): "{name} était dans une situation similaire ({situation}) — {result}"'
+
+
 def write_outreach_message(
     lead_data: dict,
     coach_name: str,
@@ -43,21 +57,25 @@ def write_outreach_message(
     coach_offer: str,
     qualification: dict,
     language: str = "fr",
+    testimonials: list[dict] | None = None,
 ) -> str:
     """
     Returns a ready-to-send DM in the lead's language.
-    Never mentions coaching, services, or a sales call.
+    Optionally weaves in a matching social proof testimonial.
     """
     first_name = (lead_data.get("name") or "").split()[0] or "toi"
     pain_context = qualification.get("recommended_angle", "") or \
                    (qualification.get("pain_points", [""])[0] if qualification.get("pain_points") else "")
     all_pains = ", ".join(qualification.get("pain_points", [])) or "unknown"
+    objection = qualification.get("predicted_objection", "")
     bio = lead_data.get("bio", "")
     posts = lead_data.get("posts_summary", "")
     platform = lead_data.get("platform", "instagram")
 
     lang_name, lang_note = _LANGUAGE_INSTRUCTIONS.get(language, _LANGUAGE_INSTRUCTIONS["fr"])
     platform_style = _PLATFORM_STYLE.get(platform, _PLATFORM_STYLE["instagram"])
+    proof_block = _build_social_proof_block(testimonials, pain_context)
+    objection_block = f"\nPredicted objection to pre-empt subtly (don't name it directly): {objection}" if objection else ""
 
     prompt = f"""You are {coach_name}. Write a DM to {first_name} in {lang_name}. {lang_note}
 
@@ -65,24 +83,26 @@ Their profile:
 - Bio: {bio}
 - Recent content: {posts}
 - Pain they express: {all_pains}
-- Best angle: {pain_context}
+- Best angle: {pain_context}{proof_block}{objection_block}
 
 Platform: {platform} — Style: {platform_style}
 
 Rules:
 1. Open with ONE sentence showing you noticed something SPECIFIC they expressed
 2. Acknowledge their struggle with empathy — make them feel SEEN
-3. End with ONE open question inviting them to share more
-4. NEVER mention coaching, programs, offers, calls, or services
-5. NEVER say "I help people like you"
-6. No emojis. Write as a real human, not a marketer.
-7. Use their first name once at the start.
+3. If a social proof is provided, reference it naturally in ONE sentence ("J'ai aidé quelqu'un dans ta situation exacte…")
+4. If a predicted objection is provided, subtly dissolve it without naming it
+5. End with ONE open question inviting them to share more
+6. NEVER mention coaching, programs, offers, calls, or services explicitly
+7. NEVER say "I help people like you"
+8. No emojis. Write as a real human, not a marketer.
+9. Use their first name once at the start.
 
 Return ONLY the DM text."""
 
     msg = _get_client().messages.create(
         model="claude-opus-4-7",
-        max_tokens=256,
+        max_tokens=300,
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text.strip()
@@ -95,37 +115,41 @@ def write_ab_variants(
     coach_offer: str,
     qualification: dict,
     language: str = "fr",
+    testimonials: list[dict] | None = None,
 ) -> tuple[str, str]:
     """
-    Returns (variant_a, variant_b) — two different DM angles for A/B testing.
-    Variant A: empathy angle (acknowledge the pain)
-    Variant B: curiosity angle (ask about their goal/vision)
+    Returns (variant_a, variant_b):
+    Variant A: empathy + social proof + objection pre-emption
+    Variant B: curiosity angle (dream/goal)
     """
     first_name = (lead_data.get("name") or "").split()[0] or "toi"
     pain = qualification.get("recommended_angle", "") or \
            (qualification.get("pain_points", [""])[0] if qualification.get("pain_points") else "")
+    objection = qualification.get("predicted_objection", "")
     bio = lead_data.get("bio", "")
     posts = lead_data.get("posts_summary", "")
     platform = lead_data.get("platform", "instagram")
 
     lang_name, lang_note = _LANGUAGE_INSTRUCTIONS.get(language, _LANGUAGE_INSTRUCTIONS["fr"])
     platform_style = _PLATFORM_STYLE.get(platform, _PLATFORM_STYLE["instagram"])
+    proof_block = _build_social_proof_block(testimonials, pain)
+    objection_block = f"\nPredicted objection to dissolve subtly in variant A: {objection}" if objection else ""
 
-    prompt = f"""You are {coach_name}. Generate TWO different DM openings to {first_name} in {lang_name}. {lang_note}
+    prompt = f"""You are {coach_name}. Generate TWO different DMs to {first_name} in {lang_name}. {lang_note}
 
 Profile:
 - Bio: {bio}
 - Content: {posts}
-- Pain: {pain}
+- Pain: {pain}{proof_block}{objection_block}
 
 Platform: {platform} — Style: {platform_style}
 
-VARIANT A — Empathy angle: Acknowledge their struggle, make them feel understood.
-VARIANT B — Curiosity angle: Ask about their dream/goal, create intrigue about possibility.
+VARIANT A — Empathy + proof: Acknowledge their struggle, reference the social proof naturally if available ("J'ai aidé quelqu'un dans ta situation exacte…"), subtly dissolve their predicted objection.
+VARIANT B — Curiosity: Ask about their dream/goal, create intrigue about what's possible.
 
 Both variants must:
 - Be under 70 words
-- NEVER mention coaching, programs, or services
+- NEVER mention coaching, programs, or services explicitly
 - Feel human and genuine
 - End with ONE open question
 

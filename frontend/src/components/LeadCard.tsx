@@ -31,6 +31,7 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
   const followupDue = lead.stage === "contacted" && lead.messaged_at && !lead.reply_received;
   const sourceBadge = lead.source_tag ? SOURCE_BADGES[lead.source_tag] : null;
   const prob = lead.response_probability;
+  const escalating = lead.escalation_alert && (lead.score_delta ?? 0) >= 10;
 
   return (
     <div
@@ -83,6 +84,11 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
               : "bg-slate-800/60 text-slate-500 border-slate-700/50"
             }`}>
               {prob}% rép.
+            </span>
+          )}
+          {escalating && (
+            <span className="text-[9px] bg-red-950/60 text-red-400 border border-red-900/50 px-1.5 py-0.5 rounded-full animate-pulse">
+              ⚡ +{lead.score_delta?.toFixed(0)} pts
             </span>
           )}
           {followupDue && (

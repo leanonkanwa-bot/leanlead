@@ -77,6 +77,10 @@ def _serialize(lead: models.Lead) -> dict:
         "warming_status": getattr(lead, "warming_status", "none") or "none",
         "warming_comment": getattr(lead, "warming_comment", None),
         "source_tag": getattr(lead, "source_tag", None),
+        # Intelligence fields v4
+        "predicted_objection": getattr(lead, "predicted_objection", None),
+        "score_delta": getattr(lead, "score_delta", None),
+        "escalation_alert": bool(getattr(lead, "escalation_alert", False)),
         "created_at": lead.created_at.isoformat() if lead.created_at else None,
         "updated_at": lead.updated_at.isoformat() if lead.updated_at else None,
     }

@@ -9,6 +9,12 @@ api.interceptors.request.use((cfg) => {
 });
 
 /* ── Types ── */
+export interface Testimonial {
+  name: string;
+  situation: string;
+  result: string;
+}
+
 export interface Coach {
   id: number; email: string; name: string;
   niche?: string; offer_description?: string;
@@ -16,6 +22,7 @@ export interface Coach {
   icp_pain_points?: string[];
   onboarded: boolean; has_apify_key?: boolean;
   offer_price?: number | null;
+  testimonials?: Testimonial[];
 }
 
 export interface AnalyticsData {
@@ -31,6 +38,9 @@ export interface AnalyticsData {
   closed_leads: number;
   offer_price: number;
   projected_mrr: number;
+  pipeline_forecast: { weighted_value: number; active_leads: number };
+  timing_ready: { lead_id: number; name: string; handle: string; best_contact_time: string; score: number }[];
+  escalation_alerts: { lead_id: number; name: string; handle: string; score: number; score_delta: number }[];
   onboarding: {
     account_created: boolean;
     niche_set: boolean;
@@ -80,6 +90,10 @@ export interface Lead {
   warming_status?: "none" | "comment_ready" | "commented" | "dm_ready";
   warming_comment?: string;
   source_tag?: "viral_post" | "competitor_audience" | "direct" | "hashtag";
+  // Intelligence fields v4
+  predicted_objection?: string;
+  score_delta?: number | null;
+  escalation_alert?: boolean;
   created_at: string; updated_at: string;
 }
 
@@ -108,6 +122,7 @@ export const authApi = {
     niche?: string; offer_description?: string; target_audience?: string;
     icp_pain_points?: string[]; calendly_link?: string;
     apify_api_key?: string; offer_price?: number;
+    testimonials?: Testimonial[];
   }) => api.patch("/auth/settings", d),
 
   onboard: (d: {
@@ -146,6 +161,8 @@ export const pipelineApi = {
     api.post<{ ok: boolean; variant_a: string; variant_b: string }>(`/pipeline/${id}/write-ab`),
   markVariant: (id: number, variant: "A" | "B") =>
     api.post(`/pipeline/${id}/mark-variant`, { variant }),
+  rescan: (id: number) =>
+    api.post<{ ok: boolean; old_score: number; new_score: number; delta: number; escalation_alert: boolean }>(`/pipeline/${id}/rescan`),
 };
 
 /* ── Follow-ups ── */

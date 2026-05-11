@@ -25,6 +25,9 @@ class Coach(Base):
     onboarded = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Social proof testimonials: JSON list of {name, situation, result}
+    testimonials = Column(Text, nullable=True)
+
     # Autonomous agent settings
     agent_enabled = Column(Boolean, default=False)
     agent_frequency_hours = Column(Integer, default=6)
@@ -94,6 +97,10 @@ class Lead(Base):
     warming_status = Column(String, default="none")  # none|comment_ready|commented|dm_ready
     warming_comment = Column(Text)              # AI-generated comment to post before DM
     source_tag = Column(String)                 # viral_post|competitor_audience|direct|hashtag
+    # Intelligence fields (v4)
+    predicted_objection = Column(Text)          # #1 objection pre-empted in DM
+    score_delta = Column(Float)                 # change in score since last rescan
+    escalation_alert = Column(Boolean, default=False)  # True when pain is escalating
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -70,6 +70,7 @@ class SettingsRequest(BaseModel):
     calendly_link: str | None = None
     apify_api_key: str | None = None
     offer_price: float | None = None
+    testimonials: list[dict] | None = None  # [{name, situation, result}, ...]
 
 
 @router.patch("/settings")
@@ -81,7 +82,7 @@ def update_settings(
     import json as _json
     data = req.model_dump(exclude_unset=True)
     for field, value in data.items():
-        if field == "icp_pain_points":
+        if field in ("icp_pain_points", "testimonials"):
             setattr(coach, field, _json.dumps(value) if value is not None else None)
         elif field == "apify_api_key":
             setattr(coach, field, value or None)
@@ -107,6 +108,7 @@ def me(coach: models.Coach = Depends(get_current_coach)):
         "has_apify_key": bool(coach.apify_api_key),
         "offer_price": coach.offer_price,
         "icp_pain_points": _json.loads(coach.icp_pain_points) if coach.icp_pain_points else [],
+        "testimonials": _json.loads(coach.testimonials) if getattr(coach, "testimonials", None) else [],
     }
 
 

@@ -178,11 +178,13 @@ Respond ONLY with valid JSON (no markdown):
     "best_contact_time": "<morning|evening|weekend|anytime>",
     "language": "<fr|en|es|pt|ar|other>"
   }},
-  "response_probability": <0-100 likelihood they reply to a personalized DM>
+  "response_probability": <0-100 likelihood they reply to a personalized DM>,
+  "predicted_objection": "<their single most likely objection to buying, e.g. 'pas les moyens', 'pas le temps', 'déjà essayé', 'pas sûr que ça marche pour moi'>"
 }}
 
 Scoring guide: 85-100 actively venting/explicit pain · 65-84 clear signals · 40-64 indirect · 15-39 weak · 0-14 wrong audience/brand/competitor
-response_probability: consider activity level, pain intensity, awareness stage, engagement patterns"""
+response_probability: consider activity level, pain intensity, awareness stage, engagement patterns
+predicted_objection: infer from their communication style, awareness stage, and content — be specific to THIS person"""
 
     msg = _get_client().messages.create(
         model="claude-opus-4-7",
@@ -200,6 +202,7 @@ response_probability: consider activity level, pain intensity, awareness stage, 
     result.setdefault("recommended_angle", "")
     result.setdefault("psychographic", {})
     result.setdefault("response_probability", 50)
+    result.setdefault("predicted_objection", "")
     result["response_probability"] = max(0, min(100, int(result["response_probability"])))
 
     # Deterministic signal boosts (applied after Claude scoring)

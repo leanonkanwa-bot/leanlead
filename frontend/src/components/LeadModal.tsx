@@ -50,6 +50,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
   const refetch = () => qc.invalidateQueries({ queryKey: ["leads"] });
 
   const qualify   = useMutation({ mutationFn: () => pipelineApi.qualify(lead.id), onSuccess: refetch });
+  const rescan    = useMutation({ mutationFn: () => pipelineApi.rescan(lead.id), onSuccess: refetch });
   const writeAb   = useMutation({ mutationFn: () => pipelineApi.writeAb(lead.id), onSuccess: refetch });
   const warm      = useMutation({ mutationFn: () => pipelineApi.warm(lead.id), onSuccess: refetch });
   const markWarmed = useMutation({
@@ -72,7 +73,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
     setCopied(key); setTimeout(() => setCopied(null), 1500);
   }
 
-  const busy = qualify.isPending || writeAb.isPending || reply.isPending || warm.isPending;
+  const busy = qualify.isPending || rescan.isPending || writeAb.isPending || reply.isPending || warm.isPending;
   const psycho = lead.psychographic_profile;
   const sourceBadge = lead.source_tag ? SOURCE_BADGES[lead.source_tag] : null;
 
@@ -144,6 +145,13 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-xs text-slate-500">Score IA</span>
                     <span className="text-2xl font-black text-brand-400">{lead.qualification_score}/100</span>
+                    {lead.score_delta != null && lead.score_delta !== 0 && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                        lead.score_delta > 0 ? "bg-red-950/60 text-red-400" : "bg-slate-800 text-slate-500"
+                      }`}>
+                        {lead.score_delta > 0 ? "⚡" : "▼"} {lead.score_delta > 0 ? "+" : ""}{lead.score_delta.toFixed(0)} pts
+                      </span>
+                    )}
                     {lead.language && (
                       <span className="ml-auto text-[10px] bg-slate-700 text-slate-400 px-2 py-0.5 rounded uppercase">
                         {lead.language}
@@ -154,12 +162,25 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                     <p className="text-xs text-slate-400 mb-3 leading-relaxed">{lead.qualification_reason}</p>
                   )}
                   {lead.pain_points?.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1.5 mb-3">
                       {lead.pain_points.map(p => (
                         <span key={p} className="text-[10px] bg-[#1a1a1a] text-brand-400 border border-white/[0.08] px-2 py-0.5 rounded-full">{p}</span>
                       ))}
                     </div>
                   )}
+                  {lead.predicted_objection && (
+                    <div className="mt-2 bg-amber-950/20 border border-amber-900/30 rounded-lg px-3 py-2">
+                      <p className="text-[10px] text-amber-600 mb-0.5">Objection probable pré-emtée dans le DM</p>
+                      <p className="text-xs text-amber-400 italic">"{lead.predicted_objection}"</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => rescan.mutate()}
+                    disabled={rescan.isPending}
+                    className="mt-3 text-[10px] text-slate-600 hover:text-slate-400 transition-colors disabled:opacity-40"
+                  >
+                    {rescan.isPending ? "⟳ Rescan…" : "⟳ Rescan douleur"}
+                  </button>
                 </div>
               )}
 

@@ -16,6 +16,48 @@ from .. import models
 router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 
+def _pipeline_forecast(leads: list, offer_price: float) -> dict:
+    """
+    Weighted revenue forecast for active pipeline leads.
+    Conversion probability tiers: score ≥80 → 30%, 60-79 → 15%, 40-59 → 7%, <40 → 2%
+    """
+    active_stages = {"new", "contacted", "replied"}
+    weighted_value = 0.0
+    for lead in leads:
+        if lead.stage not in active_stages:
+            continue
+        score = lead.qualification_score or 0
+        if score >= 80:
+            prob = 0.30
+        elif score >= 60:
+            prob = 0.15
+        elif score >= 40:
+            prob = 0.07
+        else:
+            prob = 0.02
+        weighted_value += prob * offer_price
+    active_count = sum(1 for l in leads if l.stage in active_stages)
+    return {
+        "weighted_value": round(weighted_value),
+        "active_leads": active_count,
+    }
+
+
+def _current_contact_windows() -> list[str]:
+    """Return best_contact_time values that match the current UTC time."""
+    now = datetime.utcnow()
+    hour = now.hour
+    weekday = now.weekday()  # 0=Mon … 6=Sun
+    windows = ["anytime"]
+    if 6 <= hour < 12:
+        windows.append("morning")
+    if 17 <= hour < 22:
+        windows.append("evening")
+    if weekday >= 5:
+        windows.append("weekend")
+    return windows
+
+
 @router.get("")
 def get_analytics(
     coach: models.Coach = Depends(get_current_coach),
@@ -101,6 +143,37 @@ def get_analytics(
     offer_price   = coach.offer_price or 0
     projected_mrr = closed * offer_price
 
+    # ── Pipeline revenue forecast (weighted by score + conversion probability) ──
+    forecast = _pipeline_forecast(leads, offer_price)
+
+    # ── Timing intelligence — leads ready to contact now ──
+    windows = _current_contact_windows()
+    timing_ready: list[dict] = []
+    for lead in leads:
+        if lead.stage not in ("new", "contacted"):
+            continue
+        psycho_raw = getattr(lead, "psychographic_profile", None)
+        if not psycho_raw:
+            continue
+        try:
+            psycho = json.loads(psycho_raw)
+        except Exception:
+            continue
+        bct = psycho.get("best_contact_time", "anytime")
+        if bct in windows:
+            timing_ready.append({"lead_id": lead.id, "name": lead.name or f"@{lead.handle}",
+                                  "handle": lead.handle, "best_contact_time": bct,
+                                  "score": lead.qualification_score})
+    timing_ready.sort(key=lambda x: x["score"], reverse=True)
+
+    # ── Pain escalation alerts ──
+    escalation_alerts = [
+        {"lead_id": l.id, "name": l.name or f"@{l.handle}", "handle": l.handle,
+         "score": l.qualification_score, "score_delta": getattr(l, "score_delta", 0)}
+        for l in leads
+        if getattr(l, "escalation_alert", False)
+    ]
+
     return {
         "leads_this_week":  leads_this_week,
         "leads_this_month": leads_this_month,
@@ -114,6 +187,9 @@ def get_analytics(
         "closed_leads":     closed,
         "offer_price":      offer_price,
         "projected_mrr":    projected_mrr,
+        "pipeline_forecast": forecast,
+        "timing_ready":     timing_ready[:10],
+        "escalation_alerts": escalation_alerts,
         "onboarding": {
             "account_created": True,
             "niche_set":       bool(coach.niche and coach.offer_description),

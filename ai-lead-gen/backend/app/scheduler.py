@@ -43,7 +43,7 @@ def stop_scheduler():
 
 
 def schedule_coach(coach_id: int, frequency_hours: int = 6, run_immediately: bool = False):
-    """Add or replace a coach's autonomous recurring job."""
+    """Add or replace a coach's autonomous recurring job + daily escalation rescan."""
     s = get_scheduler()
     if s is None:
         return
@@ -59,6 +59,17 @@ def schedule_coach(coach_id: int, frequency_hours: int = 6, run_immediately: boo
         replace_existing=True,
         next_run_time=next_run,
     )
+    # Daily pain escalation rescan (staggered 3h after autonomous job)
+    rescan_job_id = f"escalation_{coach_id}"
+    if not s.get_job(rescan_job_id):
+        s.add_job(
+            _rescan_for_coach,
+            trigger=IntervalTrigger(hours=24, timezone="UTC"),
+            id=rescan_job_id,
+            args=[coach_id],
+            replace_existing=True,
+            next_run_time=datetime.utcnow() + timedelta(hours=3),
+        )
     logger.info("Scheduled autonomous job for coach %d every %d hours", coach_id, frequency_hours)
 
 
@@ -218,3 +229,74 @@ def _fire_webhook(url: str, coach_id: int, result: dict):
         }, timeout=10)
     except Exception as e:
         logger.warning("Webhook delivery failed: %s", e)
+
+
+def _rescan_for_coach(coach_id: int):
+    """
+    Daily pain escalation rescan — re-qualifies contacted/replied leads
+    and sets escalation_alert=True when score increases by ≥10 points.
+    Fires webhook if new escalations found.
+    """
+    import json
+    from .database import SessionLocal
+    from . import models
+    from .agents import qualifier_agent
+
+    db = SessionLocal()
+    try:
+        coach = db.query(models.Coach).filter(models.Coach.id == coach_id).first()
+        if not coach or not getattr(coach, "agent_enabled", False) or not coach.onboarded:
+            return
+        if not coach.niche or not coach.offer_description:
+            return
+
+        rescan_stages = {"new", "contacted", "replied"}
+        leads = db.query(models.Lead).filter(
+            models.Lead.coach_id == coach_id,
+            models.Lead.stage.in_(rescan_stages),
+        ).all()
+
+        escalated = []
+        for lead in leads:
+            try:
+                old_score = lead.qualification_score or 0
+                result = qualifier_agent.qualify_lead(
+                    lead_data={
+                        "name": lead.name, "handle": lead.handle, "platform": lead.platform,
+                        "bio": lead.bio or "", "followers": lead.followers,
+                        "posts_summary": lead.posts_summary or "",
+                    },
+                    coach_niche=coach.niche,
+                    coach_offer=coach.offer_description,
+                )
+                new_score = result.get("score", 0)
+                delta = new_score - old_score
+                lead.qualification_score = new_score
+                lead.score_delta = delta
+                lead.escalation_alert = delta >= 10
+                if result.get("pain_points"):
+                    lead.pain_points = json.dumps(result["pain_points"])
+                if result.get("predicted_objection"):
+                    lead.predicted_objection = result["predicted_objection"]
+                if delta >= 10:
+                    escalated.append({"id": lead.id, "name": lead.name, "delta": delta})
+            except Exception as e:
+                logger.warning("Rescan failed for lead %d: %s", lead.id, e)
+        db.commit()
+
+        if escalated:
+            logger.info("Escalation rescan for coach %d: %d leads escalated", coach_id, len(escalated))
+            if getattr(coach, "webhook_url", None):
+                try:
+                    import httpx
+                    httpx.post(coach.webhook_url, json={
+                        "event": "pain_escalation",
+                        "coach_id": coach_id,
+                        "escalated_leads": escalated,
+                    }, timeout=10)
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.exception("Escalation rescan failed for coach %d: %s", coach_id, e)
+    finally:
+        db.close()
