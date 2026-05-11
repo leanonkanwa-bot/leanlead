@@ -308,8 +308,8 @@ function Features() {
     },
     {
       icon: "📊",
-      title: "Pipeline Kanban + Airtable",
-      desc: "Vue visuelle Nouveau → Contacté → Répondu → Réservé → Clôturé. Synchronisation Airtable en un clic, intégration Calendly native.",
+      title: "Pipeline Kanban",
+      desc: "Vue visuelle Nouveau → Contacté → Répondu → Réservé → Clôturé. Glissez-déposez vos leads d'une étape à l'autre, intégration Calendly native.",
     },
   ];
 
@@ -504,7 +504,6 @@ function Pricing() {
               "Scraping Instagram + TikTok",
               "Relances J+2 / J+4 / J+7",
               "Gestion des réponses IA",
-              "Synchronisation Airtable",
               "Intégration Calendly",
               "Support prioritaire",
             ]}

@@ -24,9 +24,6 @@ class OnboardRequest(BaseModel):
     target_audience: str
     icp_pain_points: list[str] | None = None
     calendly_link: str | None = None
-    airtable_base_id: str | None = None
-    airtable_api_key: str | None = None
-    apify_api_key: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -70,7 +67,6 @@ class SettingsRequest(BaseModel):
     target_audience: str | None = None
     icp_pain_points: list[str] | None = None
     calendly_link: str | None = None
-    apify_api_key: str | None = None
     offer_price: float | None = None
     testimonials: list[dict] | None = None  # [{name, situation, result}, ...]
 
@@ -86,8 +82,6 @@ def update_settings(
     for field, value in data.items():
         if field in ("icp_pain_points", "testimonials"):
             setattr(coach, field, _json.dumps(value) if value is not None else None)
-        elif field == "apify_api_key":
-            setattr(coach, field, value or None)
         else:
             setattr(coach, field, value)
     coach.onboarded = True
@@ -107,7 +101,6 @@ def me(coach: models.Coach = Depends(get_current_coach)):
         "target_audience": coach.target_audience,
         "calendly_link": coach.calendly_link,
         "onboarded": coach.onboarded,
-        "has_apify_key": bool(coach.apify_api_key),
         "offer_price": coach.offer_price,
         "icp_pain_points": _json.loads(coach.icp_pain_points) if coach.icp_pain_points else [],
         "testimonials": _json.loads(coach.testimonials) if getattr(coach, "testimonials", None) else [],
@@ -264,12 +257,6 @@ def onboard(req: OnboardRequest, coach: models.Coach = Depends(get_current_coach
     coach.calendly_link = req.calendly_link
     if req.icp_pain_points is not None:
         coach.icp_pain_points = _json.dumps(req.icp_pain_points)
-    if req.airtable_base_id:
-        coach.airtable_base_id = req.airtable_base_id
-    if req.airtable_api_key:
-        coach.airtable_api_key = req.airtable_api_key
-    if req.apify_api_key:
-        coach.apify_api_key = req.apify_api_key
     coach.onboarded = True
     db.commit()
     db.refresh(coach)

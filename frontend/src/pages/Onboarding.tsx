@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../lib/api";
 
-const STEPS = ["Votre coaching", "Votre offre", "Intégrations"];
+const STEPS = ["Votre coaching", "Votre offre", "Votre Calendly"];
 
 function StepBar({ step }: { step: number }) {
   return (
@@ -87,9 +87,6 @@ export default function Onboarding() {
     offer_description: "",
     icp_pain_points: [] as string[],
     calendly_link: "",
-    airtable_base_id: "appfdB2W41J5sVZ2U",
-    airtable_api_key: "",
-    apify_api_key: "",
   });
 
   const setField = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -282,27 +279,15 @@ export default function Onboarding() {
             <>
               <h1 className="font-heading text-lg font-semibold mb-1">Décrivez votre offre</h1>
               <p className="text-xs text-slate-500 mb-6">L'IA rédige des DMs ciblant directement cette transformation.</p>
-              <div className="space-y-5">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Quelle transformation apportez-vous ? *</label>
-                  <textarea
-                    value={form.offer_description}
-                    onChange={setField("offer_description")}
-                    rows={4}
-                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
-                    placeholder="ex. J'aide les femmes à reprendre confiance en elles après une rupture pour attirer la relation de leurs rêves en 90 jours."
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Lien Calendly / réservation</label>
-                  <input
-                    value={form.calendly_link}
-                    onChange={setField("calendly_link")}
-                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
-                    placeholder="https://calendly.com/yourname/30min"
-                  />
-                  <p className="text-xs text-slate-600 mt-1">Utilisé quand l'IA suggère de réserver un appel avec un lead.</p>
-                </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5">Quelle transformation apportez-vous ? *</label>
+                <textarea
+                  value={form.offer_description}
+                  onChange={setField("offer_description")}
+                  rows={4}
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 resize-none"
+                  placeholder="ex. J'aide les femmes à reprendre confiance en elles après une rupture pour attirer la relation de leurs rêves en 90 jours."
+                />
               </div>
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(0)}
@@ -317,31 +302,23 @@ export default function Onboarding() {
             </>
           )}
 
-          {/* ── Step 2 : Intégrations ── */}
+          {/* ── Step 2 : Calendly ── */}
           {step === 2 && (
             <>
-              <h1 className="font-heading text-lg font-semibold mb-1">Connectez vos outils</h1>
-              <p className="text-xs text-slate-500 mb-6">Facultatif — vous pouvez les ajouter plus tard dans les Paramètres.</p>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Airtable Base ID</label>
-                  <input value={form.airtable_base_id} onChange={setField("airtable_base_id")}
-                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-brand-500"
-                    placeholder="appfdB2W41J5sVZ2U" />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Jeton d'accès personnel Airtable</label>
-                  <input type="password" value={form.airtable_api_key} onChange={setField("airtable_api_key")}
-                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
-                    placeholder="pat••••••••••••••••" />
-                  <p className="text-xs text-slate-600 mt-1">airtable.com/create/tokens — nécessite la portée data.records:read + write</p>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Clé API Apify <span className="text-slate-600">(pour le scraping Instagram/TikTok)</span></label>
-                  <input type="password" value={form.apify_api_key} onChange={setField("apify_api_key")}
-                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
-                    placeholder="apify_api_••••••••" />
-                </div>
+              <h1 className="font-heading text-lg font-semibold mb-1">Votre lien de réservation</h1>
+              <p className="text-xs text-slate-500 mb-6">
+                L'IA l'intègre automatiquement dans les DMs quand un lead est prêt à réserver un appel.
+                Vous pouvez le modifier à tout moment dans les Paramètres.
+              </p>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5">Lien Calendly</label>
+                <input
+                  value={form.calendly_link}
+                  onChange={setField("calendly_link")}
+                  className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                  placeholder="https://calendly.com/yourname/30min"
+                />
+                <p className="text-xs text-slate-600 mt-1.5">Facultatif — vous pouvez ajouter le lien plus tard.</p>
               </div>
               {error && <p className="text-red-400 text-xs mt-4 bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2">{error}</p>}
               <div className="flex gap-3 mt-6">

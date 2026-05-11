@@ -20,7 +20,6 @@ export default function Settings() {
   const [form, setForm] = useState({
     niche: "", offer_description: "", target_audience: "", calendly_link: "",
   });
-  const [apifyKey, setApifyKey] = useState("");
   const [saved, setSaved] = useState(false);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [newT, setNewT] = useState<Testimonial>({ name: "", situation: "", result: "" });
@@ -42,14 +41,9 @@ export default function Settings() {
     setForm(f => ({ ...f, [k]: e.target.value }));
 
   const save = useMutation({
-    mutationFn: () => {
-      const payload: Record<string, unknown> = { ...form };
-      if (apifyKey) payload.apify_api_key = apifyKey;
-      return authApi.updateSettings(payload as Parameters<typeof authApi.updateSettings>[0]);
-    },
+    mutationFn: () => authApi.updateSettings(form),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["me"] });
-      setApifyKey("");
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     },

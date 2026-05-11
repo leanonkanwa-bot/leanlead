@@ -20,7 +20,7 @@ export interface Coach {
   niche?: string; offer_description?: string;
   target_audience?: string; calendly_link?: string;
   icp_pain_points?: string[];
-  onboarded: boolean; has_apify_key?: boolean;
+  onboarded: boolean;
   offer_price?: number | null;
   testimonials?: Testimonial[];
 }
@@ -80,7 +80,7 @@ export interface Lead {
   followup_d4_message?: string; followup_d4_sent_at?: string;
   followup_d7_message?: string; followup_d7_sent_at?: string;
   reply_received?: string; suggested_reply?: string;
-  notes?: string; airtable_record_id?: string;
+  notes?: string;
   // Intelligence fields v3
   language?: string;
   psychographic_profile?: Psychographic;
@@ -129,14 +129,13 @@ export const authApi = {
   updateSettings: (d: {
     niche?: string; offer_description?: string; target_audience?: string;
     icp_pain_points?: string[]; calendly_link?: string;
-    apify_api_key?: string; offer_price?: number;
+    offer_price?: number;
     testimonials?: Testimonial[];
   }) => api.patch("/auth/settings", d),
 
   onboard: (d: {
     niche: string; offer_description: string; target_audience: string;
     icp_pain_points?: string[]; calendly_link?: string;
-    airtable_base_id?: string; airtable_api_key?: string; apify_api_key?: string;
   }) => api.post("/auth/onboard", d),
 
   detectNiche: (description: string) =>
