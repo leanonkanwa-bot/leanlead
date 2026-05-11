@@ -25,8 +25,18 @@ class Coach(Base):
     onboarded = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Autonomous agent settings
+    agent_enabled = Column(Boolean, default=False)
+    agent_frequency_hours = Column(Integer, default=6)
+    agent_platforms = Column(Text)        # JSON array e.g. ["instagram","tiktok","linkedin"]
+    agent_max_results_per_platform = Column(Integer, default=20)
+    agent_dm_threshold = Column(Integer, default=70)
+    agent_last_run_at = Column(DateTime)
+    webhook_url = Column(String)
+
     leads = relationship("Lead", back_populates="coach", cascade="all, delete-orphan")
     prospecting_jobs = relationship("ProspectingJob", back_populates="coach", cascade="all, delete-orphan")
+    agent_runs = relationship("AgentRun", back_populates="coach", cascade="all, delete-orphan")
 
 
 class Lead(Base):
@@ -99,3 +109,23 @@ class ProspectingJob(Base):
     finished_at = Column(DateTime)
 
     coach = relationship("Coach", back_populates="prospecting_jobs")
+
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    coach_id = Column(Integer, ForeignKey("coaches.id"), nullable=False)
+
+    status = Column(String, default="running")  # running | done | error
+    platforms_searched = Column(Text)           # JSON list
+    leads_found = Column(Integer, default=0)
+    leads_qualified = Column(Integer, default=0)
+    dms_generated = Column(Integer, default=0)
+    high_score_leads = Column(Integer, default=0)
+    error_message = Column(Text)
+
+    started_at = Column(DateTime, default=datetime.utcnow)
+    finished_at = Column(DateTime)
+
+    coach = relationship("Coach", back_populates="agent_runs")

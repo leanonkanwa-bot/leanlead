@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  authApi, leadsApi, pipelineApi, followupsApi, prospectingApi, analyticsApi,
+  authApi, leadsApi, pipelineApi, followupsApi, prospectingApi, analyticsApi, agentApi,
   type Lead, type Stage, type FollowupDue, type Classification, type ReplyAnalysis,
-  type AnalyticsData,
+  type AnalyticsData, type AgentStatus,
 } from "../lib/api";
 import KanbanBoard from "../components/KanbanBoard";
 
@@ -165,6 +165,42 @@ function ProspectsTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["jobs"] }); qc.invalidateQueries({ queryKey: ["leads"] }); },
   });
 
+  // Auto-load suggestions when platform changes
+  useEffect(() => {
+    setTags([]);
+    suggest.mutate();
+  }, [platform]);
+
+  /* ── Autonomous agent ── */
+  const { data: agentStatus, refetch: refetchAgent } = useQuery<AgentStatus>({
+    queryKey: ["agent-status"],
+    queryFn: () => agentApi.status().then(r => r.data),
+    refetchInterval: (query) =>
+      (query.state.data as AgentStatus | undefined)?.last_run?.status === "running" ? 3_000 : 10_000,
+  });
+
+  const agentSettings = useMutation({
+    mutationFn: (d: Parameters<typeof agentApi.settings>[0]) => agentApi.settings(d),
+    onSuccess: () => refetchAgent(),
+  });
+  const agentTrigger = useMutation({
+    mutationFn: () => agentApi.trigger(),
+    onSuccess: () => { refetchAgent(); qc.invalidateQueries({ queryKey: ["leads"] }); },
+  });
+
+  const agentEnabled = agentStatus?.enabled ?? false;
+  const agentRunning = agentStatus?.last_run?.status === "running";
+  const lastRun = agentStatus?.last_run;
+
+  function formatNextRun(iso?: string): string {
+    if (!iso) return "—";
+    const diff = new Date(iso).getTime() - Date.now();
+    if (diff <= 0) return "imminent";
+    const h = Math.floor(diff / 3_600_000);
+    const m = Math.floor((diff % 3_600_000) / 60_000);
+    return h > 0 ? `dans ${h}h ${m}m` : `dans ${m}m`;
+  }
+
   function addTag() {
     const t = tagInput.replace(/^#/, "").trim().toLowerCase();
     if (t && !tags.includes(t)) setTags(p => [...p, t]);
@@ -182,6 +218,102 @@ function ProspectsTab() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-5">
+
+      {/* ── Agent Autonome ── */}
+      <div className={`border rounded-2xl p-6 transition-colors ${
+        agentEnabled
+          ? "bg-gradient-to-br from-slate-900 to-brand-950/10 border-brand-900/50"
+          : "bg-slate-900 border-[#2a2a2a]"
+      }`}>
+        <div className="flex items-start justify-between gap-4 mb-1">
+          <div>
+            <h2 className="font-semibold text-white flex items-center gap-2">
+              🤖 Agent Autonome
+              {agentRunning && (
+                <span className="text-[10px] bg-brand-500/20 text-brand-400 border border-brand-500/30 px-2 py-0.5 rounded-full animate-pulse">
+                  en cours…
+                </span>
+              )}
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Trouve et qualifie des leads 24h/24, génère les DMs — vous n'avez rien à faire.
+            </p>
+          </div>
+          {/* Toggle */}
+          <button
+            onClick={() => agentSettings.mutate({ enabled: !agentEnabled })}
+            disabled={agentSettings.isPending}
+            aria-label="Activer/désactiver l'agent"
+            className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-colors disabled:opacity-50 ${
+              agentEnabled ? "bg-brand-500" : "bg-slate-700"
+            }`}
+          >
+            <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+              agentEnabled ? "translate-x-7" : "translate-x-1"
+            }`} />
+          </button>
+        </div>
+
+        {agentEnabled && (
+          <>
+            {/* Last run stats */}
+            {lastRun ? (
+              <div className="grid grid-cols-3 gap-2 mt-4 mb-4">
+                <div className="bg-slate-800/70 rounded-xl p-3 text-center">
+                  <div className="text-xl font-black text-white">{lastRun.leads_found}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">leads trouvés</div>
+                </div>
+                <div className="bg-slate-800/70 rounded-xl p-3 text-center">
+                  <div className="text-xl font-black text-brand-400">{lastRun.dms_generated}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">DMs générés</div>
+                </div>
+                <div className="bg-slate-800/70 rounded-xl p-3 text-center">
+                  <div className="text-xl font-black text-emerald-400">{lastRun.high_score_leads}</div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">score ≥70</div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 mb-4 py-4 rounded-xl bg-slate-800/40 text-center">
+                <p className="text-xs text-slate-600">Aucun run encore — déclenchez le premier ci-dessous.</p>
+              </div>
+            )}
+
+            {lastRun?.error_message && (
+              <p className="text-[11px] text-red-400 bg-red-950/30 border border-red-900/30 rounded-lg px-3 py-2 mb-3">
+                Erreur : {lastRun.error_message}
+              </p>
+            )}
+
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] text-slate-600">
+                {agentStatus?.next_run_at
+                  ? `Prochain run : ${formatNextRun(agentStatus.next_run_at)}`
+                  : agentRunning ? "Run en cours…" : "En attente du prochain cycle"}
+              </p>
+              <button
+                onClick={() => agentTrigger.mutate()}
+                disabled={agentRunning || agentTrigger.isPending}
+                className="px-3 py-1.5 bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-400 text-xs rounded-lg transition-colors disabled:opacity-40 flex-shrink-0"
+              >
+                {agentTrigger.isPending ? "Démarrage…" : "▶ Lancer maintenant"}
+              </button>
+            </div>
+            {agentTrigger.isError && (
+              <p className="text-red-400 text-xs mt-2">
+                {(agentTrigger.error as any)?.response?.data?.detail || "Erreur"}
+              </p>
+            )}
+          </>
+        )}
+
+        {!agentEnabled && (
+          <p className="text-xs text-slate-600 mt-3">
+            Activez l'agent pour démarrer la prospection automatique toutes les{" "}
+            {agentStatus?.frequency_hours ?? 6}h sur {agentStatus?.platforms?.length ?? 5} plateformes.
+          </p>
+        )}
+      </div>
+
       {/* ── Prospection par URL ── */}
       <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-6">
         <h2 className="font-semibold text-white mb-1">🚀 Lancer la prospection</h2>

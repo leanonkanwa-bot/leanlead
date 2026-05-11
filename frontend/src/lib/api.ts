@@ -140,6 +140,38 @@ export const analyticsApi = {
   get: () => api.get<AnalyticsData>("/analytics"),
 };
 
+/* ── Autonomous Agent ── */
+export interface AgentRunSummary {
+  id: number; status: string;
+  platforms_searched: string[];
+  leads_found: number; leads_qualified: number;
+  dms_generated: number; high_score_leads: number;
+  error_message?: string;
+  started_at?: string; finished_at?: string;
+}
+
+export interface AgentStatus {
+  enabled: boolean;
+  frequency_hours: number;
+  platforms: string[];
+  max_results_per_platform: number;
+  dm_threshold: number;
+  webhook_url?: string;
+  last_run_at?: string;
+  next_run_at?: string;
+  last_run?: AgentRunSummary | null;
+}
+
+export const agentApi = {
+  status: () => api.get<AgentStatus>("/agent/status"),
+  settings: (d: Partial<{
+    enabled: boolean; frequency_hours: number; platforms: string[];
+    max_results_per_platform: number; dm_threshold: number; webhook_url: string;
+  }>) => api.patch("/agent/settings", d),
+  trigger: () => api.post<{ ok: boolean; message: string }>("/agent/trigger"),
+  runs: () => api.get<AgentRunSummary[]>("/agent/runs"),
+};
+
 /* ── Prospecting ── */
 export const prospectingApi = {
   run: (d: { platform: string; hashtags: string[]; max_results: number; auto_qualify: boolean }) =>
@@ -148,7 +180,8 @@ export const prospectingApi = {
     id: number; platform: string; hashtags: string[]; status: string;
     leads_found: number; error_message?: string; started_at?: string;
   }[]>("/prospecting/jobs"),
-  suggestHashtags: () => api.get<{ hashtags: string[] }>("/prospecting/suggest-hashtags"),
+  suggestHashtags: (platform: string = "instagram") =>
+    api.get<{ hashtags: string[] }>("/prospecting/suggest-hashtags", { params: { platform } }),
   fromUrl: (d: { profile_url: string; auto_write: boolean }) =>
     api.post<Lead>("/prospecting/from-url", d),
 };

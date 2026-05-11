@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import text
 from .database import Base, engine
 from .routers import auth, leads, pipeline, prospecting, followups, analytics
+from .routers import agent as agent_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -20,6 +21,15 @@ Base.metadata.create_all(bind=engine)
 _migrations = [
     "ALTER TABLE coaches ADD COLUMN offer_price REAL",
     "ALTER TABLE coaches ADD COLUMN icp_pain_points TEXT",
+    "UPDATE leads SET qualification_score = qualification_score * 10 WHERE qualification_score > 0 AND qualification_score <= 10",
+    # Autonomous agent fields
+    "ALTER TABLE coaches ADD COLUMN agent_enabled INTEGER DEFAULT 0",
+    "ALTER TABLE coaches ADD COLUMN agent_frequency_hours INTEGER DEFAULT 6",
+    "ALTER TABLE coaches ADD COLUMN agent_platforms TEXT",
+    "ALTER TABLE coaches ADD COLUMN agent_max_results_per_platform INTEGER DEFAULT 20",
+    "ALTER TABLE coaches ADD COLUMN agent_dm_threshold INTEGER DEFAULT 70",
+    "ALTER TABLE coaches ADD COLUMN agent_last_run_at DATETIME",
+    "ALTER TABLE coaches ADD COLUMN webhook_url TEXT",
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:
@@ -27,9 +37,9 @@ with engine.connect() as _conn:
             _conn.execute(text(_sql))
             _conn.commit()
         except Exception:
-            pass  # column already exists
+            pass  # column already exists or migration already applied
 
-app = FastAPI(title="LeanLead AI", version="2.0.0")
+app = FastAPI(title="LeanLead AI", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -45,6 +55,38 @@ app.include_router(pipeline.router)
 app.include_router(prospecting.router)
 app.include_router(followups.router)
 app.include_router(analytics.router)
+app.include_router(agent_router.router)
+
+
+@app.on_event("startup")
+def startup_scheduler():
+    """Start APScheduler and resume jobs for all coaches with agent_enabled."""
+    from .scheduler import start_scheduler, schedule_coach
+    from .database import SessionLocal
+    from . import models
+
+    start_scheduler()
+
+    db = SessionLocal()
+    try:
+        enabled_coaches = (
+            db.query(models.Coach)
+            .filter(models.Coach.agent_enabled == True, models.Coach.onboarded == True)
+            .all()
+        )
+        for coach in enabled_coaches:
+            schedule_coach(coach.id, coach.agent_frequency_hours or 6)
+    except Exception:
+        pass
+    finally:
+        db.close()
+
+
+@app.on_event("shutdown")
+def shutdown_scheduler():
+    from .scheduler import stop_scheduler
+    stop_scheduler()
+
 
 # Serve built React frontend
 _dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
@@ -63,4 +105,4 @@ def root():
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "2.0.0"}
+    return {"status": "ok", "version": "3.0.0"}

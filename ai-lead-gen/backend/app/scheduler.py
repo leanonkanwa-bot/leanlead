@@ -1,0 +1,212 @@
+"""APScheduler-based scheduler for autonomous lead generation jobs."""
+import logging
+import threading
+from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
+
+try:
+    from apscheduler.schedulers.background import BackgroundScheduler
+    from apscheduler.triggers.interval import IntervalTrigger
+    _APSCHEDULER_AVAILABLE = True
+except ImportError:
+    _APSCHEDULER_AVAILABLE = False
+    logger.warning("APScheduler not installed — autonomous agent disabled")
+
+_scheduler = None
+_scheduler_lock = threading.Lock()
+
+
+def get_scheduler():
+    global _scheduler
+    if not _APSCHEDULER_AVAILABLE:
+        return None
+    with _scheduler_lock:
+        if _scheduler is None:
+            _scheduler = BackgroundScheduler(daemon=True, timezone="UTC")
+    return _scheduler
+
+
+def start_scheduler():
+    s = get_scheduler()
+    if s is None:
+        return
+    if not s.running:
+        s.start()
+        logger.info("APScheduler started")
+
+
+def stop_scheduler():
+    s = get_scheduler()
+    if s is not None and s.running:
+        s.shutdown(wait=False)
+
+
+def schedule_coach(coach_id: int, frequency_hours: int = 6, run_immediately: bool = False):
+    """Add or replace a coach's autonomous recurring job."""
+    s = get_scheduler()
+    if s is None:
+        return
+    job_id = f"autonomous_{coach_id}"
+    if s.get_job(job_id):
+        s.remove_job(job_id)
+    next_run = datetime.utcnow() + (timedelta(seconds=5) if run_immediately else timedelta(hours=frequency_hours))
+    s.add_job(
+        _run_for_coach,
+        trigger=IntervalTrigger(hours=frequency_hours, timezone="UTC"),
+        id=job_id,
+        args=[coach_id],
+        replace_existing=True,
+        next_run_time=next_run,
+    )
+    logger.info("Scheduled autonomous job for coach %d every %d hours", coach_id, frequency_hours)
+
+
+def unschedule_coach(coach_id: int):
+    s = get_scheduler()
+    if s is None:
+        return
+    job_id = f"autonomous_{coach_id}"
+    if s.get_job(job_id):
+        s.remove_job(job_id)
+        logger.info("Removed autonomous job for coach %d", coach_id)
+
+
+def get_next_run(coach_id: int) -> datetime | None:
+    s = get_scheduler()
+    if s is None:
+        return None
+    job = s.get_job(f"autonomous_{coach_id}")
+    return job.next_run_time if job else None
+
+
+def trigger_now(coach_id: int):
+    """Trigger an immediate run in a background thread (non-blocking)."""
+    t = threading.Thread(target=_run_for_coach, args=[coach_id], daemon=True)
+    t.start()
+
+
+def _run_for_coach(coach_id: int):
+    """Called by APScheduler or trigger_now — runs a full autonomous cycle."""
+    import json
+    from .database import SessionLocal
+    from . import models
+    from .agents import autonomous_agent, prospector_agent
+
+    db = SessionLocal()
+    run = None
+    try:
+        coach = db.query(models.Coach).filter(models.Coach.id == coach_id).first()
+        if not coach or not getattr(coach, "agent_enabled", False) or not coach.onboarded:
+            return
+        if not coach.niche or not coach.offer_description:
+            return
+
+        platforms = json.loads(getattr(coach, "agent_platforms", None) or
+                               '["instagram","tiktok","linkedin","twitter","reddit"]')
+        icp_pain_points = json.loads(coach.icp_pain_points or "[]") or None
+        max_per_platform = getattr(coach, "agent_max_results_per_platform", None) or 20
+        dm_threshold = getattr(coach, "agent_dm_threshold", None) or 70
+
+        run = models.AgentRun(
+            coach_id=coach_id,
+            status="running",
+            platforms_searched=json.dumps(platforms),
+        )
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+
+        # Generate search terms for each platform
+        search_terms: dict[str, list[str]] = {}
+        for platform in platforms:
+            try:
+                terms = prospector_agent.suggest_hashtags(
+                    niche=coach.niche,
+                    target_audience=coach.target_audience or "",
+                    icp_pain_points=icp_pain_points,
+                    platform=platform,
+                )
+                search_terms[platform] = terms[:5]
+            except Exception as e:
+                logger.warning("suggest_hashtags failed for %s: %s", platform, e)
+                search_terms[platform] = []
+
+        existing = db.query(models.Lead.handle).filter(models.Lead.coach_id == coach_id).all()
+        existing_handles = {row[0] for row in existing if row[0]}
+
+        result = autonomous_agent.run_autonomous(
+            coach_id=coach_id,
+            coach_niche=coach.niche,
+            coach_offer=coach.offer_description,
+            coach_name=coach.name,
+            icp_pain_points=icp_pain_points,
+            platforms=platforms,
+            search_terms_per_platform=search_terms,
+            max_per_platform=max_per_platform,
+            dm_threshold=dm_threshold,
+            existing_handles=existing_handles,
+        )
+
+        for lead_data in result.get("leads", []):
+            lead = models.Lead(
+                coach_id=coach_id,
+                name=lead_data.get("name", ""),
+                handle=lead_data["handle"],
+                platform=lead_data.get("platform", "unknown"),
+                profile_url=lead_data.get("profile_url", ""),
+                bio=lead_data.get("bio", ""),
+                followers=lead_data.get("followers", 0),
+                posts_summary=lead_data.get("posts_summary", ""),
+                qualification_score=lead_data.get("qualification_score", 0),
+                qualification_reason=lead_data.get("qualification_reason", ""),
+                pain_points=lead_data.get("pain_points", "[]"),
+                recommended_angle=lead_data.get("recommended_angle", ""),
+                outreach_message=lead_data.get("outreach_message"),
+                stage="new",
+            )
+            db.add(lead)
+
+        run.status = "done"
+        run.leads_found = result["leads_found"]
+        run.leads_qualified = result["leads_qualified"]
+        run.dms_generated = result["dms_generated"]
+        run.high_score_leads = result["high_score_leads"]
+        run.finished_at = datetime.utcnow()
+        coach.agent_last_run_at = datetime.utcnow()
+        db.commit()
+
+        logger.info(
+            "Autonomous run done for coach %d: %d leads, %d DMs, %d high-score",
+            coach_id, result["leads_found"], result["dms_generated"], result["high_score_leads"],
+        )
+
+        if result["high_score_leads"] > 0 and getattr(coach, "webhook_url", None):
+            _fire_webhook(coach.webhook_url, coach_id, result)
+
+    except Exception as e:
+        logger.exception("Autonomous run failed for coach %d: %s", coach_id, e)
+        if run:
+            try:
+                run.status = "error"
+                run.error_message = str(e)[:500]
+                run.finished_at = datetime.utcnow()
+                db.commit()
+            except Exception:
+                pass
+    finally:
+        db.close()
+
+
+def _fire_webhook(url: str, coach_id: int, result: dict):
+    try:
+        import httpx
+        httpx.post(url, json={
+            "event": "high_score_leads",
+            "coach_id": coach_id,
+            "leads_found": result["leads_found"],
+            "high_score_leads": result["high_score_leads"],
+            "dms_generated": result["dms_generated"],
+        }, timeout=10)
+    except Exception as e:
+        logger.warning("Webhook delivery failed: %s", e)
