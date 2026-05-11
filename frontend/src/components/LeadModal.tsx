@@ -77,7 +77,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                 <div className="bg-slate-800 rounded-xl p-4">
                   <div className="flex items-center gap-3 mb-2">
                     <span className="text-xs text-slate-500">Score IA</span>
-                    <span className="text-2xl font-black text-brand-400">{lead.qualification_score}/10</span>
+                    <span className="text-2xl font-black text-brand-400">{lead.qualification_score}/100</span>
                   </div>
                   {lead.qualification_reason && (
                     <p className="text-xs text-slate-400 mb-3 leading-relaxed">{lead.qualification_reason}</p>

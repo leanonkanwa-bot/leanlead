@@ -8,8 +8,8 @@ const PLATFORM: Record<string, string> = {
 
 function Score({ v }: { v: number }) {
   if (!v) return null;
-  const cls = v >= 8 ? "text-emerald-400" : v >= 6 ? "text-amber-400" : "text-slate-500";
-  const dot = v >= 8 ? "bg-emerald-500" : v >= 6 ? "bg-amber-500" : "bg-slate-600";
+  const cls = v >= 80 ? "text-emerald-400" : v >= 60 ? "text-amber-400" : "text-slate-500";
+  const dot = v >= 80 ? "bg-emerald-500" : v >= 60 ? "bg-amber-500" : "bg-slate-600";
   return (
     <span className={`flex items-center gap-1 text-[10px] font-mono font-bold ${cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />

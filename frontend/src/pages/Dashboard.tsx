@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -127,6 +127,14 @@ function AddLeadModal({ onClose }: { onClose: () => void }) {
 /* ════════════════════════════════════════════════════════════════════
    ONGLET PROSPECTION
 ════════════════════════════════════════════════════════════════════ */
+const PLATFORM_CONFIG: Record<string, { icon: string; label: string; termLabel: string; termPrefix: string; placeholder: string }> = {
+  instagram: { icon: "📸", label: "Instagram", termLabel: "Hashtags", termPrefix: "#", placeholder: "coachbusiness" },
+  tiktok:    { icon: "🎵", label: "TikTok",    termLabel: "Hashtags", termPrefix: "#", placeholder: "entrepreneuriat" },
+  twitter:   { icon: "𝕏",  label: "Twitter",   termLabel: "Mots-clés", termPrefix: "",  placeholder: "online business" },
+  linkedin:  { icon: "💼", label: "LinkedIn",  termLabel: "Mots-clés", termPrefix: "",  placeholder: "scale my business" },
+  reddit:    { icon: "💬", label: "Reddit",    termLabel: "Subreddits", termPrefix: "r/", placeholder: "Entrepreneur" },
+};
+
 function ProspectsTab() {
   const qc = useQueryClient();
   const [profileUrl, setProfileUrl] = useState("");
@@ -137,7 +145,7 @@ function ProspectsTab() {
     mutationFn: () => prospectingApi.fromUrl({ profile_url: profileUrl, auto_write: autoWrite }).then(r => r.data),
     onSuccess: (lead) => {
       qc.invalidateQueries({ queryKey: ["leads"] });
-      setUrlSuccess(`@${lead.handle} ajouté au pipeline${lead.outreach_message ? " avec DM généré" : ""} !`);
+      setUrlSuccess(`@${lead.handle} ajouté au pipeline${lead.outreach_message ? " avec message généré" : ""} !`);
       setProfileUrl("");
       setTimeout(() => setUrlSuccess(null), 6000);
     },
@@ -146,6 +154,7 @@ function ProspectsTab() {
   const [platform, setPlatform] = useState("instagram");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
   const [maxResults, setMaxResults] = useState(20);
   const [autoQualify, setAutoQualify] = useState(true);
 
@@ -156,8 +165,8 @@ function ProspectsTab() {
   });
 
   const suggest = useMutation({
-    mutationFn: () => prospectingApi.suggestHashtags().then(r => r.data.hashtags),
-    onSuccess: t => setTags(t),
+    mutationFn: () => prospectingApi.suggestHashtags(platform).then(r => r.data.hashtags),
+    onSuccess: t => { setSuggestedTags(t); },
   });
 
   const run = useMutation({
@@ -165,13 +174,26 @@ function ProspectsTab() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["jobs"] }); qc.invalidateQueries({ queryKey: ["leads"] }); },
   });
 
-  function addTag() {
-    const t = tagInput.replace(/^#/, "").trim().toLowerCase();
-    if (t && !tags.includes(t)) setTags(p => [...p, t]);
-    setTagInput("");
+  // Auto-load suggestions when platform changes
+  useEffect(() => {
+    setSuggestedTags([]);
+    setTags([]);
+    suggest.mutate();
+  }, [platform]);
+
+  function addTag(t?: string) {
+    const val = (t || tagInput).replace(/^[#r\/]/, "").trim().toLowerCase();
+    if (val && !tags.includes(val)) setTags(p => [...p, val]);
+    if (!t) setTagInput("");
+  }
+
+  function toggleSuggested(t: string) {
+    const val = t.replace(/^[#r\/]/, "").toLowerCase();
+    setTags(p => p.includes(val) ? p.filter(x => x !== val) : [...p, val]);
   }
 
   const running = jobs.some(j => j.status === "running" || j.status === "pending");
+  const cfg = PLATFORM_CONFIG[platform] || PLATFORM_CONFIG.instagram;
 
   const statusColors: Record<string, string> = {
     pending: "text-amber-400", running: "text-brand-400", done: "text-emerald-400", error: "text-red-400",
@@ -184,8 +206,8 @@ function ProspectsTab() {
     <div className="max-w-2xl mx-auto space-y-5">
       {/* ── Prospection par URL ── */}
       <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-6">
-        <h2 className="font-semibold text-white mb-1">🚀 Lancer la prospection</h2>
-        <p className="text-xs text-slate-500 mb-5">Collez l'URL d'un profil TikTok ou Instagram — l'IA le qualifie et rédige le DM automatiquement.</p>
+        <h2 className="font-semibold text-white mb-1">🚀 Ajouter un profil par URL</h2>
+        <p className="text-xs text-slate-500 mb-5">Collez l'URL d'un profil — l'IA le qualifie et rédige le message automatiquement.</p>
 
         <div className="mb-4">
           <label className="text-xs text-slate-400 mb-1.5 block">URL du profil</label>
@@ -193,14 +215,14 @@ function ProspectsTab() {
             value={profileUrl}
             onChange={e => { setProfileUrl(e.target.value); setUrlSuccess(null); fromUrl.reset(); }}
             className="w-full bg-slate-800 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500 transition-colors"
-            placeholder="https://tiktok.com/@nomduprofil ou https://instagram.com/nomduprofil"
+            placeholder="instagram.com/@… · tiktok.com/@… · linkedin.com/in/… · twitter.com/… · reddit.com/u/…"
           />
         </div>
 
         <label className="flex items-center gap-2 cursor-pointer mb-5">
           <input type="checkbox" checked={autoWrite} onChange={e => setAutoWrite(e.target.checked)}
             className="w-4 h-4 accent-brand-500" />
-          <span className="text-sm text-slate-300">Générer le DM automatiquement</span>
+          <span className="text-sm text-slate-300">Générer le message automatiquement</span>
         </label>
 
         {fromUrl.isError && (
@@ -219,57 +241,88 @@ function ProspectsTab() {
           disabled={fromUrl.isPending || !profileUrl.trim()}
           className="w-full py-3 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
           {fromUrl.isPending
-            ? (autoWrite ? "Qualification + rédaction du DM…" : "Qualification en cours…")
-            : "🚀 Lancer la prospection"}
+            ? (autoWrite ? "Qualification + rédaction du message…" : "Qualification en cours…")
+            : "🚀 Qualifier ce profil"}
         </button>
       </div>
 
       <div className="bg-slate-900 border border-[#2a2a2a] rounded-2xl p-6">
-        <h2 className="font-semibold text-white mb-1">Trouver de nouveaux leads</h2>
-        <p className="text-xs text-slate-500 mb-5">Scraper des profils publics par hashtag et les qualifier automatiquement.</p>
+        <h2 className="font-semibold text-white mb-1">Trouver de nouveaux clients potentiels</h2>
+        <p className="text-xs text-slate-500 mb-5">L'IA trouve des profils avec des signaux de douleur réels sur 5 plateformes.</p>
 
-        {/* Plateforme */}
+        {/* Platform tabs */}
         <div className="mb-5">
           <label className="text-xs text-slate-400 mb-2 block">Plateforme</label>
-          <div className="grid grid-cols-2 gap-3">
-            {[["instagram","📸 Instagram"],["tiktok","🎵 TikTok"]].map(([v,l]) => (
+          <div className="grid grid-cols-5 gap-1.5">
+            {Object.entries(PLATFORM_CONFIG).map(([v, c]) => (
               <button key={v} onClick={() => setPlatform(v)}
-                className={`py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                className={`py-2 rounded-xl border text-xs font-medium transition-all flex flex-col items-center gap-0.5 ${
                   platform === v
-                    ? "bg-white/[0.04] border-brand-600 text-brand-300"
+                    ? "bg-white/[0.06] border-brand-600 text-brand-300"
                     : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"}`}>
-                {l}
+                <span className="text-base leading-none">{c.icon}</span>
+                <span className="hidden sm:block">{c.label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Hashtags */}
+        {/* AI suggestions — shown immediately */}
         <div className="mb-5">
-          <div className="flex justify-between mb-2">
-            <label className="text-xs text-slate-400">Hashtags *</label>
+          <div className="flex justify-between items-center mb-2">
+            <label className="text-xs text-slate-400">{cfg.termLabel} *</label>
             <button onClick={() => suggest.mutate()} disabled={suggest.isPending}
               className="text-[10px] text-brand-400 hover:text-brand-300 transition-colors">
-              {suggest.isPending ? "Génération…" : "❆ Suggestions IA pour mon créneau"}
+              {suggest.isPending ? "Génération…" : "↺ Rafraîchir les suggestions IA"}
             </button>
           </div>
-          <div className="flex gap-2 mb-2">
+
+          {/* Suggested chips — auto-loaded */}
+          {(suggest.isPending && suggestedTags.length === 0) && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {[1,2,3,4,5,6,7,8].map(i => (
+                <div key={i} className="h-6 w-20 bg-slate-800 rounded-full animate-pulse" />
+              ))}
+            </div>
+          )}
+          {suggestedTags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {suggestedTags.map(t => {
+                const val = t.replace(/^[#r\/]/, "").toLowerCase();
+                const selected = tags.includes(val);
+                return (
+                  <button key={t} onClick={() => toggleSuggested(t)}
+                    className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${
+                      selected
+                        ? "bg-brand-500/20 border-brand-500 text-brand-300"
+                        : "bg-slate-800 border-[#2a2a2a] text-slate-400 hover:border-slate-500"}`}>
+                    {cfg.termPrefix}{val}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Manual add */}
+          <div className="flex gap-2">
             <div className="flex flex-1 items-center bg-slate-800 border border-[#2a2a2a] rounded-xl overflow-hidden focus-within:border-brand-500 transition-colors">
-              <span className="pl-3 text-slate-500 text-sm">#</span>
+              {cfg.termPrefix && <span className="pl-3 text-slate-500 text-sm">{cfg.termPrefix}</span>}
               <input value={tagInput} onChange={e => setTagInput(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addTag())}
                 className="flex-1 bg-transparent px-2 py-2.5 text-sm focus:outline-none"
-                placeholder="coachbusiness" />
+                placeholder={cfg.placeholder} />
             </div>
-            <button onClick={addTag}
-              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-colors">Ajouter</button>
+            <button onClick={() => addTag()}
+              className="px-4 py-2.5 bg-slate-700 hover:bg-slate-600 rounded-xl text-sm transition-colors">+</button>
           </div>
+
+          {/* Selected tags */}
           {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 mt-2">
               {tags.map(t => (
-                <span key={t} className="flex items-center gap-1 bg-white/[0.05] border border-[#2a2a2a] text-brand-400 text-xs px-2.5 py-1 rounded-full">
-                  #{t}
-                  <button onClick={() => setTags(p => p.filter(x => x !== t))} className="text-slate-400 hover:text-white">×</button>
+                <span key={t} className="flex items-center gap-1 bg-brand-500/20 border border-brand-500/40 text-brand-300 text-xs px-2.5 py-1 rounded-full">
+                  {cfg.termPrefix}{t}
+                  <button onClick={() => setTags(p => p.filter(x => x !== t))} className="text-slate-400 hover:text-white ml-0.5">×</button>
                 </span>
               ))}
             </div>
@@ -300,11 +353,11 @@ function ProspectsTab() {
 
         <button onClick={() => run.mutate()} disabled={run.isPending || !tags.length || running}
           className="w-full py-3 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
-          {run.isPending ? "Démarrage…" : running ? "Tâche en cours…" : `🔍 Trouver des leads sur ${platform}`}
+          {run.isPending ? "Démarrage…" : running ? "Recherche en cours…" : `🔍 Trouver des clients sur ${cfg.icon} ${cfg.label}`}
         </button>
         {running && (
           <p className="text-center text-xs text-amber-400 mt-2">
-            Scraping en arrière-plan — les leads apparaîtront dans votre pipeline une fois terminé.
+            Recherche en arrière-plan — les leads apparaîtront dans votre pipeline une fois terminé.
           </p>
         )}
       </div>
@@ -316,28 +369,31 @@ function ProspectsTab() {
           <p className="text-xs text-slate-600 text-center py-6">Aucune tâche — lancez une recherche ci-dessus.</p>
         ) : (
           <div className="space-y-3">
-            {jobs.map(j => (
-              <div key={j.id} className="flex items-center justify-between gap-4 py-3 border-b border-[#2a2a2a] last:border-0">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[10px] font-bold uppercase ${statusColors[j.status]}`}>
-                      {j.status === "running" ? "⟳ en cours" : statusLabels[j.status] || j.status}
-                    </span>
-                    <span className="text-xs text-slate-600 capitalize">{j.platform}</span>
+            {jobs.map(j => {
+              const jcfg = PLATFORM_CONFIG[j.platform] || PLATFORM_CONFIG.instagram;
+              return (
+                <div key={j.id} className="flex items-center justify-between gap-4 py-3 border-b border-[#2a2a2a] last:border-0">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold uppercase ${statusColors[j.status]}`}>
+                        {j.status === "running" ? "⟳ en cours" : statusLabels[j.status] || j.status}
+                      </span>
+                      <span className="text-xs text-slate-600">{jcfg.icon} {jcfg.label}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {j.hashtags.slice(0, 5).map(t => (
+                        <span key={t} className="text-[10px] text-slate-600">{jcfg.termPrefix}{t}</span>
+                      ))}
+                    </div>
+                    {j.error_message && <p className="text-[10px] text-red-400 mt-1 truncate max-w-xs">{j.error_message}</p>}
                   </div>
-                  <div className="flex flex-wrap gap-1">
-                    {j.hashtags.slice(0, 5).map(t => (
-                      <span key={t} className="text-[10px] text-slate-600">#{t}</span>
-                    ))}
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-semibold text-white">{j.leads_found} leads</p>
+                    <p className="text-[10px] text-slate-600">{j.started_at ? new Date(j.started_at).toLocaleTimeString() : ""}</p>
                   </div>
-                  {j.error_message && <p className="text-[10px] text-red-400 mt-1 truncate max-w-xs">{j.error_message}</p>}
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-white">{j.leads_found} leads</p>
-                  <p className="text-[10px] text-slate-600">{j.started_at ? new Date(j.started_at).toLocaleTimeString() : ""}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
