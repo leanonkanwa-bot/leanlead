@@ -109,8 +109,8 @@ export default function Onboarding() {
       }));
       setSuggestedHashtags(res.data.hashtags);
       setAnalyzed(true);
-    } catch {
-      setError("Impossible d'analyser votre coaching. Réessayez.");
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || "Impossible d'analyser votre coaching. Réessayez.");
     } finally {
       setAnalyzing(false);
     }
