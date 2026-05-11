@@ -118,27 +118,97 @@ class DetectNicheRequest(BaseModel):
     description: str
 
 
+def _dev_mock_niche(desc: str) -> dict:
+    """Keyword-based mock response for dev/test environments without a real API key."""
+    d = desc.lower()
+    if any(w in d for w in ["business", "entrepreneur", "scal", "revenus", "vente", "client", "agence"]):
+        return {
+            "niche": "Business en ligne",
+            "target_audience": "Entrepreneurs et indépendants qui veulent développer leur activité en ligne et atteindre 10k€/mois sans épuisement.",
+            "pain_points": [
+                "Je travaille 60h/semaine et mes revenus stagnent toujours au même niveau",
+                "Je ne sais pas comment trouver des clients réguliers en ligne",
+                "J'ai peur d'augmenter mes tarifs et de perdre les quelques clients que j'ai",
+            ],
+            "hashtags": ["pasentrepreneur", "galeredentrepreneur", "revenusinstables", "clientsintrouvables",
+                         "burnoutentrepreneur", "indépendant", "tropdetravail", "freelancegalère"],
+        }
+    if any(w in d for w in ["maigrir", "poids", "minceur", "fitness", "sport", "corps", "nutrition"]):
+        return {
+            "niche": "Remise en forme",
+            "target_audience": "Femmes de 30-45 ans qui veulent perdre du poids durablement sans régime restrictif ni privations.",
+            "pain_points": [
+                "J'ai essayé tous les régimes mais je reprends toujours le poids perdu en quelques semaines",
+                "Je n'arrive pas à me motiver à faire du sport régulièrement plus de 2 semaines",
+                "Mon corps ne répond plus comme avant depuis ma grossesse et ça me déprime",
+            ],
+            "hashtags": ["regimeechec", "plusjamaisderegime", "corpsapresaccouchement", "motivationsport",
+                         "mincirfemme", "pesermoins", "fatiguedemaigrir", "rechutedieete"],
+        }
+    if any(w in d for w in ["confiance", "estime", "mental", "mindset", "développement", "personnel", "anxiété"]):
+        return {
+            "niche": "Confiance en soi",
+            "target_audience": "Personnes qui souffrent de manque de confiance et veulent s'affirmer dans leur vie professionnelle et personnelle.",
+            "pain_points": [
+                "Je n'ose jamais prendre la parole en réunion tellement j'ai peur du jugement des autres",
+                "Je dis toujours oui même quand ça me pèse parce que je n'arrive pas à décevoir",
+                "Je sabote tout ce qui commence bien dans ma vie sans comprendre pourquoi",
+            ],
+            "hashtags": ["manquedeconfiance", "peurduregard", "syndromeimposteur", "oserparler",
+                         "autosabotage", "anxietesociale", "peurdejugement", "hypersensible"],
+        }
+    if any(w in d for w in ["relation", "couple", "amour", "séduction", "dating", "rencontre"]):
+        return {
+            "niche": "Relations amoureuses",
+            "target_audience": "Célibataires et personnes en couple qui veulent construire une relation épanouissante et attirer le bon partenaire.",
+            "pain_points": [
+                "Je rencontre toujours le même type de personnes qui me font souffrir",
+                "Je suis célibataire depuis des années malgré tous mes efforts pour me faire remarquer",
+                "Mon couple s'est éteint progressivement et on ne sait plus comment se reconnecter",
+            ],
+            "hashtags": ["celibatairechronique", "attirerlamour", "relationtoxique", "couplequis éloigne",
+                         "problemecouple", "rencontreimpossible", "seductionrate", "solitudeamoureuse"],
+        }
+    return {
+        "niche": "Coaching personnel",
+        "target_audience": "Personnes en transition de vie qui cherchent à retrouver clarté, direction et épanouissement durable.",
+        "pain_points": [
+            "Je me sens complètement perdu(e) et je ne sais plus ce que je veux vraiment",
+            "J'ai l'impression de vivre la vie des autres, pas la mienne",
+            "Je tourne en rond depuis des mois sans avancer malgré tous mes efforts",
+        ],
+        "hashtags": ["perduedansmavie", "transitiondevie", "quefairedemavie", "sansdirection",
+                     "changement", "reconversionforcee", "viequineplaitpas", "sensduvide"],
+    }
+
+
 @router.post("/detect-niche")
 def detect_niche(req: DetectNicheRequest, coach: models.Coach = Depends(get_current_coach)):
     """
     Takes a free-text coaching description and returns AI-detected niche,
     ICP pain points, and pain-expression hashtags. No DB write — caller confirms.
+    Falls back to keyword-based mock when no valid API key is present (dev mode).
     """
     import json as _json
-    import os
     import traceback
     import anthropic
 
-    if len(req.description.strip()) < 10:
+    desc = req.description.strip()
+    if len(desc) < 10:
         raise HTTPException(status_code=400, detail="Description trop courte (minimum 10 caractères)")
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
     print(f"[detect-niche] api_key present={bool(api_key)} prefix={api_key[:12] if api_key else 'NONE'}...")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="Clé API Anthropic non configurée — ajoutez ANTHROPIC_API_KEY dans votre fichier .env")
+
+    is_real_key = bool(api_key) and len(api_key) > 40 and not api_key.startswith("sk-ant-api03-test-key")
+    if not is_real_key:
+        print("[detect-niche] DEV MODE: no valid API key — returning keyword-based mock")
+        result = _dev_mock_niche(desc)
+        result["_demo"] = True
+        return result
 
     try:
-        print(f"[detect-niche] Calling claude-opus-4-7 ...")
+        print("[detect-niche] Calling claude-opus-4-7...")
         client = anthropic.Anthropic(api_key=api_key)
         msg = client.messages.create(
             model="claude-opus-4-7",
@@ -147,7 +217,7 @@ def detect_niche(req: DetectNicheRequest, coach: models.Coach = Depends(get_curr
                 "role": "user",
                 "content": f"""You are an expert at analyzing coaching niches. A coach described their work in their own words.
 
-Description: "{req.description.strip()}"
+Description: "{desc}"
 
 Your task — respond in the SAME LANGUAGE as the description:
 1. "niche": A precise 2-5 word category label (e.g. "Confiance en soi", "Business en ligne", "Remise en forme femmes 40+")
@@ -169,16 +239,16 @@ Respond ONLY with valid JSON, no markdown:
         print(f"[detect-niche] Parsed niche={result.get('niche')}")
     except anthropic.AuthenticationError as exc:
         print(f"[detect-niche] AUTH ERROR: {exc}")
-        raise HTTPException(status_code=500, detail="Clé API Anthropic invalide ou expirée")
+        raise HTTPException(status_code=500, detail="Clé API Anthropic invalide ou expirée — vérifiez ANTHROPIC_API_KEY dans votre .env")
     except anthropic.APIConnectionError as exc:
         print(f"[detect-niche] CONNECTION ERROR: {exc}")
-        raise HTTPException(status_code=503, detail="Impossible de joindre l'API Anthropic")
+        raise HTTPException(status_code=503, detail="Impossible de joindre l'API Anthropic — vérifiez votre connexion internet")
     except HTTPException:
         raise
     except Exception as exc:
         print(f"[detect-niche] UNEXPECTED ERROR: {type(exc).__name__}: {exc}")
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Impossible d'analyser votre coaching : {type(exc).__name__}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Erreur lors de l'analyse : {type(exc).__name__}: {exc}")
 
     result["pain_points"] = result.get("pain_points", [])[:5]
     result["hashtags"] = result.get("hashtags", [])[:10]
@@ -200,46 +270,7 @@ def onboard(req: OnboardRequest, coach: models.Coach = Depends(get_current_coach
         coach.airtable_api_key = req.airtable_api_key
     if req.apify_api_key:
         coach.apify_api_key = req.apify_api_key
-    if req.icp_pain_points is not None:
-        coach.icp_pain_points = json.dumps(req.icp_pain_points)
     coach.onboarded = True
     db.commit()
     db.refresh(coach)
     return {"ok": True, "onboarded": True}
-
-
-class DetectNicheRequest(BaseModel):
-    description: str
-
-
-@router.post("/detect-niche")
-def detect_niche(req: DetectNicheRequest):
-    """Use Claude to auto-detect niche, target audience, pain points, and hashtags from a free-form description."""
-    import anthropic as _anthropic
-
-    if not req.description or len(req.description.strip()) < 10:
-        raise HTTPException(status_code=400, detail="Description too short")
-
-    client = _anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    msg = client.messages.create(
-        model="claude-opus-4-7",
-        max_tokens=512,
-        messages=[{
-            "role": "user",
-            "content": f"""You are an expert at identifying coaching niches.
-
-From this description, extract:
-- niche: a concise 1-sentence niche description
-- target_audience: who the ideal client is (1-2 sentences)
-- pain_points: 4-6 specific pain points the ICP has (array of strings)
-- hashtags: 6 hashtags (without #) that POTENTIAL CLIENTS (not coaches) use
-
-Description: {req.description}
-
-Respond ONLY with valid JSON:
-{{"niche": "...", "target_audience": "...", "pain_points": ["..."], "hashtags": ["..."]}}""",
-        }],
-    )
-    text = msg.content[0].text
-    start, end = text.find("{"), text.rfind("}") + 1
-    return json.loads(text[start:end])
