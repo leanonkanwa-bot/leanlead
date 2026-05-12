@@ -67,6 +67,7 @@ def _serialize(lead: models.Lead) -> dict:
         "reply_received": lead.reply_received,
         "suggested_reply": lead.suggested_reply,
         "notes": lead.notes,
+        "profile_pic_url": getattr(lead, "profile_pic_url", None),
         # Intelligence fields v3
         "language": getattr(lead, "language", None),
         "psychographic_profile": _parse_json(getattr(lead, "psychographic_profile", None)),

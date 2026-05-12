@@ -19,6 +19,8 @@ from .leads import _serialize
 
 router = APIRouter(prefix="/api/prospecting", tags=["prospecting"])
 
+PLAN_LIMITS: dict[str, int | None] = {"free": 20, "growth": 200, "agency": None}
+
 
 class ProspectRequest(BaseModel):
     platform: str = "instagram"     # instagram | tiktok | linkedin | twitter | reddit
@@ -54,6 +56,19 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
             max_results=req.max_results,
         )
 
+        # Check plan lead limit
+        coach_plan = getattr(coach, "plan", "free") or "free"
+        plan_limit = PLAN_LIMITS.get(coach_plan)
+        if plan_limit is not None:
+            current_count = db.query(models.Lead).filter(models.Lead.coach_id == coach_id).count()
+            if current_count >= plan_limit:
+                job.status = "done"
+                job.leads_found = 0
+                job.error_message = f"Limite du plan {coach_plan} atteinte ({plan_limit} leads). Passez au plan supérieur pour continuer."
+                job.finished_at = datetime.utcnow()
+                db.commit()
+                return
+
         added = 0
         for profile in raw_profiles:
             handle = (profile.get("handle") or "").strip().lower()
@@ -66,6 +81,12 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
             if exists:
                 continue
 
+            # Stop if plan limit reached mid-run
+            if plan_limit is not None:
+                current_total = db.query(models.Lead).filter(models.Lead.coach_id == coach_id).count()
+                if current_total >= plan_limit:
+                    break
+
             lead = models.Lead(
                 coach_id=coach_id,
                 name=profile.get("name", ""),
@@ -75,6 +96,7 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
                 bio=profile.get("bio", ""),
                 followers=profile.get("followers", 0),
                 posts_summary=profile.get("posts_summary", ""),
+                profile_pic_url=profile.get("profile_pic_url"),
                 stage="new",
             )
             db.add(lead)
@@ -133,6 +155,17 @@ def run_prospecting(
         raise HTTPException(status_code=400, detail="max_results cannot exceed 100")
     if not req.hashtags:
         raise HTTPException(status_code=400, detail="Provide at least one term")
+
+    # Enforce plan lead limits
+    coach_plan = getattr(coach, "plan", "free") or "free"
+    plan_limit = PLAN_LIMITS.get(coach_plan)
+    if plan_limit is not None:
+        current_count = db.query(models.Lead).filter(models.Lead.coach_id == coach.id).count()
+        if current_count >= plan_limit:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Limite du plan {coach_plan} atteinte ({plan_limit} leads). Passez au plan supérieur pour continuer.",
+            )
 
     job = models.ProspectingJob(
         coach_id=coach.id,

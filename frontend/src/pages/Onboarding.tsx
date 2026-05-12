@@ -89,6 +89,8 @@ export default function Onboarding() {
     calendly_link: "",
     instagram_handle: "",
     tiktok_handle: "",
+    twitter_handle: "",
+    reddit_handle: "",
     facebook_url: "",
     linkedin_url: "",
   });
@@ -371,6 +373,30 @@ export default function Onboarding() {
                       value={form.tiktok_handle}
                       onChange={setField("tiktok_handle")}
                       className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl pl-7 pr-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                      placeholder="votre_pseudo"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1.5">Twitter / X <span className="text-slate-600">(optionnel)</span></label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
+                    <input
+                      value={form.twitter_handle}
+                      onChange={setField("twitter_handle")}
+                      className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl pl-7 pr-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                      placeholder="votre_pseudo"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1.5">Reddit <span className="text-slate-600">(optionnel)</span></label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">u/</span>
+                    <input
+                      value={form.reddit_handle}
+                      onChange={setField("reddit_handle")}
+                      className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl pl-8 pr-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
                       placeholder="votre_pseudo"
                     />
                   </div>

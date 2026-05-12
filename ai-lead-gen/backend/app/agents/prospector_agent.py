@@ -110,6 +110,7 @@ def _ig_api(handle: str) -> dict | None:
             "bio": user.get("biography", ""),
             "followers": (user.get("edge_followed_by") or {}).get("count", 0),
             "posts_summary": " | ".join(c for c in caps if c),
+            "profile_pic_url": user.get("profile_pic_url_hd") or user.get("profile_pic_url"),
         }
     except Exception:
         return None
@@ -259,6 +260,7 @@ def _fetch_tiktok(handle: str) -> dict:
             "bio": user.get("signature", ""),
             "followers": stats.get("followerCount", 0),
             "posts_summary": "",
+            "profile_pic_url": user.get("avatarLarger") or user.get("avatarMedium"),
         }
     except Exception:
         return fallback

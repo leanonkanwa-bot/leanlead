@@ -1546,6 +1546,11 @@ export default function Dashboard() {
 
   const warmingCount = leads.filter(l => l.warming_status && l.warming_status !== "none").length;
 
+  const PLAN_LIMITS: Record<string, number | null> = { free: 20, growth: 200, agency: null };
+  const coachPlan = (coach?.plan || "free") as string;
+  const planLimit = PLAN_LIMITS[coachPlan] ?? null;
+  const planLimitReached = planLimit !== null && leads.length >= planLimit;
+
   const TABS: { id: Tab; label: string; badge?: number }[] = [
     { id: "pipeline",  label: "Pipeline" },
     { id: "prospects", label: "Prospection" },
@@ -1618,6 +1623,17 @@ export default function Dashboard() {
           </div>
         </div>
       </nav>
+
+      {planLimitReached && (
+        <div className="flex items-center justify-between gap-3 px-5 py-2.5 bg-amber-950/40 border-b border-amber-900/40">
+          <p className="text-xs text-amber-300">
+            Limite du plan {coachPlan} atteinte ({planLimit} leads). Passez au plan supérieur pour continuer à prospecter.
+          </p>
+          <a href="/pricing" className="text-[11px] font-semibold text-amber-400 hover:text-amber-300 whitespace-nowrap transition-colors">
+            Mettre à niveau →
+          </a>
+        </div>
+      )}
 
       {tab === "pipeline" && (
         <div className="flex gap-6 px-6 py-3 border-b border-slate-900">

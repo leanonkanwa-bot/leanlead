@@ -20,8 +20,11 @@ export interface Coach {
   niche?: string; offer_description?: string;
   target_audience?: string; calendly_link?: string;
   icp_pain_points?: string[];
+  plan?: string;
   instagram_handle?: string;
   tiktok_handle?: string;
+  twitter_handle?: string;
+  reddit_handle?: string;
   facebook_url?: string;
   linkedin_url?: string;
   onboarded: boolean;
@@ -85,6 +88,7 @@ export interface Lead {
   followup_d7_message?: string; followup_d7_sent_at?: string;
   reply_received?: string; suggested_reply?: string;
   notes?: string;
+  profile_pic_url?: string;
   // Intelligence fields v3
   language?: string;
   psychographic_profile?: Psychographic;
@@ -134,6 +138,7 @@ export const authApi = {
     niche?: string; offer_description?: string; target_audience?: string;
     icp_pain_points?: string[]; calendly_link?: string;
     instagram_handle?: string; tiktok_handle?: string;
+    twitter_handle?: string; reddit_handle?: string;
     facebook_url?: string; linkedin_url?: string;
     offer_price?: number;
     testimonials?: Testimonial[];
@@ -143,6 +148,7 @@ export const authApi = {
     niche: string; offer_description: string; target_audience: string;
     icp_pain_points?: string[]; calendly_link?: string;
     instagram_handle?: string; tiktok_handle?: string;
+    twitter_handle?: string; reddit_handle?: string;
     facebook_url?: string; linkedin_url?: string;
   }) => api.post("/auth/onboard", d),
 

@@ -27,6 +27,30 @@ function Score({ v }: { v: number }) {
   );
 }
 
+const DM_STATUS: Record<string, { label: string; cls: string }> = {
+  contacted: { label: "DM envoyé ✓", cls: "bg-blue-950/60 text-blue-400 border-blue-900/50" },
+  replied:   { label: "Répondu ✓",   cls: "bg-emerald-950/60 text-emerald-400 border-emerald-900/50" },
+};
+
+function Avatar({ lead }: { lead: Lead }) {
+  const initials = (lead.name || lead.handle).slice(0, 2).toUpperCase();
+  if (lead.profile_pic_url) {
+    return (
+      <img
+        src={lead.profile_pic_url}
+        alt={lead.name || lead.handle}
+        className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-1 ring-white/10"
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+      />
+    );
+  }
+  return (
+    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400 flex-shrink-0">
+      {initials}
+    </div>
+  );
+}
+
 export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lead.id });
 
@@ -36,6 +60,7 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
   const escalating = lead.escalation_alert && (lead.score_delta ?? 0) >= 10;
   const gap = lead.aspiration_gap_score;
   const churnRisk = lead.churn_risk ?? 0;
+  const dmStatus = DM_STATUS[lead.stage];
 
   return (
     <div
@@ -45,7 +70,8 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
       onClick={onClick}
       className="bg-slate-800/80 border border-[#2a2a2a]/60 hover:border-slate-600 hover:bg-slate-800 rounded-xl p-3.5 cursor-pointer select-none transition-all duration-150 group"
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
+      <div className="flex items-start gap-2.5 mb-2">
+        <Avatar lead={lead} />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-slate-100 truncate group-hover:text-white transition-colors">
             {lead.name || `@${lead.handle}`}
@@ -118,6 +144,16 @@ export default function LeadCard({ lead, onClick }: { lead: Lead; onClick: () =>
           {churnRisk >= 0.7 && lead.stage === "contacted" && !lead.reply_received && (
             <span className="text-[9px] bg-rose-950/60 text-rose-400 border border-rose-900/50 px-1.5 py-0.5 rounded-full animate-pulse">
               🧊 froid
+            </span>
+          )}
+          {dmStatus && (
+            <span className={`text-[9px] border px-1.5 py-0.5 rounded-full ${dmStatus.cls}`}>
+              {dmStatus.label}
+            </span>
+          )}
+          {lead.stage === "new" && lead.outreach_message && (
+            <span className="text-[9px] bg-slate-800/80 text-slate-400 border border-slate-700/50 px-1.5 py-0.5 rounded-full">
+              DM prêt
             </span>
           )}
         </div>

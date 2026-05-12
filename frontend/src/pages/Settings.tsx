@@ -19,7 +19,8 @@ export default function Settings() {
 
   const [form, setForm] = useState({
     niche: "", offer_description: "", target_audience: "", calendly_link: "",
-    instagram_handle: "", tiktok_handle: "", facebook_url: "", linkedin_url: "",
+    instagram_handle: "", tiktok_handle: "", twitter_handle: "", reddit_handle: "",
+    facebook_url: "", linkedin_url: "",
   });
   const [saved, setSaved] = useState(false);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -35,6 +36,8 @@ export default function Settings() {
         calendly_link:     coach.calendly_link     || "",
         instagram_handle:  coach.instagram_handle  || "",
         tiktok_handle:     coach.tiktok_handle     || "",
+        twitter_handle:    coach.twitter_handle    || "",
+        reddit_handle:     coach.reddit_handle     || "",
         facebook_url:      coach.facebook_url      || "",
         linkedin_url:      coach.linkedin_url      || "",
       });
@@ -137,6 +140,20 @@ export default function Settings() {
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
                     <input value={form.tiktok_handle} onChange={set("tiktok_handle")}
                       className={inputCls + " pl-7"} placeholder="votre_pseudo" />
+                  </div>
+                </Field>
+                <Field label="Twitter / X (optionnel)">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
+                    <input value={form.twitter_handle} onChange={set("twitter_handle")}
+                      className={inputCls + " pl-7"} placeholder="votre_pseudo" />
+                  </div>
+                </Field>
+                <Field label="Reddit (optionnel)">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">u/</span>
+                    <input value={form.reddit_handle} onChange={set("reddit_handle")}
+                      className={inputCls + " pl-8"} placeholder="votre_pseudo" />
                   </div>
                 </Field>
                 <Field label="Page Facebook (optionnel)">
