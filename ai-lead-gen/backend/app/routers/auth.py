@@ -7,6 +7,8 @@ import os
 
 import secrets
 
+from datetime import datetime, timedelta
+
 from ..auth import (
     create_access_token,
     decrypt_handle,
@@ -15,6 +17,7 @@ from ..auth import (
     hash_password,
     verify_password,
     _send_verification_email,
+    _send_welcome_email,
 )
 from ..database import get_db
 from .. import models
@@ -54,10 +57,13 @@ class TokenResponse(BaseModel):
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(models.Coach).filter(models.Coach.email == req.email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
+    trial_end = datetime.utcnow() + timedelta(days=14)
     coach = models.Coach(
         email=req.email,
         password_hash=hash_password(req.password),
         name=req.name,
+        plan="agency",
+        trial_end_date=trial_end,
     )
     db.add(coach)
     db.commit()
@@ -72,6 +78,9 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         coach.email_verified = True
         coach.email_verification_token = None
     db.commit()
+
+    # Welcome email with trial details (best-effort)
+    _send_welcome_email(req.email, req.name, trial_end)
 
     token = create_access_token(coach.id)
     return TokenResponse(access_token=token, coach_id=coach.id, name=coach.name, onboarded=False)
@@ -147,6 +156,15 @@ def me(coach: models.Coach = Depends(get_current_coach)):
         "icp_pain_points": _json.loads(coach.icp_pain_points) if coach.icp_pain_points else [],
         "testimonials": _json.loads(coach.testimonials) if getattr(coach, "testimonials", None) else [],
         "email_verified": getattr(coach, "email_verified", True) or False,
+        "trial_end_date": getattr(coach, "trial_end_date", None) and coach.trial_end_date.isoformat(),
+        "trial_days_left": (
+            max(0, (coach.trial_end_date - datetime.utcnow()).days)
+            if getattr(coach, "trial_end_date", None) else None
+        ),
+        "trial_active": (
+            coach.trial_end_date is not None and coach.trial_end_date > datetime.utcnow()
+            if getattr(coach, "trial_end_date", None) else False
+        ),
     }
 
 

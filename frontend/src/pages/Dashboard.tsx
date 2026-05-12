@@ -1500,6 +1500,71 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
 ════════════════════════════════════════════════════════════════════ */
 type Tab = "pipeline" | "prospects" | "followups" | "warming" | "replies" | "analytics";
 
+function TrialBanner({ coach }: { coach: Coach }) {
+  if (!coach.trial_active) return null;
+  const days = coach.trial_days_left ?? 0;
+  return (
+    <div className="flex items-center justify-between gap-3 px-5 py-2.5 bg-brand-950/40 border-b border-brand-900/40">
+      <p className="text-xs text-brand-300">
+        Essai Agency gratuit — <strong>{days} jour{days > 1 ? "s" : ""} restant{days > 1 ? "s" : ""}</strong>. Accès à toutes les fonctionnalités Agency.
+      </p>
+      <a href="https://buy.stripe.com/agency-placeholder" target="_blank" rel="noopener noreferrer"
+        className="text-[11px] font-semibold text-brand-400 hover:text-brand-300 whitespace-nowrap transition-colors">
+        Passer à Agency €129/mois →
+      </a>
+    </div>
+  );
+}
+
+function TrialExpiredModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-slate-900 border border-[#2a2a2a] rounded-2xl overflow-hidden shadow-2xl">
+        <div className="p-8 text-center">
+          <span className="text-5xl block mb-4">⏰</span>
+          <h2 className="font-heading text-xl font-bold text-white mb-2">Votre essai Agency est terminé</h2>
+          <p className="text-sm text-slate-400 mb-6">
+            Continuez à générer des leads qualifiés en choisissant votre plan.
+          </p>
+
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-slate-800 border border-[#2a2a2a] rounded-xl p-4 text-left">
+              <p className="text-xs text-slate-400 mb-1">Growth</p>
+              <p className="text-2xl font-bold text-white mb-3">€49<span className="text-sm font-normal text-slate-400">/mois</span></p>
+              <ul className="text-xs text-slate-300 space-y-1.5">
+                <li>✓ 200 leads/mois</li>
+                <li>✓ 5 plateformes</li>
+                <li>✓ Relances auto</li>
+              </ul>
+              <a href="https://buy.stripe.com/growth-placeholder" target="_blank" rel="noopener noreferrer"
+                className="mt-4 block text-center px-4 py-2 border border-brand-500 text-brand-400 hover:bg-brand-500 hover:text-white rounded-xl text-sm font-semibold transition-colors">
+                Choisir Growth
+              </a>
+            </div>
+            <div className="bg-brand-950/40 border border-brand-800/50 rounded-xl p-4 text-left">
+              <p className="text-xs text-brand-400 mb-1">Agency ⭐</p>
+              <p className="text-2xl font-bold text-white mb-3">€129<span className="text-sm font-normal text-slate-400">/mois</span></p>
+              <ul className="text-xs text-slate-300 space-y-1.5">
+                <li>✓ Illimité</li>
+                <li>✓ Agent autonome</li>
+                <li>✓ Tout inclus</li>
+              </ul>
+              <a href="https://buy.stripe.com/agency-placeholder" target="_blank" rel="noopener noreferrer"
+                className="mt-4 block text-center px-4 py-2 bg-brand-500 hover:bg-brand-400 text-white rounded-xl text-sm font-semibold transition-colors">
+                Choisir Agency
+              </a>
+            </div>
+          </div>
+
+          <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-400 transition-colors">
+            Continuer avec le plan Gratuit (20 leads)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EmailVerificationBanner({ coach }: { coach: Coach }) {
   const qc = useQueryClient();
   const [sent, setSent] = useState(false);
@@ -1528,11 +1593,19 @@ export default function Dashboard() {
   const [tab, setTab] = useState<Tab>("pipeline");
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
+  const [showTrialExpired, setShowTrialExpired] = useState(false);
 
   const { data: coach } = useQuery({
     queryKey: ["me"],
     queryFn: () => authApi.me().then(r => r.data),
   });
+
+  useEffect(() => {
+    if (coach && !coach.trial_active && coach.trial_end_date && coach.plan === "free") {
+      const dismissed = sessionStorage.getItem("trial_modal_dismissed");
+      if (!dismissed) setShowTrialExpired(true);
+    }
+  }, [coach]);
 
   const { data: leads = [], isLoading } = useQuery({
     queryKey: ["leads"],
@@ -1649,6 +1722,17 @@ export default function Dashboard() {
 
       {coach && coach.email_verified === false && (
         <EmailVerificationBanner coach={coach} />
+      )}
+
+      {coach && coach.trial_active && (
+        <TrialBanner coach={coach} />
+      )}
+
+      {showTrialExpired && (
+        <TrialExpiredModal onClose={() => {
+          sessionStorage.setItem("trial_modal_dismissed", "1");
+          setShowTrialExpired(false);
+        }} />
       )}
 
       {planLimitReached && (

@@ -22,6 +22,9 @@ export interface Coach {
   icp_pain_points?: string[];
   plan?: string;
   email_verified?: boolean;
+  trial_end_date?: string | null;
+  trial_days_left?: number | null;
+  trial_active?: boolean;
   instagram_handle?: string;
   tiktok_handle?: string;
   twitter_handle?: string;
@@ -32,6 +35,9 @@ export interface Coach {
   offer_price?: number | null;
   testimonials?: Testimonial[];
 }
+
+export const STRIPE_GROWTH_URL = "https://buy.stripe.com/growth-placeholder";
+export const STRIPE_AGENCY_URL = "https://buy.stripe.com/agency-placeholder";
 
 export interface AnalyticsData {
   leads_this_week: number;
@@ -250,6 +256,29 @@ export const agentApi = {
   addCompetitor: (d: { url: string; platform: string }) =>
     api.post<{ ok: boolean; handle: string; competitors: CompetitorAccount[] }>("/agent/competitors", d),
   removeCompetitor: (handle: string) => api.delete(`/agent/competitors/${handle}`),
+};
+
+/* ── Admin ── */
+export const adminApi = {
+  stats: (adminKey: string) =>
+    api.get<{
+      total_coaches: number;
+      active_trials: number;
+      expired_trials: number;
+      plan_breakdown: Record<string, number>;
+      total_leads: number;
+    }>("/admin/stats", { headers: { "x-admin-key": adminKey } }),
+
+  emails: (adminKey: string) =>
+    api.get<{
+      coaches: {
+        id: number; name: string; email: string; plan: string;
+        signup_date: string | null; trial_end_date: string | null;
+        trial_active: boolean; trial_days_left: number | null;
+        onboarded: boolean; email_verified: boolean;
+      }[];
+      total: number;
+    }>("/admin/emails", { headers: { "x-admin-key": adminKey } }),
 };
 
 /* ── Prospecting ── */

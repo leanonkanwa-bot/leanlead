@@ -33,6 +33,7 @@ from .database import Base, engine
 from .routers import auth, leads, pipeline, prospecting, followups, analytics
 from .routers import agent as agent_router
 from .routers import icp as icp_router
+from .routers import admin as admin_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -92,6 +93,7 @@ _migrations = [
     "ALTER TABLE leads ADD COLUMN profile_pic_url TEXT",
     "ALTER TABLE coaches ADD COLUMN email_verified INTEGER DEFAULT 0",
     "ALTER TABLE coaches ADD COLUMN email_verification_token TEXT",
+    "ALTER TABLE coaches ADD COLUMN trial_end_date DATETIME",
     # ICP and competitive intelligence tables (created via Base.metadata.create_all)
 ]
 with engine.connect() as _conn:
@@ -120,6 +122,7 @@ app.include_router(followups.router)
 app.include_router(analytics.router)
 app.include_router(agent_router.router)
 app.include_router(icp_router.router)
+app.include_router(admin_router.router)
 
 
 @app.on_event("startup")

@@ -158,9 +158,20 @@ def run_prospecting(
     if not req.hashtags:
         raise HTTPException(status_code=400, detail="Provide at least one term")
 
-    # Enforce plan lead limits
+    # Enforce plan lead limits and platform gates
     coach_plan = getattr(coach, "plan", "free") or "free"
     plan_limit = PLAN_LIMITS.get(coach_plan)
+
+    # Free plan (after trial): Instagram only
+    trial_end = getattr(coach, "trial_end_date", None)
+    from datetime import datetime as _dt
+    trial_active = trial_end is not None and trial_end > _dt.utcnow()
+    if coach_plan == "free" and not trial_active and req.platform != "instagram":
+        raise HTTPException(
+            status_code=403,
+            detail="Plan Gratuit : prospection Instagram uniquement. Passez au plan Growth ou Agency pour accéder à d'autres plateformes.",
+        )
+
     if plan_limit is not None:
         current_count = db.query(models.Lead).filter(models.Lead.coach_id == coach.id).count()
         if current_count >= plan_limit:

@@ -34,6 +34,15 @@ def start_scheduler():
     if not s.running:
         s.start()
         logger.info("APScheduler started")
+        # Schedule daily trial management job
+        if not s.get_job("trial_management"):
+            s.add_job(
+                _trial_management_job,
+                trigger=IntervalTrigger(hours=12, timezone="UTC"),
+                id="trial_management",
+                replace_existing=True,
+                next_run_time=datetime.utcnow() + timedelta(minutes=5),
+            )
 
 
 def stop_scheduler():
@@ -314,6 +323,47 @@ def _rescan_for_coach(coach_id: int):
                     pass
     except Exception as e:
         logger.exception("Escalation rescan failed for coach %d: %s", coach_id, e)
+    finally:
+        db.close()
+
+
+def _trial_management_job():
+    """
+    Runs every 12 hours:
+    - Downgrades coaches whose trial has expired to Free plan
+    - Sends reminder emails at days 10 and 13 of the trial
+    """
+    from .database import SessionLocal
+    from . import models
+    from .auth import _send_trial_reminder_email
+
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        coaches = db.query(models.Coach).filter(
+            models.Coach.trial_end_date.isnot(None)
+        ).all()
+
+        for coach in coaches:
+            trial_end = coach.trial_end_date
+            if trial_end is None:
+                continue
+
+            days_left = (trial_end - now).days
+
+            # Downgrade expired trials
+            if now >= trial_end and getattr(coach, "plan", "free") == "agency":
+                coach.plan = "free"
+                db.commit()
+                logger.info("Trial expired for coach %d (%s) — downgraded to Free", coach.id, coach.email)
+                continue
+
+            # Send reminders (only once per day window)
+            if days_left in (1, 3):  # day 13 (1 left) and day 10 (3 left) approx
+                _send_trial_reminder_email(coach.email, coach.name, days_left, trial_end)
+
+    except Exception as e:
+        logger.exception("Trial management job failed: %s", e)
     finally:
         db.close()
 

@@ -36,6 +36,9 @@ class Coach(Base):
     email_verified = Column(Boolean, default=False)
     email_verification_token = Column(String, nullable=True)
 
+    # Trial
+    trial_end_date = Column(DateTime, nullable=True)   # signup + 14 days; None = no trial
+
     # Autonomous agent settings
     agent_enabled = Column(Boolean, default=False)
     agent_frequency_hours = Column(Integer, default=6)
