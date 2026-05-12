@@ -17,8 +17,11 @@ class Coach(Base):
     offer_description = Column(Text)
     target_audience = Column(Text)
     calendly_link = Column(String)
+    plan = Column(String, default="free")          # free | growth | agency
     instagram_handle = Column(String)   # coach's own @handle (without @)
     tiktok_handle = Column(String)
+    twitter_handle = Column(String)
+    reddit_handle = Column(String)
     facebook_url = Column(String)
     linkedin_url = Column(String)
     offer_price = Column(Float, nullable=True)
@@ -87,6 +90,7 @@ class Lead(Base):
 
     # CRM
     notes = Column(Text)
+    profile_pic_url = Column(String)    # cached avatar URL from IG/TT
 
     # Intelligence fields (v3)
     language = Column(String)                   # fr|en|es|pt|ar|other
