@@ -11,7 +11,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..auth import get_current_coach
+from ..auth import get_current_coach, decrypt_handle
 from ..database import get_db
 from .. import models
 from ..agents import prospector_agent, qualifier_agent, writer_agent
@@ -45,10 +45,12 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
         # Augment hashtags with coach's own handle so the prospector can
         # find people who engage with similar content / competitor audiences.
         search_terms = list(req.hashtags)
-        if req.platform == "instagram" and getattr(coach, "instagram_handle", None):
-            search_terms.append(coach.instagram_handle)
-        elif req.platform == "tiktok" and getattr(coach, "tiktok_handle", None):
-            search_terms.append(coach.tiktok_handle)
+        ig_handle = decrypt_handle(getattr(coach, "instagram_handle", None))
+        tt_handle = decrypt_handle(getattr(coach, "tiktok_handle", None))
+        if req.platform == "instagram" and ig_handle:
+            search_terms.append(ig_handle)
+        elif req.platform == "tiktok" and tt_handle:
+            search_terms.append(tt_handle)
 
         raw_profiles = prospector_agent.prospect(
             platform=req.platform,

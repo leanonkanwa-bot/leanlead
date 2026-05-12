@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   authApi, leadsApi, pipelineApi, followupsApi, prospectingApi, analyticsApi, agentApi,
   type Lead, type Stage, type FollowupDue, type Classification, type ReplyAnalysis,
-  type AnalyticsData, type AgentStatus,
+  type AnalyticsData, type AgentStatus, type Coach,
 } from "../lib/api";
 import KanbanBoard from "../components/KanbanBoard";
 
@@ -1500,6 +1500,29 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
 ════════════════════════════════════════════════════════════════════ */
 type Tab = "pipeline" | "prospects" | "followups" | "warming" | "replies" | "analytics";
 
+function EmailVerificationBanner({ coach }: { coach: Coach }) {
+  const qc = useQueryClient();
+  const [sent, setSent] = useState(false);
+  const resend = useMutation({
+    mutationFn: () => authApi.resendVerification(),
+    onSuccess: () => { setSent(true); qc.invalidateQueries({ queryKey: ["me"] }); },
+  });
+  return (
+    <div className="flex items-center justify-between gap-3 px-5 py-2.5 bg-blue-950/40 border-b border-blue-900/40">
+      <p className="text-xs text-blue-300">
+        Vérifiez votre email ({coach.email}) pour activer toutes les fonctionnalités.
+      </p>
+      <button
+        onClick={() => resend.mutate()}
+        disabled={resend.isPending || sent}
+        className="text-[11px] font-semibold text-blue-400 hover:text-blue-300 whitespace-nowrap transition-colors disabled:opacity-50"
+      >
+        {sent ? "✓ Envoyé !" : resend.isPending ? "Envoi…" : "Renvoyer l'email →"}
+      </button>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const nav = useNavigate();
   const [tab, setTab] = useState<Tab>("pipeline");
@@ -1623,6 +1646,10 @@ export default function Dashboard() {
           </div>
         </div>
       </nav>
+
+      {coach && coach.email_verified === false && (
+        <EmailVerificationBanner coach={coach} />
+      )}
 
       {planLimitReached && (
         <div className="flex items-center justify-between gap-3 px-5 py-2.5 bg-amber-950/40 border-b border-amber-900/40">

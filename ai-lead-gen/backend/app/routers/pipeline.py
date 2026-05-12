@@ -54,6 +54,7 @@ def qualify(
         },
         coach_niche=coach.niche,
         coach_offer=coach.offer_description,
+        icp_pain_points=json.loads(coach.icp_pain_points) if coach.icp_pain_points else None,
     )
 
     lead.qualification_score = result.get("score", 0)
@@ -330,6 +331,7 @@ def rescan_lead(
         },
         coach_niche=coach.niche,
         coach_offer=coach.offer_description,
+        icp_pain_points=json.loads(coach.icp_pain_points) if coach.icp_pain_points else None,
     )
 
     new_score = result.get("score", 0)

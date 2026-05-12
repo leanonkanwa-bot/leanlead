@@ -5,6 +5,7 @@ import Register from "./pages/Register";
 import Onboarding from "./pages/Onboarding";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
+import VerifyEmail from "./pages/VerifyEmail";
 
 function Guard({ children }: { children: React.ReactNode }) {
   return localStorage.getItem("ll_token") ? <>{children}</> : <Navigate to="/login" replace />;
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/onboarding" element={<Guard><Onboarding /></Guard>} />
         <Route path="/dashboard" element={<Guard><Dashboard /></Guard>} />
         <Route path="/settings" element={<Guard><Settings /></Guard>} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

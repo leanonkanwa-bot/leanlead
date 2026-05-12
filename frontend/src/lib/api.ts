@@ -21,6 +21,7 @@ export interface Coach {
   target_audience?: string; calendly_link?: string;
   icp_pain_points?: string[];
   plan?: string;
+  email_verified?: boolean;
   instagram_handle?: string;
   tiktok_handle?: string;
   twitter_handle?: string;
@@ -159,6 +160,12 @@ export const authApi = {
       pain_points: string[];
       hashtags: string[];
     }>("/auth/detect-niche", { description }),
+
+  verifyEmail: (token: string) =>
+    api.get<{ ok: boolean; message: string }>("/auth/verify-email", { params: { token } }),
+
+  resendVerification: () =>
+    api.post<{ ok: boolean; sent: boolean; message: string }>("/auth/resend-verification"),
 };
 
 /* ── Leads ── */

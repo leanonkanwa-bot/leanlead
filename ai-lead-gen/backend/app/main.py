@@ -90,6 +90,8 @@ _migrations = [
     "ALTER TABLE coaches ADD COLUMN facebook_url TEXT",
     "ALTER TABLE coaches ADD COLUMN linkedin_url TEXT",
     "ALTER TABLE leads ADD COLUMN profile_pic_url TEXT",
+    "ALTER TABLE coaches ADD COLUMN email_verified INTEGER DEFAULT 0",
+    "ALTER TABLE coaches ADD COLUMN email_verification_token TEXT",
     # ICP and competitive intelligence tables (created via Base.metadata.create_all)
 ]
 with engine.connect() as _conn:

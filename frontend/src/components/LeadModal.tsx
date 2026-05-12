@@ -3,6 +3,51 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Lead } from "../lib/api";
 import { leadsApi, pipelineApi } from "../lib/api";
 
+const PLATFORM_DM_URL: Record<string, (handle: string) => string> = {
+  instagram: (h) => `https://ig.me/m/${h}`,
+  tiktok:    (h) => `https://www.tiktok.com/messages?u=${h}`,
+  twitter:   (h) => `https://twitter.com/messages/compose?recipient_handle=${h}`,
+  linkedin:  (h) => `https://www.linkedin.com/messaging/compose/?recipients=${h}`,
+  reddit:    (h) => `https://www.reddit.com/message/compose/?to=${h}`,
+};
+const PLATFORM_ICON: Record<string, string> = {
+  instagram: "📸", tiktok: "🎵", twitter: "𝕏", linkedin: "💼", reddit: "💬",
+};
+
+function DMSendButton({ lead, text, variant, markVariant }: {
+  lead: Lead;
+  text: string;
+  variant: "A" | "B";
+  markVariant: ReturnType<typeof useMutation<any, any, "A" | "B">>;
+}) {
+  const [sent, setSent] = useState(lead.dm_variant_sent === variant);
+  const urlFn = PLATFORM_DM_URL[lead.platform];
+  if (!urlFn) return null;
+
+  function handleSend() {
+    navigator.clipboard.writeText(text).catch(() => {});
+    window.open(urlFn(lead.handle), "_blank", "noopener,noreferrer");
+    if (!sent) {
+      markVariant.mutate(variant);
+      setSent(true);
+    }
+  }
+
+  const icon = PLATFORM_ICON[lead.platform] || "📩";
+  return (
+    <button
+      onClick={handleSend}
+      className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1 ${
+        sent
+          ? "bg-emerald-950/40 border border-emerald-900/50 text-emerald-400"
+          : "bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-400"
+      }`}
+    >
+      {sent ? "✓ DM envoyé" : `${icon} Envoyer via ${lead.platform}`}
+    </button>
+  );
+}
+
 const EMOTION_COLORS: Record<string, string> = {
   frustration: "text-orange-400",
   fear: "text-red-400",
@@ -309,8 +354,12 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
               </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 <button onClick={() => qualify.mutate()} disabled={busy}
-                  className="px-3 py-2 rounded-lg text-xs font-medium bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-brand-400 transition-colors disabled:opacity-40">
-                  {qualify.isPending ? "Qualification…" : "🎯 Re-qualifier"}
+                  className={`px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 ${
+                    lead.qualification_score > 0
+                      ? "bg-[#1a1a1a] hover:bg-[#222] border border-[#2a2a2a] text-slate-400"
+                      : "bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-400"
+                  }`}>
+                  {qualify.isPending ? "Qualification en cours…" : lead.qualification_score > 0 ? "⟳ Re-qualifier" : "🎯 Qualifier ce lead"}
                 </button>
                 <button onClick={() => { if (confirm("Supprimer ce lead ?")) del.mutate(); }}
                   className="ml-auto px-3 py-2 bg-red-950 hover:bg-red-900 text-red-400 rounded-lg text-xs transition-colors">
@@ -323,64 +372,62 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
           {/* ── DM A/B tab ── */}
           {tab === "dm" && (
             <>
-              {(lead.outreach_message || lead.dm_variant_b) ? (
-                <>
-                  {/* Variant selector */}
-                  <div className="flex gap-2 mb-3">
-                    {(["A", "B"] as const).map(v => (
-                      <button key={v} onClick={() => setActiveVariant(v)}
-                        className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
-                          activeVariant === v
-                            ? "bg-brand-500/20 border-brand-500 text-brand-300"
-                            : "bg-slate-800 border-[#2a2a2a] text-slate-500"
-                        }`}>
-                        Variante {v}
-                        {lead.dm_variant_sent === v && (
-                          <span className="ml-1.5 text-[9px] bg-emerald-950/60 text-emerald-400 px-1 py-0.5 rounded">envoyé</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* DM text */}
-                  {((activeVariant === "A" && lead.outreach_message) || (activeVariant === "B" && lead.dm_variant_b)) ? (
-                    <div>
-                      <div className="bg-slate-800 rounded-xl p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                        {activeVariant === "A" ? lead.outreach_message : lead.dm_variant_b}
-                      </div>
-                      <div className="flex gap-3 mt-2">
-                        <button onClick={() => copy(activeVariant === "A" ? lead.outreach_message! : lead.dm_variant_b!, `dm-${activeVariant}`)}
-                          className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
-                          {copied === `dm-${activeVariant}` ? "Copié !" : "📋 Copier"}
-                        </button>
-                        {lead.dm_variant_sent !== activeVariant && (
-                          <button onClick={() => { copy(activeVariant === "A" ? lead.outreach_message! : lead.dm_variant_b!, `dm-${activeVariant}`); markVariant.mutate(activeVariant); }}
-                            className="text-xs text-emerald-400 hover:text-emerald-300 transition-colors">
-                            ✓ Marquer comme envoyé
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-600 py-4 text-center">Pas de variante {activeVariant} encore.</p>
-                  )}
-                </>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-sm text-slate-500 mb-4">
-                    {!lead.qualification_reason
-                      ? "Qualifiez d'abord ce lead."
-                      : "Aucun DM généré pour l'instant."}
-                  </p>
+              {!lead.qualification_reason && (
+                <div className="bg-amber-950/30 border border-amber-900/40 rounded-xl px-4 py-3 mb-2">
+                  <p className="text-xs text-amber-400">Qualifiez ce lead d'abord (onglet Profil) pour générer des DMs personnalisés.</p>
                 </div>
               )}
 
-              <button onClick={() => writeAb.mutate()} disabled={busy || !lead.qualification_reason}
-                className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors">
-                {writeAb.isPending ? "Génération A/B…" : (lead.outreach_message ? "↻ Régénérer variantes A/B" : "✍️ Générer variantes A/B")}
+              {/* Both variants shown simultaneously */}
+              {(lead.outreach_message || lead.dm_variant_b) && (
+                <div className="space-y-3">
+                  {[
+                    { variant: "A" as const, text: lead.outreach_message, label: "Variante A — Empathie + preuve" },
+                    { variant: "B" as const, text: lead.dm_variant_b, label: "Variante B — Curiosité + rêve" },
+                  ].map(({ variant, text, label }) => text ? (
+                    <div key={variant} className={`border rounded-xl p-4 transition-colors ${
+                      lead.dm_variant_sent === variant
+                        ? "bg-emerald-950/20 border-emerald-900/40"
+                        : "bg-slate-800/60 border-[#2a2a2a]"
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] font-semibold text-slate-400">{label}</span>
+                        {lead.dm_variant_sent === variant && (
+                          <span className="text-[9px] bg-emerald-950/60 text-emerald-400 border border-emerald-900/50 px-1.5 py-0.5 rounded-full">
+                            DM envoyé ✓
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed mb-3">{text}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => copy(text, `dm-${variant}`)}
+                          className="flex-1 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium rounded-lg transition-colors"
+                        >
+                          {copied === `dm-${variant}` ? "✓ Copié !" : "📋 Copier"}
+                        </button>
+                        <DMSendButton lead={lead} text={text} variant={variant} markVariant={markVariant} />
+                      </div>
+                    </div>
+                  ) : null)}
+                </div>
+              )}
+
+              <button
+                onClick={() => writeAb.mutate()}
+                disabled={busy || !lead.qualification_reason}
+                className="w-full py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand disabled:opacity-40 disabled:shadow-none rounded-xl text-sm font-semibold transition-colors"
+              >
+                {writeAb.isPending
+                  ? "Génération des variantes A/B…"
+                  : lead.outreach_message
+                  ? "↻ Régénérer variantes A/B"
+                  : "✍️ Générer variantes A/B"}
               </button>
               {writeAb.isError && (
-                <p className="text-red-400 text-xs">{(writeAb.error as any)?.response?.data?.detail}</p>
+                <p className="text-red-400 text-xs bg-red-950/30 border border-red-900/40 rounded-lg px-3 py-2">
+                  {(writeAb.error as any)?.response?.data?.detail || "Erreur lors de la génération."}
+                </p>
               )}
             </>
           )}

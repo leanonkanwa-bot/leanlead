@@ -32,6 +32,10 @@ class Coach(Base):
     # Social proof testimonials: JSON list of {name, situation, result}
     testimonials = Column(Text, nullable=True)
 
+    # Email verification
+    email_verified = Column(Boolean, default=False)
+    email_verification_token = Column(String, nullable=True)
+
     # Autonomous agent settings
     agent_enabled = Column(Boolean, default=False)
     agent_frequency_hours = Column(Integer, default=6)

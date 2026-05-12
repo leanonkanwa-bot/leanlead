@@ -3,9 +3,16 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authApi, type Testimonial } from "../lib/api";
 
-const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+const Field = ({ label, children, connected }: { label: string; children: React.ReactNode; connected?: boolean }) => (
   <div>
-    <label className="block text-xs font-medium text-slate-400 mb-1.5 tracking-wide">{label}</label>
+    <div className="flex items-center gap-2 mb-1.5">
+      <label className="text-xs font-medium text-slate-400 tracking-wide">{label}</label>
+      {connected && (
+        <span className="text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/50 px-1.5 py-0.5 rounded-full">
+          Compte connecté ✓
+        </span>
+      )}
+    </div>
     {children}
   </div>
 );
@@ -123,44 +130,47 @@ export default function Settings() {
 
             {/* Social Accounts */}
             <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
-              <p className="font-heading text-sm font-semibold text-white mb-1">Réseaux sociaux</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="font-heading text-sm font-semibold text-white">Réseaux sociaux</p>
+                <span className="text-[10px] text-slate-600 flex items-center gap-1">🔒 Données chiffrées</span>
+              </div>
               <p className="text-[11px] text-slate-500 mb-4">
-                L'IA utilise vos profils pour trouver des audiences similaires et personnaliser la prospection.
+                L'IA utilise vos profils pour trouver des audiences similaires. Vos identifiants sont stockés de façon sécurisée et chiffrée.
               </p>
               <div className="space-y-4">
-                <Field label="Instagram">
+                <Field label="Instagram" connected={!!coach?.instagram_handle}>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
                     <input value={form.instagram_handle} onChange={set("instagram_handle")}
                       className={inputCls + " pl-7"} placeholder="votre_pseudo" />
                   </div>
                 </Field>
-                <Field label="TikTok">
+                <Field label="TikTok" connected={!!coach?.tiktok_handle}>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
                     <input value={form.tiktok_handle} onChange={set("tiktok_handle")}
                       className={inputCls + " pl-7"} placeholder="votre_pseudo" />
                   </div>
                 </Field>
-                <Field label="Twitter / X (optionnel)">
+                <Field label="Twitter / X (optionnel)" connected={!!coach?.twitter_handle}>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
                     <input value={form.twitter_handle} onChange={set("twitter_handle")}
                       className={inputCls + " pl-7"} placeholder="votre_pseudo" />
                   </div>
                 </Field>
-                <Field label="Reddit (optionnel)">
+                <Field label="Reddit (optionnel)" connected={!!coach?.reddit_handle}>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">u/</span>
                     <input value={form.reddit_handle} onChange={set("reddit_handle")}
                       className={inputCls + " pl-8"} placeholder="votre_pseudo" />
                   </div>
                 </Field>
-                <Field label="Page Facebook (optionnel)">
+                <Field label="Page Facebook (optionnel)" connected={!!coach?.facebook_url}>
                   <input value={form.facebook_url} onChange={set("facebook_url")} className={inputCls}
                     placeholder="https://facebook.com/votrepageprofessionnelle" />
                 </Field>
-                <Field label="LinkedIn (optionnel)">
+                <Field label="LinkedIn (optionnel)" connected={!!coach?.linkedin_url}>
                   <input value={form.linkedin_url} onChange={set("linkedin_url")} className={inputCls}
                     placeholder="https://linkedin.com/in/votre-profil" />
                 </Field>

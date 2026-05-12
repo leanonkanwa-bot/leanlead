@@ -5,7 +5,17 @@ from sqlalchemy.orm import Session
 import json
 import os
 
-from ..auth import create_access_token, get_current_coach, hash_password, verify_password
+import secrets
+
+from ..auth import (
+    create_access_token,
+    decrypt_handle,
+    encrypt_handle,
+    get_current_coach,
+    hash_password,
+    verify_password,
+    _send_verification_email,
+)
 from ..database import get_db
 from .. import models
 
@@ -52,6 +62,17 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     db.add(coach)
     db.commit()
     db.refresh(coach)
+
+    # Email verification
+    verification_token = secrets.token_urlsafe(32)
+    coach.email_verification_token = verification_token
+    smtp_configured = _send_verification_email(req.email, verification_token, req.name)
+    if not smtp_configured:
+        # Auto-verify in dev/no-SMTP environments
+        coach.email_verified = True
+        coach.email_verification_token = None
+    db.commit()
+
     token = create_access_token(coach.id)
     return TokenResponse(access_token=token, coach_id=coach.id, name=coach.name, onboarded=False)
 
@@ -95,7 +116,7 @@ def update_settings(
         if field in ("icp_pain_points", "testimonials"):
             setattr(coach, field, _json.dumps(value) if value is not None else None)
         elif field in ("instagram_handle", "tiktok_handle", "twitter_handle", "reddit_handle"):
-            setattr(coach, field, (value or "").lstrip("@") or None)
+            setattr(coach, field, encrypt_handle((value or "").lstrip("@") or None))
         else:
             setattr(coach, field, value)
     coach.onboarded = True
@@ -115,16 +136,17 @@ def me(coach: models.Coach = Depends(get_current_coach)):
         "target_audience": coach.target_audience,
         "calendly_link": coach.calendly_link,
         "plan": getattr(coach, "plan", "free") or "free",
-        "instagram_handle": coach.instagram_handle,
-        "tiktok_handle": coach.tiktok_handle,
-        "twitter_handle": getattr(coach, "twitter_handle", None),
-        "reddit_handle": getattr(coach, "reddit_handle", None),
+        "instagram_handle": decrypt_handle(coach.instagram_handle),
+        "tiktok_handle": decrypt_handle(coach.tiktok_handle),
+        "twitter_handle": decrypt_handle(getattr(coach, "twitter_handle", None)),
+        "reddit_handle": decrypt_handle(getattr(coach, "reddit_handle", None)),
         "facebook_url": coach.facebook_url,
         "linkedin_url": coach.linkedin_url,
         "onboarded": coach.onboarded,
         "offer_price": coach.offer_price,
         "icp_pain_points": _json.loads(coach.icp_pain_points) if coach.icp_pain_points else [],
         "testimonials": _json.loads(coach.testimonials) if getattr(coach, "testimonials", None) else [],
+        "email_verified": getattr(coach, "email_verified", True) or False,
     }
 
 
@@ -269,6 +291,28 @@ Respond ONLY with valid JSON, no markdown:
     return result
 
 
+@router.get("/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    coach = db.query(models.Coach).filter(models.Coach.email_verification_token == token).first()
+    if not coach:
+        raise HTTPException(status_code=400, detail="Lien de vérification invalide ou expiré.")
+    coach.email_verified = True
+    coach.email_verification_token = None
+    db.commit()
+    return {"ok": True, "message": "Email vérifié avec succès !"}
+
+
+@router.post("/resend-verification")
+def resend_verification(coach: models.Coach = Depends(get_current_coach), db: Session = Depends(get_db)):
+    if coach.email_verified:
+        return {"ok": True, "message": "Email déjà vérifié."}
+    token = secrets.token_urlsafe(32)
+    coach.email_verification_token = token
+    db.commit()
+    sent = _send_verification_email(coach.email, token, coach.name)
+    return {"ok": True, "sent": sent, "message": "Email de vérification renvoyé." if sent else "SMTP non configuré — vérification auto-activée en développement."}
+
+
 @router.post("/onboard")
 def onboard(req: OnboardRequest, coach: models.Coach = Depends(get_current_coach), db: Session = Depends(get_db)):
     import json as _json
@@ -276,10 +320,10 @@ def onboard(req: OnboardRequest, coach: models.Coach = Depends(get_current_coach
     coach.offer_description = req.offer_description
     coach.target_audience = req.target_audience
     coach.calendly_link = req.calendly_link
-    coach.instagram_handle = (req.instagram_handle or "").lstrip("@") or None
-    coach.tiktok_handle = (req.tiktok_handle or "").lstrip("@") or None
-    coach.twitter_handle = (req.twitter_handle or "").lstrip("@") or None
-    coach.reddit_handle = (req.reddit_handle or "").lstrip("@") or None
+    coach.instagram_handle = encrypt_handle((req.instagram_handle or "").lstrip("@") or None)
+    coach.tiktok_handle = encrypt_handle((req.tiktok_handle or "").lstrip("@") or None)
+    coach.twitter_handle = encrypt_handle((req.twitter_handle or "").lstrip("@") or None)
+    coach.reddit_handle = encrypt_handle((req.reddit_handle or "").lstrip("@") or None)
     coach.facebook_url = req.facebook_url or None
     coach.linkedin_url = req.linkedin_url or None
     if req.icp_pain_points is not None:
