@@ -40,9 +40,17 @@ def _run_job(job_id: int, coach_id: int, req: ProspectRequest) -> None:
         job.status = "running"
         db.commit()
 
+        # Augment hashtags with coach's own handle so the prospector can
+        # find people who engage with similar content / competitor audiences.
+        search_terms = list(req.hashtags)
+        if req.platform == "instagram" and getattr(coach, "instagram_handle", None):
+            search_terms.append(coach.instagram_handle)
+        elif req.platform == "tiktok" and getattr(coach, "tiktok_handle", None):
+            search_terms.append(coach.tiktok_handle)
+
         raw_profiles = prospector_agent.prospect(
             platform=req.platform,
-            hashtags=req.hashtags,
+            hashtags=search_terms,
             max_results=req.max_results,
         )
 

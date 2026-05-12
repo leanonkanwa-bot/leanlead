@@ -24,6 +24,10 @@ class OnboardRequest(BaseModel):
     target_audience: str
     icp_pain_points: list[str] | None = None
     calendly_link: str | None = None
+    instagram_handle: str | None = None
+    tiktok_handle: str | None = None
+    facebook_url: str | None = None
+    linkedin_url: str | None = None
 
 
 class TokenResponse(BaseModel):
@@ -67,6 +71,10 @@ class SettingsRequest(BaseModel):
     target_audience: str | None = None
     icp_pain_points: list[str] | None = None
     calendly_link: str | None = None
+    instagram_handle: str | None = None
+    tiktok_handle: str | None = None
+    facebook_url: str | None = None
+    linkedin_url: str | None = None
     offer_price: float | None = None
     testimonials: list[dict] | None = None  # [{name, situation, result}, ...]
 
@@ -82,6 +90,8 @@ def update_settings(
     for field, value in data.items():
         if field in ("icp_pain_points", "testimonials"):
             setattr(coach, field, _json.dumps(value) if value is not None else None)
+        elif field in ("instagram_handle", "tiktok_handle"):
+            setattr(coach, field, (value or "").lstrip("@") or None)
         else:
             setattr(coach, field, value)
     coach.onboarded = True
@@ -100,6 +110,10 @@ def me(coach: models.Coach = Depends(get_current_coach)):
         "offer_description": coach.offer_description,
         "target_audience": coach.target_audience,
         "calendly_link": coach.calendly_link,
+        "instagram_handle": coach.instagram_handle,
+        "tiktok_handle": coach.tiktok_handle,
+        "facebook_url": coach.facebook_url,
+        "linkedin_url": coach.linkedin_url,
         "onboarded": coach.onboarded,
         "offer_price": coach.offer_price,
         "icp_pain_points": _json.loads(coach.icp_pain_points) if coach.icp_pain_points else [],
@@ -255,6 +269,10 @@ def onboard(req: OnboardRequest, coach: models.Coach = Depends(get_current_coach
     coach.offer_description = req.offer_description
     coach.target_audience = req.target_audience
     coach.calendly_link = req.calendly_link
+    coach.instagram_handle = (req.instagram_handle or "").lstrip("@") or None
+    coach.tiktok_handle = (req.tiktok_handle or "").lstrip("@") or None
+    coach.facebook_url = req.facebook_url or None
+    coach.linkedin_url = req.linkedin_url or None
     if req.icp_pain_points is not None:
         coach.icp_pain_points = _json.dumps(req.icp_pain_points)
     coach.onboarded = True

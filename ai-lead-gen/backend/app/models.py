@@ -17,6 +17,10 @@ class Coach(Base):
     offer_description = Column(Text)
     target_audience = Column(Text)
     calendly_link = Column(String)
+    instagram_handle = Column(String)   # coach's own @handle (without @)
+    tiktok_handle = Column(String)
+    facebook_url = Column(String)
+    linkedin_url = Column(String)
     offer_price = Column(Float, nullable=True)
     icp_pain_points = Column(Text, nullable=True)   # JSON array: pains the coach's ICP expresses
     onboarded = Column(Boolean, default=False)

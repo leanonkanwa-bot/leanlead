@@ -439,7 +439,7 @@ function PricingCard({
         <p className={`text-xs font-bold uppercase tracking-[0.15em] mb-3 ${hot ? "text-white/70" : "text-slate-500"}`}>{name}</p>
         <div className="flex items-baseline gap-1.5">
           <span className="text-5xl font-black text-white">{price}</span>
-          {price !== "Gratuit" && (
+          {price !== "0€" && (
             <span className={`text-sm font-medium ${hot ? "text-white/60" : "text-slate-500"}`}>/mois</span>
           )}
         </div>
@@ -484,14 +484,14 @@ function Pricing() {
         <div className="grid sm:grid-cols-3 gap-6 items-center">
           <PricingCard
             name="Gratuit"
-            price="Gratuit"
-            sub="Pour démarrer sans risque."
+            price="0€"
+            sub="Pour tester sans risque."
             features={[
               "20 leads / mois",
-              "Détection IA du créneau",
-              "Score de qualification 0-100",
-              "Rédacteur de DM IA",
+              "Instagram uniquement",
+              "DMs générés par l'IA",
               "Pipeline Kanban",
+              "Détection de créneau IA",
             ]}
             cta="Commencer gratuitement"
           />
@@ -501,10 +501,10 @@ function Pricing() {
             sub="Pour les coachs en prospection active."
             features={[
               "200 leads / mois",
-              "Scraping Instagram + TikTok",
-              "Relances J+2 / J+4 / J+7",
-              "Gestion des réponses IA",
-              "Intégration Calendly",
+              "5 plateformes (IG, TT, LI, X, Reddit)",
+              "Relances automatiques J+2 / J+4 / J+7",
+              "Analyse psychographique des leads",
+              "Intégration Calendly native",
               "Support prioritaire",
             ]}
             hot
@@ -513,12 +513,12 @@ function Pricing() {
           <PricingCard
             name="Agency"
             price="129€"
-            sub="Pour les agences multi-coachs."
+            sub="Pour les agences et coachs à fort volume."
             features={[
               "Leads illimités",
-              "Comptes multi-coachs",
-              "Toutes fonctionnalités Growth",
-              "Prospection en masse",
+              "Toutes les plateformes",
+              "Agent autonome 24h/7j",
+              "5 comptes coachs inclus",
               "Prompts IA personnalisés",
               "Support Slack dédié",
             ]}

@@ -19,6 +19,7 @@ export default function Settings() {
 
   const [form, setForm] = useState({
     niche: "", offer_description: "", target_audience: "", calendly_link: "",
+    instagram_handle: "", tiktok_handle: "", facebook_url: "", linkedin_url: "",
   });
   const [saved, setSaved] = useState(false);
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
@@ -32,6 +33,10 @@ export default function Settings() {
         offer_description: coach.offer_description || "",
         target_audience:   coach.target_audience   || "",
         calendly_link:     coach.calendly_link     || "",
+        instagram_handle:  coach.instagram_handle  || "",
+        tiktok_handle:     coach.tiktok_handle     || "",
+        facebook_url:      coach.facebook_url      || "",
+        linkedin_url:      coach.linkedin_url      || "",
       });
       setTestimonials(coach.testimonials || []);
     }
@@ -109,6 +114,38 @@ export default function Settings() {
                 <Field label="Lien Calendly">
                   <input value={form.calendly_link} onChange={set("calendly_link")} className={inputCls}
                     placeholder="https://calendly.com/yourname/30min" />
+                </Field>
+              </div>
+            </div>
+
+            {/* Social Accounts */}
+            <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+              <p className="font-heading text-sm font-semibold text-white mb-1">Réseaux sociaux</p>
+              <p className="text-[11px] text-slate-500 mb-4">
+                L'IA utilise vos profils pour trouver des audiences similaires et personnaliser la prospection.
+              </p>
+              <div className="space-y-4">
+                <Field label="Instagram">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
+                    <input value={form.instagram_handle} onChange={set("instagram_handle")}
+                      className={inputCls + " pl-7"} placeholder="votre_pseudo" />
+                  </div>
+                </Field>
+                <Field label="TikTok">
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
+                    <input value={form.tiktok_handle} onChange={set("tiktok_handle")}
+                      className={inputCls + " pl-7"} placeholder="votre_pseudo" />
+                  </div>
+                </Field>
+                <Field label="Page Facebook (optionnel)">
+                  <input value={form.facebook_url} onChange={set("facebook_url")} className={inputCls}
+                    placeholder="https://facebook.com/votrepageprofessionnelle" />
+                </Field>
+                <Field label="LinkedIn (optionnel)">
+                  <input value={form.linkedin_url} onChange={set("linkedin_url")} className={inputCls}
+                    placeholder="https://linkedin.com/in/votre-profil" />
                 </Field>
               </div>
             </div>

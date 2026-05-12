@@ -20,6 +20,10 @@ export interface Coach {
   niche?: string; offer_description?: string;
   target_audience?: string; calendly_link?: string;
   icp_pain_points?: string[];
+  instagram_handle?: string;
+  tiktok_handle?: string;
+  facebook_url?: string;
+  linkedin_url?: string;
   onboarded: boolean;
   offer_price?: number | null;
   testimonials?: Testimonial[];
@@ -129,6 +133,8 @@ export const authApi = {
   updateSettings: (d: {
     niche?: string; offer_description?: string; target_audience?: string;
     icp_pain_points?: string[]; calendly_link?: string;
+    instagram_handle?: string; tiktok_handle?: string;
+    facebook_url?: string; linkedin_url?: string;
     offer_price?: number;
     testimonials?: Testimonial[];
   }) => api.patch("/auth/settings", d),
@@ -136,6 +142,8 @@ export const authApi = {
   onboard: (d: {
     niche: string; offer_description: string; target_audience: string;
     icp_pain_points?: string[]; calendly_link?: string;
+    instagram_handle?: string; tiktok_handle?: string;
+    facebook_url?: string; linkedin_url?: string;
   }) => api.post("/auth/onboard", d),
 
   detectNiche: (description: string) =>

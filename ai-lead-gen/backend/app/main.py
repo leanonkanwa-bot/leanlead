@@ -82,6 +82,10 @@ _migrations = [
     "ALTER TABLE leads ADD COLUMN nurture_step INTEGER DEFAULT 0",
     "ALTER TABLE leads ADD COLUMN converting_angle TEXT",
     "ALTER TABLE leads ADD COLUMN predicted_close_date DATETIME",
+    "ALTER TABLE coaches ADD COLUMN instagram_handle TEXT",
+    "ALTER TABLE coaches ADD COLUMN tiktok_handle TEXT",
+    "ALTER TABLE coaches ADD COLUMN facebook_url TEXT",
+    "ALTER TABLE coaches ADD COLUMN linkedin_url TEXT",
     # ICP and competitive intelligence tables (created via Base.metadata.create_all)
 ]
 with engine.connect() as _conn:

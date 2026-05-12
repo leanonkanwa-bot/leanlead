@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../lib/api";
 
-const STEPS = ["Votre coaching", "Votre offre", "Votre Calendly"];
+const STEPS = ["Votre coaching", "Votre offre", "Calendly", "Réseaux sociaux"];
 
 function StepBar({ step }: { step: number }) {
   return (
@@ -87,6 +87,10 @@ export default function Onboarding() {
     offer_description: "",
     icp_pain_points: [] as string[],
     calendly_link: "",
+    instagram_handle: "",
+    tiktok_handle: "",
+    facebook_url: "",
+    linkedin_url: "",
   });
 
   const setField = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -323,6 +327,76 @@ export default function Onboarding() {
               {error && <p className="text-red-400 text-xs mt-4 bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2">{error}</p>}
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep(1)}
+                  className="flex-1 py-2.5 border border-[#2a2a2a] hover:border-slate-600 rounded-xl text-sm transition-colors">
+                  ← Retour
+                </button>
+                <button onClick={() => setStep(3)}
+                  className="flex-1 py-2.5 bg-brand-500 hover:bg-brand-400 shadow-glow-brand hover:shadow-glow-brand-lg rounded-xl text-sm font-semibold transition-colors">
+                  Continuer →
+                </button>
+              </div>
+              <button onClick={finish} disabled={saving}
+                className="w-full text-center text-xs text-slate-600 hover:text-slate-400 mt-3 transition-colors">
+                Passer pour l'instant
+              </button>
+            </>
+          )}
+
+          {/* ── Step 3 : Réseaux sociaux ── */}
+          {step === 3 && (
+            <>
+              <h1 className="font-heading text-lg font-semibold mb-1">Vos réseaux sociaux</h1>
+              <p className="text-xs text-slate-500 mb-6">
+                L'IA utilise vos profils pour trouver des audiences similaires et personnaliser vos DMs.
+                Tous les champs sont facultatifs.
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1.5">Instagram</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
+                    <input
+                      value={form.instagram_handle}
+                      onChange={setField("instagram_handle")}
+                      className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl pl-7 pr-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                      placeholder="votre_pseudo"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1.5">TikTok</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm select-none">@</span>
+                    <input
+                      value={form.tiktok_handle}
+                      onChange={setField("tiktok_handle")}
+                      className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl pl-7 pr-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                      placeholder="votre_pseudo"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1.5">Page Facebook <span className="text-slate-600">(optionnel)</span></label>
+                  <input
+                    value={form.facebook_url}
+                    onChange={setField("facebook_url")}
+                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                    placeholder="https://facebook.com/votrepageprofessionnelle"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1.5">LinkedIn <span className="text-slate-600">(optionnel)</span></label>
+                  <input
+                    value={form.linkedin_url}
+                    onChange={setField("linkedin_url")}
+                    className="w-full bg-[#111] border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-500"
+                    placeholder="https://linkedin.com/in/votre-profil"
+                  />
+                </div>
+              </div>
+              {error && <p className="text-red-400 text-xs mt-4 bg-red-950/40 border border-red-900/40 rounded-lg px-3 py-2">{error}</p>}
+              <div className="flex gap-3 mt-6">
+                <button onClick={() => setStep(2)}
                   className="flex-1 py-2.5 border border-[#2a2a2a] hover:border-slate-600 rounded-xl text-sm transition-colors">
                   ← Retour
                 </button>
