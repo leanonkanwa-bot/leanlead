@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { authApi, type Testimonial } from "../lib/api";
+import { authApi, leadMagnetsApi, keywordTriggersApi, type Testimonial, type LeadMagnet, type KeywordTrigger } from "../lib/api";
 
 const Field = ({ label, children, connected }: { label: string; children: React.ReactNode; connected?: boolean }) => (
   <div>
@@ -17,11 +17,261 @@ const Field = ({ label, children, connected }: { label: string; children: React.
   </div>
 );
 
+const MAGNET_TYPE_LABELS: Record<string, string> = {
+  pdf: "📄 PDF / Guide",
+  video: "🎥 Vidéo",
+  ebook: "📚 Ebook",
+  call: "📞 Appel gratuit",
+  course: "🎓 Mini-formation",
+  other: "🔗 Autre",
+};
+
+function LeadMagnetSection() {
+  const qc = useQueryClient();
+  const { data: magnets = [] } = useQuery({
+    queryKey: ["lead-magnets"],
+    queryFn: () => leadMagnetsApi.list().then(r => r.data),
+  });
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ title: "", description: "", type: "pdf" as LeadMagnet["type"], link: "" });
+
+  const create = useMutation({
+    mutationFn: () => leadMagnetsApi.create(form),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["lead-magnets"] });
+      setShowForm(false);
+      setForm({ title: "", description: "", type: "pdf", link: "" });
+    },
+  });
+
+  const del = useMutation({
+    mutationFn: (id: number) => leadMagnetsApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["lead-magnets"] }),
+  });
+
+  const inputCls = "w-full bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all duration-150";
+
+  return (
+    <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-1">
+        <p className="font-heading text-sm font-semibold text-white">Bibliothèque de lead magnets</p>
+        <button onClick={() => setShowForm(v => !v)}
+          className="text-xs px-3 py-1.5 bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-400 rounded-lg transition-colors">
+          + Ajouter
+        </button>
+      </div>
+      <p className="text-[11px] text-slate-500 mb-4">
+        L'IA sélectionne automatiquement le lead magnet le plus adapté au profil de chaque prospect.
+      </p>
+
+      {magnets.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {magnets.map(m => (
+            <div key={m.id} className="flex items-center gap-3 bg-slate-900 border border-[#2a2a2a] rounded-xl px-4 py-3">
+              <span className="text-lg">{MAGNET_TYPE_LABELS[m.type]?.split(" ")[0] || "🔗"}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-slate-200 truncate">{m.title}</p>
+                {m.link && <p className="text-[10px] text-slate-500 truncate">{m.link}</p>}
+              </div>
+              <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">{MAGNET_TYPE_LABELS[m.type]?.split(" ").slice(1).join(" ")}</span>
+              <button onClick={() => del.mutate(m.id)}
+                className="text-slate-600 hover:text-red-400 text-lg leading-none transition-colors">×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="border border-dashed border-slate-700/50 rounded-xl p-4 space-y-3">
+          <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+            placeholder="Titre (ex: Guide Gratuit — 5 Erreurs à Éviter)"
+            className={inputCls} />
+          <select value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value as any }))}
+            className={inputCls}>
+            {Object.entries(MAGNET_TYPE_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>{l}</option>
+            ))}
+          </select>
+          <input value={form.link} onChange={e => setForm(f => ({ ...f, link: e.target.value }))}
+            placeholder="Lien (Google Drive, Calendly, YouTube…)"
+            className={inputCls} />
+          <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+            placeholder="Description courte (optionnel)"
+            className={inputCls} />
+          <div className="flex gap-2">
+            <button onClick={() => create.mutate()} disabled={!form.title || create.isPending}
+              className="flex-1 py-2 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-xs font-semibold transition-colors">
+              {create.isPending ? "Ajout…" : "Ajouter le lead magnet"}
+            </button>
+            <button onClick={() => setShowForm(false)}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs text-slate-400 transition-colors">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
+      {magnets.length === 0 && !showForm && (
+        <div className="text-center py-6 text-slate-600 text-xs">
+          Aucun lead magnet — ajoutez-en un pour automatiser vos DMs
+        </div>
+      )}
+    </div>
+  );
+}
+
+function KeywordTriggerSection({ leadMagnets }: { leadMagnets: LeadMagnet[] }) {
+  const qc = useQueryClient();
+  const { data: triggers = [] } = useQuery({
+    queryKey: ["keyword-triggers"],
+    queryFn: () => keywordTriggersApi.list().then(r => r.data),
+  });
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({
+    keyword: "",
+    platform: "instagram",
+    message_template: "",
+    lead_magnet_id: null as number | null,
+  });
+
+  const create = useMutation({
+    mutationFn: () => keywordTriggersApi.create(form),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["keyword-triggers"] });
+      setShowForm(false);
+      setForm({ keyword: "", platform: "instagram", message_template: "", lead_magnet_id: null });
+    },
+  });
+
+  const del = useMutation({
+    mutationFn: (id: number) => keywordTriggersApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["keyword-triggers"] }),
+  });
+
+  const toggle = useMutation({
+    mutationFn: ({ id, active }: { id: number; active: boolean }) =>
+      keywordTriggersApi.update(id, { active } as any),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["keyword-triggers"] }),
+  });
+
+  const inputCls = "w-full bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2.5 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-all duration-150";
+
+  return (
+    <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-1">
+        <p className="font-heading text-sm font-semibold text-white">Mots-clés déclencheurs</p>
+        <button onClick={() => setShowForm(v => !v)}
+          className="text-xs px-3 py-1.5 bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-400 rounded-lg transition-colors">
+          + Ajouter
+        </button>
+      </div>
+      <p className="text-[11px] text-slate-500 mb-4">
+        Quand quelqu'un commente un mot-clé sous votre post → DM automatique avec votre lead magnet. La tactique #1 sur Instagram et TikTok.
+      </p>
+
+      {triggers.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {triggers.map(t => (
+            <div key={t.id} className="bg-slate-900 border border-[#2a2a2a] rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-bold text-brand-400 bg-brand-500/10 px-2 py-0.5 rounded-full">
+                      {t.keyword}
+                    </span>
+                    <span className="text-[10px] text-slate-500">{t.platform}</span>
+                    <span className="text-[10px] text-emerald-400">{t.trigger_count} déclenchements</span>
+                  </div>
+                  {t.lead_magnet && (
+                    <p className="text-[10px] text-slate-500 truncate">→ {t.lead_magnet.title}</p>
+                  )}
+                </div>
+                <button onClick={() => toggle.mutate({ id: t.id, active: !t.active })}
+                  className={`text-[10px] px-2 py-1 rounded-full font-medium transition-colors ${
+                    t.active ? "bg-emerald-950/40 text-emerald-400 border border-emerald-900/50"
+                              : "bg-slate-800 text-slate-500 border border-slate-700"
+                  }`}>
+                  {t.active ? "Actif" : "Pausé"}
+                </button>
+                <button onClick={() => del.mutate(t.id)}
+                  className="text-slate-600 hover:text-red-400 text-lg leading-none transition-colors">×</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="border border-dashed border-slate-700/50 rounded-xl p-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] text-slate-500 mb-1 block">Mot-clé (majuscules)</label>
+              <input value={form.keyword}
+                onChange={e => setForm(f => ({ ...f, keyword: e.target.value.toUpperCase() }))}
+                placeholder="ex: GUIDE"
+                className={inputCls} />
+            </div>
+            <div>
+              <label className="text-[10px] text-slate-500 mb-1 block">Plateforme</label>
+              <select value={form.platform}
+                onChange={e => setForm(f => ({ ...f, platform: e.target.value }))}
+                className={inputCls}>
+                <option value="instagram">📸 Instagram</option>
+                <option value="tiktok">🎵 TikTok</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-500 mb-1 block">Lead magnet à envoyer (optionnel)</label>
+            <select value={form.lead_magnet_id || ""}
+              onChange={e => setForm(f => ({ ...f, lead_magnet_id: e.target.value ? parseInt(e.target.value) : null }))}
+              className={inputCls}>
+              <option value="">— Aucun lead magnet —</option>
+              {leadMagnets.map(m => (
+                <option key={m.id} value={m.id}>{m.title}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-slate-500 mb-1 block">Message DM (laisser vide = message auto)</label>
+            <textarea value={form.message_template}
+              onChange={e => setForm(f => ({ ...f, message_template: e.target.value }))}
+              placeholder={`Hey ! Tu as commenté ${form.keyword || 'MOT-CLÉ'} sous mon post 😊 Voici ce que j'ai préparé pour toi : {{link}}`}
+              rows={3}
+              className={inputCls + " resize-none"} />
+            <p className="text-[10px] text-slate-600 mt-1">Utilisez {"{{link}}"} pour insérer automatiquement le lien du lead magnet</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => create.mutate()} disabled={!form.keyword || create.isPending}
+              className="flex-1 py-2 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-xs font-semibold transition-colors">
+              {create.isPending ? "Ajout…" : "Créer le déclencheur"}
+            </button>
+            <button onClick={() => setShowForm(false)}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs text-slate-400 transition-colors">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
+      {triggers.length === 0 && !showForm && (
+        <div className="text-center py-6 text-slate-600 text-xs">
+          Aucun déclencheur — créez-en un pour automatiser vos DMs depuis les commentaires
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const qc = useQueryClient();
   const { data: coach, isLoading } = useQuery({
     queryKey: ["me"],
     queryFn: () => authApi.me().then(r => r.data),
+  });
+  const { data: leadMagnets = [] } = useQuery({
+    queryKey: ["lead-magnets"],
+    queryFn: () => leadMagnetsApi.list().then(r => r.data),
   });
 
   const [form, setForm] = useState({
@@ -244,6 +494,12 @@ export default function Settings() {
                 </button>
               )}
             </div>
+
+            {/* Lead Magnet Library */}
+            <LeadMagnetSection />
+
+            {/* Keyword Triggers */}
+            <KeywordTriggerSection leadMagnets={leadMagnets} />
 
             {/* Account info */}
             <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-6">

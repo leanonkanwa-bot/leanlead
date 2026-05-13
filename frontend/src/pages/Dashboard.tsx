@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   authApi, leadsApi, pipelineApi, followupsApi, prospectingApi, analyticsApi, agentApi,
+  keywordTriggersApi, contentIntelApi,
   type Lead, type Stage, type FollowupDue, type Classification, type ReplyAnalysis,
-  type AnalyticsData, type AgentStatus, type Coach,
+  type AnalyticsData, type AgentStatus, type Coach, type ContentAnalysis,
 } from "../lib/api";
 import KanbanBoard from "../components/KanbanBoard";
 
@@ -1496,9 +1497,321 @@ function AnalyticsTab({ coach }: { coach: { offer_price?: number | null } }) {
 }
 
 /* ════════════════════════════════════════════════════════════════════
+   ONGLET AUTOMATISATIONS
+════════════════════════════════════════════════════════════════════ */
+function AutomationsTab() {
+  const qc = useQueryClient();
+  const { data: triggers = [] } = useQuery({
+    queryKey: ["keyword-triggers"],
+    queryFn: () => keywordTriggersApi.list().then(r => r.data),
+  });
+  const { data: stats } = useQuery({
+    queryKey: ["trigger-stats"],
+    queryFn: () => keywordTriggersApi.stats().then(r => r.data),
+    refetchInterval: 30_000,
+  });
+
+  const fire = useMutation({
+    mutationFn: ({ id, handle }: { id: number; handle: string }) =>
+      keywordTriggersApi.fire(id, handle),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["keyword-triggers"] });
+      qc.invalidateQueries({ queryKey: ["trigger-stats"] });
+      if (data.data.dm_url) {
+        navigator.clipboard.writeText(data.data.message).catch(() => {});
+        window.open(data.data.dm_url, "_blank", "noopener,noreferrer");
+      }
+    },
+  });
+
+  const [handleInputs, setHandleInputs] = useState<Record<number, string>>({});
+
+  return (
+    <div className="space-y-6">
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">DMs envoyés via mots-clés</p>
+            <p className="text-2xl font-black text-brand-400">{stats.total_triggers}</p>
+          </div>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Mots-clés actifs</p>
+            <p className="text-2xl font-black text-white">{stats.active_keywords}</p>
+          </div>
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl p-4">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Top mot-clé</p>
+            <p className="text-lg font-black text-emerald-400">
+              {stats.top_keywords[0]?.keyword || "—"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Keyword triggers list */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#2a2a2a]">
+          <h3 className="font-semibold text-sm text-white">Déclencheurs actifs</h3>
+          <a href="/settings" className="text-xs text-brand-400 hover:text-brand-300 transition-colors">
+            Gérer →
+          </a>
+        </div>
+
+        {triggers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center px-6">
+            <p className="text-3xl mb-3">⚡</p>
+            <p className="text-sm font-semibold text-white mb-1">Aucun déclencheur configuré</p>
+            <p className="text-xs text-slate-500 mb-4">
+              Configurez des mots-clés dans les Paramètres pour automatiser vos DMs depuis les commentaires.
+            </p>
+            <a href="/settings"
+              className="px-4 py-2 bg-brand-500 hover:bg-brand-400 rounded-xl text-xs font-semibold transition-colors text-white">
+              Configurer les mots-clés →
+            </a>
+          </div>
+        ) : (
+          <div className="divide-y divide-[#1f1f1f]">
+            {triggers.map(t => (
+              <div key={t.id} className="px-5 py-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-full">
+                        {t.keyword}
+                      </span>
+                      <span className="text-xs text-slate-500">{t.platform}</span>
+                      {t.active ? (
+                        <span className="text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/50 px-1.5 py-0.5 rounded-full">Actif</span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded-full">Pausé</span>
+                      )}
+                    </div>
+                    {t.lead_magnet && (
+                      <p className="text-xs text-slate-400 mb-1">Lead magnet : {t.lead_magnet.title}</p>
+                    )}
+                    <p className="text-xs text-slate-500">
+                      {t.trigger_count} déclenchement{t.trigger_count !== 1 ? "s" : ""} total
+                      {t.last_triggered_at && ` · Dernier : ${new Date(t.last_triggered_at).toLocaleDateString("fr-FR")}`}
+                    </p>
+                  </div>
+
+                  {/* Manual fire section */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={handleInputs[t.id] || ""}
+                      onChange={e => setHandleInputs(h => ({ ...h, [t.id]: e.target.value }))}
+                      placeholder="@handle du commentateur"
+                      className="bg-slate-900 border border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-brand-500 w-44 transition-colors"
+                    />
+                    <button
+                      onClick={() => fire.mutate({ id: t.id, handle: handleInputs[t.id] || "" })}
+                      disabled={fire.isPending}
+                      className="px-3 py-1.5 bg-brand-500/20 hover:bg-brand-500/30 border border-brand-500/30 text-brand-400 rounded-lg text-xs font-medium transition-colors whitespace-nowrap disabled:opacity-50">
+                      ⚡ Envoyer DM
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* How it works */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+        <p className="text-xs font-semibold text-slate-400 mb-3">Comment ça marche</p>
+        <div className="space-y-2">
+          {[
+            { step: "1", text: "Publiez un contenu avec un appel à l'action : \"Commente GUIDE pour recevoir ma méthode gratuite\"" },
+            { step: "2", text: "Quelqu'un commente le mot-clé sur votre post" },
+            { step: "3", text: "Entrez son @handle ici → LeanLead prépare le DM avec votre lead magnet" },
+            { step: "4", text: "Cliquez Envoyer DM → le message est copié, la fenêtre DM s'ouvre automatiquement" },
+          ].map(({ step, text }) => (
+            <div key={step} className="flex gap-3 text-xs text-slate-400">
+              <span className="w-5 h-5 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center flex-shrink-0 font-bold">{step}</span>
+              <span>{text}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ONGLET CONTENT INTELLIGENCE
+════════════════════════════════════════════════════════════════════ */
+function ContentIntelligenceTab() {
+  const qc = useQueryClient();
+  const [platform, setPlatform] = useState("instagram");
+  const [customHandle, setCustomHandle] = useState("");
+
+  const { data: result, isLoading } = useQuery({
+    queryKey: ["content-intel", platform],
+    queryFn: () => contentIntelApi.get(platform).then(r => r.data),
+    refetchInterval: 60_000,
+  });
+
+  const analyze = useMutation({
+    mutationFn: () => contentIntelApi.analyze(platform, customHandle || undefined),
+    onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ["content-intel"] }), 5000),
+  });
+
+  const analysis = result?.analysis;
+
+  return (
+    <div className="space-y-6">
+      {/* Controls */}
+      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+        <p className="font-heading text-sm font-semibold text-white mb-4">Analyser votre contenu</p>
+        <div className="flex gap-3">
+          <select value={platform} onChange={e => setPlatform(e.target.value)}
+            className="bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-500 transition-colors text-slate-200">
+            <option value="instagram">📸 Instagram</option>
+            <option value="tiktok">🎵 TikTok</option>
+            <option value="youtube">▶️ YouTube</option>
+          </select>
+          <input value={customHandle} onChange={e => setCustomHandle(e.target.value.replace("@", ""))}
+            placeholder="@handle (optionnel — utilise votre compte par défaut)"
+            className="flex-1 bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-500 transition-colors text-slate-200 placeholder-slate-600" />
+          <button onClick={() => analyze.mutate()} disabled={analyze.isPending}
+            className="px-4 py-2 bg-brand-500 hover:bg-brand-400 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 whitespace-nowrap">
+            {analyze.isPending ? "Analyse…" : "Analyser →"}
+          </button>
+        </div>
+        {analyze.isSuccess && (
+          <p className="text-xs text-emerald-400 mt-2">
+            ✓ Analyse démarrée. Les résultats apparaîtront dans 30-60 secondes…
+          </p>
+        )}
+        {result?.analyzed_at && (
+          <p className="text-[10px] text-slate-600 mt-2">
+            Dernière analyse : {new Date(result.analyzed_at).toLocaleString("fr-FR")}
+            {result.handle && ` · @${result.handle}`}
+            {analysis?._demo && " · (mode démo — ajoutez votre clé API pour une analyse réelle)"}
+          </p>
+        )}
+      </div>
+
+      {!analysis && !isLoading && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <p className="text-4xl mb-3">🔍</p>
+          <p className="text-sm font-semibold text-white mb-1">Aucune analyse disponible</p>
+          <p className="text-xs text-slate-500">
+            Cliquez "Analyser" pour obtenir des insights sur votre contenu et générer plus de leads.
+          </p>
+        </div>
+      )}
+
+      {isLoading && !analysis && (
+        <div className="flex items-center justify-center py-16">
+          <div className="text-slate-500 text-sm">Chargement…</div>
+        </div>
+      )}
+
+      {analysis && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Content score */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5 sm:col-span-2">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Score de génération de leads</p>
+              <span className={`text-2xl font-black ${analysis.content_score >= 70 ? "text-emerald-400" : analysis.content_score >= 50 ? "text-amber-400" : "text-red-400"}`}>
+                {analysis.content_score}/100
+              </span>
+            </div>
+            <div className="w-full bg-slate-800 rounded-full h-2">
+              <div className="h-2 rounded-full transition-all duration-500"
+                style={{
+                  width: `${analysis.content_score}%`,
+                  background: analysis.content_score >= 70 ? "#34d399" : analysis.content_score >= 50 ? "#fbbf24" : "#f87171"
+                }} />
+            </div>
+          </div>
+
+          {/* Themes */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">🔥 Thèmes qui engagent</p>
+            <ul className="space-y-1.5">
+              {analysis.top_content_themes.map((t, i) => (
+                <li key={i} className="text-xs text-slate-300 flex gap-2">
+                  <span className="text-brand-400 font-bold">{i + 1}.</span> {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Pain points */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">💬 Points de douleur exprimés</p>
+            <ul className="space-y-1.5">
+              {analysis.audience_pain_points.map((p, i) => (
+                <li key={i} className="text-xs text-slate-300 flex gap-2">
+                  <span className="text-red-400">•</span> {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Suggested topics */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">🎯 Sujets à créer pour générer des leads</p>
+            <ul className="space-y-2">
+              {analysis.suggested_topics.map((t, i) => (
+                <li key={i} className="text-xs text-slate-300 flex gap-2">
+                  <span className="text-emerald-400 font-bold">{i + 1}.</span> {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Lead gen hooks */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">⚡ Accroches qui convertissent</p>
+            <ul className="space-y-2">
+              {analysis.lead_gen_hooks.map((h, i) => (
+                <li key={i} className="text-xs bg-slate-900 rounded-lg px-3 py-2 text-slate-200 border border-[#2a2a2a]">
+                  "{h}"
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Keyword triggers suggestions */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">🔑 Mots-clés déclencheurs suggérés</p>
+            <div className="flex flex-wrap gap-2">
+              {analysis.keyword_triggers.map((k, i) => (
+                <span key={i} className="text-xs font-bold text-brand-400 bg-brand-500/10 px-3 py-1 rounded-full border border-brand-500/20">
+                  {k}
+                </span>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-600 mt-3">
+              Configurez ces mots-clés dans l'onglet Automatisations pour les envoyer automatiquement.
+            </p>
+          </div>
+
+          {/* Best time + questions */}
+          <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl p-5">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">🕐 Meilleur moment pour poster</p>
+            <p className="text-sm text-emerald-400 font-semibold">{analysis.best_posting_time}</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-4 mb-3">❓ Questions fréquentes</p>
+            <ul className="space-y-1.5">
+              {analysis.audience_questions.map((q, i) => (
+                <li key={i} className="text-xs text-slate-400">"{q}"</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════════════════════════════
    TABLEAU DE BORD
 ════════════════════════════════════════════════════════════════════ */
-type Tab = "pipeline" | "prospects" | "followups" | "warming" | "replies" | "analytics";
+type Tab = "pipeline" | "prospects" | "followups" | "warming" | "replies" | "analytics" | "automations";
 
 function TrialBanner({ coach }: { coach: Coach }) {
   if (!coach.trial_active) return null;
@@ -1648,12 +1961,13 @@ export default function Dashboard() {
   const planLimitReached = planLimit !== null && leads.length >= planLimit;
 
   const TABS: { id: Tab; label: string; badge?: number }[] = [
-    { id: "pipeline",  label: "Pipeline" },
-    { id: "prospects", label: "Prospection" },
-    { id: "followups", label: "Relances", badge: followups.length || undefined },
-    { id: "warming",   label: "Warming",  badge: warmingCount || undefined },
-    { id: "replies",   label: "Réponses" },
-    { id: "analytics", label: "Analytics" },
+    { id: "pipeline",    label: "Pipeline" },
+    { id: "prospects",   label: "Prospection" },
+    { id: "followups",   label: "Relances", badge: followups.length || undefined },
+    { id: "warming",     label: "Warming",  badge: warmingCount || undefined },
+    { id: "replies",     label: "Réponses" },
+    { id: "analytics",   label: "Analytics" },
+    { id: "automations", label: "Automatisations" },
   ];
 
   const initials = (coach?.name ?? "?")[0].toUpperCase();
@@ -1813,8 +2127,15 @@ export default function Dashboard() {
         )}
 
         {tab === "analytics" && (
-          <div className="px-5 py-6 overflow-auto">
+          <div className="px-5 py-6 overflow-auto space-y-8">
+            <ContentIntelligenceTab />
             <AnalyticsTab coach={coach ?? {}} />
+          </div>
+        )}
+
+        {tab === "automations" && (
+          <div className="px-5 py-6 overflow-auto">
+            <AutomationsTab />
           </div>
         )}
       </div>

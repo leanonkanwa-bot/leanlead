@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useRef, useEffect } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Lead } from "../lib/api";
-import { leadsApi, pipelineApi } from "../lib/api";
+import { leadsApi, pipelineApi, aiCloneApi, type AIConversation, type AIMessage } from "../lib/api";
 
 const PLATFORM_DM_URL: Record<string, (handle: string) => string> = {
   instagram: (h) => `https://ig.me/m/${h}`,
@@ -85,9 +85,158 @@ const SOURCE_BADGES: Record<string, { label: string; cls: string }> = {
   hashtag:             { label: "# Hashtag",           cls: "bg-slate-800 text-slate-500 border-slate-700" },
 };
 
+function AICloneTab({ lead }: { lead: Lead }) {
+  const qc = useQueryClient();
+  const [input, setInput] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { data: convData, isLoading } = useQuery({
+    queryKey: ["ai-conv", lead.id],
+    queryFn: () => aiCloneApi.get(lead.id).then(r => r.data),
+  });
+
+  const start = useMutation({
+    mutationFn: () => aiCloneApi.start(lead.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ai-conv", lead.id] }),
+  });
+
+  const sendMsg = useMutation({
+    mutationFn: (content: string) => aiCloneApi.message(lead.id, content),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["ai-conv", lead.id] });
+      if (data.data.is_hot) {
+        qc.invalidateQueries({ queryKey: ["leads"] });
+      }
+    },
+  });
+
+  const handOff = useMutation({
+    mutationFn: () => aiCloneApi.handOff(lead.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ai-conv", lead.id] }),
+  });
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [convData]);
+
+  const conv = convData?.conversation;
+  const messages = conv?.messages || [];
+
+  function handleSend() {
+    if (!input.trim()) return;
+    const msg = input.trim();
+    setInput("");
+    sendMsg.mutate(msg);
+  }
+
+  const STATUS_LABELS: Record<string, { label: string; color: string }> = {
+    active:      { label: "Conversation active", color: "text-brand-400" },
+    hot:         { label: "🔥 Lead chaud — Passer la main", color: "text-amber-400" },
+    disqualified:{ label: "Lead non qualifié", color: "text-red-400" },
+    handed_off:  { label: "✓ Transmis au coach", color: "text-emerald-400" },
+  };
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-8 text-slate-500 text-sm">Chargement…</div>;
+  }
+
+  if (!conv) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-center">
+        <p className="text-3xl mb-3">🤖</p>
+        <p className="text-sm font-semibold text-white mb-1">IA Clone — Qualifieur conversationnel</p>
+        <p className="text-xs text-slate-400 mb-5 max-w-xs">
+          L'IA pose des questions qualifiantes dans votre voix et ne vous transfère le lead que quand il atteint 80+.
+        </p>
+        <button
+          onClick={() => start.mutate()}
+          disabled={start.isPending}
+          className="px-5 py-2.5 bg-brand-500 hover:bg-brand-400 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50">
+          {start.isPending ? "Démarrage…" : "Démarrer la qualification IA →"}
+        </button>
+      </div>
+    );
+  }
+
+  const statusInfo = STATUS_LABELS[conv.status] || STATUS_LABELS.active;
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Status bar */}
+      <div className="flex items-center justify-between px-1 pb-3 border-b border-[#2a2a2a]">
+        <div className="flex items-center gap-3">
+          <span className={`text-xs font-semibold ${statusInfo.color}`}>{statusInfo.label}</span>
+          {conv.current_score > 0 && (
+            <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+              conv.current_score >= 80 ? "bg-amber-500/20 text-amber-400" :
+              conv.current_score >= 50 ? "bg-brand-500/20 text-brand-400" :
+              "bg-slate-800 text-slate-400"
+            }`}>
+              Score {Math.round(conv.current_score)}/100
+            </span>
+          )}
+        </div>
+        {conv.status === "hot" && (
+          <button
+            onClick={() => handOff.mutate()}
+            disabled={handOff.isPending}
+            className="text-xs px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 rounded-lg transition-colors disabled:opacity-50">
+            ✓ Prendre en charge
+          </button>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto space-y-3 py-3 min-h-0" style={{ maxHeight: "320px" }}>
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === "assistant" ? "justify-start" : "justify-end"}`}>
+            <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
+              msg.role === "assistant"
+                ? "bg-slate-800 text-slate-200 rounded-tl-sm"
+                : "bg-brand-500/20 border border-brand-500/30 text-slate-200 rounded-tr-sm"
+            }`}>
+              {msg.content}
+            </div>
+          </div>
+        ))}
+        {sendMsg.isPending && (
+          <div className="flex justify-start">
+            <div className="bg-slate-800 rounded-2xl rounded-tl-sm px-3 py-2 text-xs text-slate-500">
+              IA en train d'écrire…
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      {conv.status === "active" && (
+        <div className="pt-3 border-t border-[#2a2a2a]">
+          <p className="text-[10px] text-slate-600 mb-2">Entrez la réponse du lead pour que l'IA continue la conversation :</p>
+          <div className="flex gap-2">
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSend())}
+              placeholder="Réponse du lead…"
+              className="flex-1 bg-slate-900 border border-[#2a2a2a] rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-brand-500 transition-colors text-slate-200 placeholder-slate-600"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || sendMsg.isPending}
+              className="px-4 py-2 bg-brand-500 hover:bg-brand-400 disabled:opacity-40 rounded-xl text-xs font-semibold transition-colors">
+              →
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () => void }) {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"info" | "dm" | "warming" | "reply">("info");
+  const [tab, setTab] = useState<"info" | "dm" | "warming" | "reply" | "ai-clone">("info");
   const [replyText, setReplyText] = useState(lead.reply_received || "");
   const [convHistory, setConvHistory] = useState("");
   const [notes, setNotes] = useState(lead.notes || "");
@@ -130,6 +279,7 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
     { id: "dm" as const, label: "DM A/B" },
     { id: "warming" as const, label: "Warming" },
     { id: "reply" as const, label: "Réponse" },
+    { id: "ai-clone" as const, label: "IA Clone" },
   ];
 
   return (
@@ -497,6 +647,11 @@ export default function LeadModal({ lead, onClose }: { lead: Lead; onClose: () =
                 <p className="text-red-400 text-xs">{(warm.error as any)?.response?.data?.detail}</p>
               )}
             </>
+          )}
+
+          {/* ── IA CLONE tab ── */}
+          {tab === "ai-clone" && (
+            <AICloneTab lead={lead} />
           )}
 
           {/* ── RÉPONSE tab ── */}

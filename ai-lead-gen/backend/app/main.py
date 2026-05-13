@@ -34,6 +34,10 @@ from .routers import auth, leads, pipeline, prospecting, followups, analytics
 from .routers import agent as agent_router
 from .routers import icp as icp_router
 from .routers import admin as admin_router
+from .routers import lead_magnets as lead_magnets_router
+from .routers import keywords as keywords_router
+from .routers import ai_clone as ai_clone_router
+from .routers import content_intelligence as content_intel_router
 
 Base.metadata.create_all(bind=engine)
 
@@ -95,6 +99,10 @@ _migrations = [
     "ALTER TABLE coaches ADD COLUMN email_verification_token TEXT",
     "ALTER TABLE coaches ADD COLUMN trial_end_date DATETIME",
     # ICP and competitive intelligence tables (created via Base.metadata.create_all)
+    # v8 — lead magnets, keyword triggers, AI conversations, content analyses
+    # (new tables created via Base.metadata.create_all above)
+    "ALTER TABLE leads ADD COLUMN matched_lead_magnet_id INTEGER",
+    "ALTER TABLE leads ADD COLUMN ai_conversation_id INTEGER",
 ]
 with engine.connect() as _conn:
     for _sql in _migrations:
@@ -123,6 +131,10 @@ app.include_router(analytics.router)
 app.include_router(agent_router.router)
 app.include_router(icp_router.router)
 app.include_router(admin_router.router)
+app.include_router(lead_magnets_router.router)
+app.include_router(keywords_router.router)
+app.include_router(ai_clone_router.router)
+app.include_router(content_intel_router.router)
 
 
 @app.on_event("startup")

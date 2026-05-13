@@ -281,6 +281,119 @@ export const adminApi = {
     }>("/admin/emails", { headers: { "x-admin-key": adminKey } }),
 };
 
+/* ── Lead Magnets ── */
+export interface LeadMagnet {
+  id: number;
+  coach_id: number;
+  title: string;
+  description?: string;
+  type: "pdf" | "video" | "ebook" | "call" | "course" | "other";
+  link?: string;
+  created_at: string;
+}
+
+export const leadMagnetsApi = {
+  list: () => api.get<LeadMagnet[]>("/lead-magnets"),
+  create: (d: Omit<LeadMagnet, "id" | "coach_id" | "created_at">) =>
+    api.post<LeadMagnet>("/lead-magnets", d),
+  update: (id: number, d: Partial<LeadMagnet>) =>
+    api.patch<LeadMagnet>(`/lead-magnets/${id}`, d),
+  delete: (id: number) => api.delete(`/lead-magnets/${id}`),
+};
+
+/* ── Keyword Triggers ── */
+export interface KeywordTrigger {
+  id: number;
+  keyword: string;
+  platform: string;
+  message_template?: string;
+  lead_magnet_id?: number | null;
+  lead_magnet?: { id: number; title: string; type: string; link?: string } | null;
+  trigger_count: number;
+  last_triggered_at?: string | null;
+  active: boolean;
+  created_at: string;
+}
+
+export interface TriggerStats {
+  total_triggers: number;
+  active_keywords: number;
+  top_keywords: { keyword: string; platform: string; count: number }[];
+}
+
+export const keywordTriggersApi = {
+  list: () => api.get<KeywordTrigger[]>("/keyword-triggers"),
+  stats: () => api.get<TriggerStats>("/keyword-triggers/stats"),
+  create: (d: { keyword: string; platform?: string; message_template?: string; lead_magnet_id?: number | null }) =>
+    api.post<KeywordTrigger>("/keyword-triggers", d),
+  update: (id: number, d: Partial<KeywordTrigger>) =>
+    api.patch<KeywordTrigger>(`/keyword-triggers/${id}`, d),
+  delete: (id: number) => api.delete(`/keyword-triggers/${id}`),
+  fire: (id: number, commenter_handle?: string) =>
+    api.post<{ ok: boolean; message: string; dm_url: string; trigger_count: number }>(
+      `/keyword-triggers/${id}/fire`,
+      {},
+      { params: { commenter_handle: commenter_handle || "" } }
+    ),
+};
+
+/* ── AI Clone ── */
+export interface AIMessage {
+  role: "user" | "assistant";
+  content: string;
+  ts: string;
+}
+
+export interface AIConversation {
+  id: number;
+  lead_id: number;
+  messages: AIMessage[];
+  current_score: number;
+  status: "active" | "hot" | "disqualified" | "handed_off";
+  created_at: string;
+  updated_at: string;
+}
+
+export const aiCloneApi = {
+  get: (leadId: number) =>
+    api.get<{ conversation: AIConversation | null }>(`/ai-clone/${leadId}`),
+  start: (leadId: number) =>
+    api.post<{ conversation: AIConversation; created: boolean }>(`/ai-clone/${leadId}/start`),
+  message: (leadId: number, content: string) =>
+    api.post<{ reply: string; score: number; status: string; is_hot: boolean; conversation: AIConversation }>(
+      `/ai-clone/${leadId}/message`,
+      { content }
+    ),
+  handOff: (leadId: number) =>
+    api.post<{ ok: boolean; status: string }>(`/ai-clone/${leadId}/hand-off`),
+};
+
+/* ── Content Intelligence ── */
+export interface ContentAnalysis {
+  top_content_themes: string[];
+  audience_pain_points: string[];
+  audience_questions: string[];
+  suggested_topics: string[];
+  lead_gen_hooks: string[];
+  keyword_triggers: string[];
+  best_posting_time: string;
+  content_score: number;
+  _demo?: boolean;
+}
+
+export const contentIntelApi = {
+  analyze: (platform: string, handle?: string) =>
+    api.post<{ ok: boolean; message: string }>("/content-intelligence/analyze", { platform, handle }),
+  get: (platform: string = "instagram") =>
+    api.get<{ analysis: ContentAnalysis | null; handle: string | null; analyzed_at: string | null }>(
+      "/content-intelligence",
+      { params: { platform } }
+    ),
+  all: () => api.get<{ id: number; platform: string; handle: string; analyzed_at: string; content_score: number }[]>(
+    "/content-intelligence/all"
+  ),
+};
+
 /* ── Prospecting ── */
 export const prospectingApi = {
   run: (d: { platform: string; hashtags: string[]; max_results: number; auto_qualify: boolean }) =>
