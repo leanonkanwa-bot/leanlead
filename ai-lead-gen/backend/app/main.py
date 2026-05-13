@@ -149,13 +149,12 @@ def startup_scheduler():
         db.close()
 
 
-@app.on_event("shutdown")
-def shutdown_scheduler():
-    from .scheduler import stop_scheduler
-    stop_scheduler()
+@app.get("/api/health")
+def health():
+    return {"status": "ok", "version": "3.0.0"}
 
 
-# Serve built React frontend
+# Serve built React frontend (must come AFTER all API routes)
 _dist = Path(__file__).parent.parent.parent / "frontend" / "dist"
 if _dist.exists():
     app.mount("/assets", StaticFiles(directory=str(_dist / "assets")), name="assets")
@@ -165,11 +164,7 @@ if _dist.exists():
         return FileResponse(str(_dist / "index.html"))
 
 
-@app.get("/")
-def root():
-    return {"status": "ok"}
-
-
-@app.get("/api/health")
-def health():
-    return {"status": "ok", "version": "3.0.0"}
+@app.on_event("shutdown")
+def shutdown_scheduler():
+    from .scheduler import stop_scheduler
+    stop_scheduler()

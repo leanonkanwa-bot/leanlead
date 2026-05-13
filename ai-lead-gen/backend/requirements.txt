@@ -13,5 +13,5 @@ lxml>=5.0
 ddgs>=9.0
 python-dotenv==1.0.1
 aiofiles==24.1.0
-apscheduler==3.10.4
-cryptography>=42.0
+apscheduler>=3.10
+cryptography>=41.0
