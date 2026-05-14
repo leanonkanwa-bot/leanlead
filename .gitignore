@@ -33,6 +33,7 @@ dist/
 backend/storage/uploads/*
 backend/storage/outputs/*
 backend/storage/work/*
+backend/storage/jobs.json
 !backend/storage/uploads/.gitkeep
 !backend/storage/outputs/.gitkeep
 !backend/storage/work/.gitkeep
