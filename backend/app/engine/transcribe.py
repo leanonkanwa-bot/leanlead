@@ -17,7 +17,6 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
-import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -169,8 +168,13 @@ class Transcript:
 
 
 def transcribe(video_path: Path) -> Transcript:
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as tmp:
-        wav_path = Path(tmp.name)
+    # Use a deterministic path in the project work_dir rather than the system
+    # temp directory.  On Windows, NamedTemporaryFile keeps the file handle
+    # open while the context manager is active, so ffmpeg gets "Permission
+    # denied" when it tries to write to the same path.  Writing to work_dir
+    # and cleaning up with try/finally avoids the lock entirely.
+    wav_path = settings.work_dir / f"{video_path.stem}_audio.wav"
+    try:
         _extract_audio_wav(video_path, wav_path)
 
         model = _load_model()
@@ -204,12 +208,13 @@ def transcribe(video_path: Path) -> Transcript:
             )
             last_end = max(last_end, float(seg.end))
 
-    full_text = " ".join(s.text for s in segments).strip()
-
-    detected_lang = getattr(info, "language", None) or "en"
-    return Transcript(
-        language=detected_lang,
-        duration=last_end,
-        text=full_text,
-        segments=segments,
-    )
+        full_text = " ".join(s.text for s in segments).strip()
+        detected_lang = getattr(info, "language", None) or "en"
+        return Transcript(
+            language=detected_lang,
+            duration=last_end,
+            text=full_text,
+            segments=segments,
+        )
+    finally:
+        wav_path.unlink(missing_ok=True)
