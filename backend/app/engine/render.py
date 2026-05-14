@@ -25,6 +25,7 @@ from typing import Any
 
 from app.agent.planner import EditPlan
 from app.engine.captions import WordTiming, build_ass
+from app.engine.transcribe import FFMPEG_PATH, FFPROBE_PATH
 from app.engine.graphics import (
     AESTHETIC_COLORS,
     render_motion_graphic,
@@ -69,7 +70,7 @@ def _run(cmd: list[str]) -> None:
 def _probe_duration(path: Path) -> float:
     out = subprocess.check_output(
         [
-            "ffprobe", "-v", "error",
+            FFPROBE_PATH, "-v", "error",
             "-show_entries", "format=duration",
             "-of", "default=noprint_wrappers=1:nokey=1",
             str(path),
@@ -84,7 +85,7 @@ def _probe_video_info(path: Path) -> dict[str, Any]:
     try:
         out = subprocess.check_output(
             [
-                "ffprobe", "-v", "error",
+                FFPROBE_PATH, "-v", "error",
                 "-select_streams", "v:0",
                 "-show_entries", "stream=width,height,codec_name",
                 "-of", "csv=p=0",
@@ -144,7 +145,7 @@ def _create_proxy(
         f"crop={target_w}:{target_h},fps={fps}"
     )
     _run([
-        "ffmpeg", "-y", "-loglevel", "error",
+        FFMPEG_PATH, "-y", "-loglevel", "error",
         "-threads", "1",                    # global: limit decoder threads
         "-i", str(src),
         "-vf", vf,
@@ -179,7 +180,7 @@ def _cut_proxy_segment(
         f"afade=t=out:st={fade_out_start:.3f}:d={AUDIO_FADE_S}"
     )
     _run([
-        "ffmpeg", "-y", "-loglevel", "error",
+        FFMPEG_PATH, "-y", "-loglevel", "error",
         "-threads", "1",
         "-ss", f"{start:.3f}", "-i", str(proxy),
         "-t", f"{duration:.3f}",
@@ -256,7 +257,7 @@ def _cut_segment(
     # caps. Most importantly: no +faststart (moov-atom rewrite buffers the
     # entire mdat, doubling peak RSS on large videos → SIGKILL on small dynos).
     _run([
-        "ffmpeg", "-y", "-loglevel", "error",
+        FFMPEG_PATH, "-y", "-loglevel", "error",
         "-threads", "1",        # global: limits decoder threads too, not just encoder
         "-ss", f"{start:.3f}", "-i", str(src),
         "-t", f"{duration:.3f}",
@@ -275,7 +276,7 @@ def _concat(parts: list[Path], dst: Path) -> None:
     list_path = dst.with_suffix(".txt")
     list_path.write_text("\n".join(f"file '{p.as_posix()}'" for p in parts))
     _run([
-        "ffmpeg", "-y", "-loglevel", "error",
+        FFMPEG_PATH, "-y", "-loglevel", "error",
         "-f", "concat", "-safe", "0", "-i", str(list_path),
         "-c", "copy",
         str(dst),
@@ -747,7 +748,7 @@ def render(
     # [M+1..M+V] = layout PNGs (vignette moments)
     # [M+V+1..M+2V] = mask PNGs (one per vignette, all same file)
     M = len(rendered_graphics)
-    cmd: list[str] = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(concat_path)]
+    cmd: list[str] = [FFMPEG_PATH, "-y", "-loglevel", "error", "-i", str(concat_path)]
     for rg in rendered_graphics:
         cmd += ["-i", str(rg.png)]
     for lp in layout_paths:
