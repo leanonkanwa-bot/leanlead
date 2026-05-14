@@ -14,8 +14,10 @@ Public surface stays identical: `transcribe(path) -> Transcript` with
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -23,11 +25,49 @@ from typing import Any
 
 from app.core.config import settings
 
+# ---------------------------------------------------------------------------
+# Windows: inject the user's ffmpeg bin folder into the subprocess PATH so
+# that the shared-build DLLs (avcodec-*.dll, etc.) are resolvable even when
+# Python was launched from a shell whose $env:Path session variable was never
+# made permanent.  On non-Windows systems this is a no-op.
+# ---------------------------------------------------------------------------
+_FFMPEG_WIN_BIN = Path(
+    r"C:\Users\KANWAGI\Downloads"
+    r"\ffmpeg-master-latest-win64-gpl-shared"
+    r"\ffmpeg-master-latest-win64-gpl-shared"
+    r"\bin"
+)
+
+if sys.platform == "win32" and _FFMPEG_WIN_BIN.is_dir():
+    _bin_str = str(_FFMPEG_WIN_BIN)
+    if _bin_str not in os.environ.get("PATH", ""):
+        os.environ["PATH"] = _bin_str + os.pathsep + os.environ.get("PATH", "")
+
 
 def _ffmpeg_bin() -> str:
-    """Return the ffmpeg executable name, using the full path when found."""
+    """Return the full path to the ffmpeg executable.
+
+    Priority order:
+    1. The known Windows installation path (absolute, avoids DLL-not-found crashes)
+    2. Whatever shutil.which() finds on PATH (covers Linux/macOS/custom installs)
+    3. Bare "ffmpeg" as a last resort
+    """
+    if sys.platform == "win32":
+        candidate = _FFMPEG_WIN_BIN / "ffmpeg.exe"
+        if candidate.is_file():
+            return str(candidate)
     found = shutil.which("ffmpeg")
     return found if found else "ffmpeg"
+
+
+def _ffprobe_bin() -> str:
+    """Return the full path to the ffprobe executable (same logic as ffmpeg)."""
+    if sys.platform == "win32":
+        candidate = _FFMPEG_WIN_BIN / "ffprobe.exe"
+        if candidate.is_file():
+            return str(candidate)
+    found = shutil.which("ffprobe")
+    return found if found else "ffprobe"
 
 
 _model = None
@@ -76,7 +116,7 @@ def _extract_audio_wav(video_path: Path, wav_path: Path) -> None:
     Variant 2 — remove codec flag (handles shared builds that lack libswresample DLLs)
     Variant 3 — minimal flags only (last resort; accepts whatever sample format ffmpeg picks)
     """
-    ffmpeg = _ffmpeg_bin()
+    ffmpeg = _ffmpeg_bin()   # full absolute path on Windows
     base = [ffmpeg, "-y", "-loglevel", "error", "-i", str(video_path),
             "-vn", "-ac", "1", "-ar", "16000"]
 
