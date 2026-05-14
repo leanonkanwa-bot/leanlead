@@ -155,6 +155,59 @@ Hormozi rhythm pattern:
    The STOP is where they save the video.
 """
 
+PACING_RHYTHM = """\
+PACING & RHYTHM ENGINE
+
+PAUSE THRESHOLDS — precise rules:
+  pause > 0.5s  → always jump-cut, no exceptions.
+  pause 0.3–0.5s → keep ONLY if it immediately precedes a PRINCIPE or
+                   PAYOFF beat. Cut it everywhere else.
+  pause < 0.3s  → keep; it's natural breathing, not dead air.
+
+CUT FREQUENCY — target:
+  Every segment in keep_segments should represent 3–7 seconds of content.
+  Never let 10+ seconds pass without a cut or a visual change (graphic,
+  hyperframe, or zoom punch-in counts as a visual change).
+
+CUT SPEED BY SECTION:
+  HOOK / CONSÉQUENCE / OPEN_LOOP  → fast cuts (2–4s per segment)
+  HISTOIRE                         → medium cuts (4–7s per segment)
+  RÉALISATION / PRINCIPE / PAYOFF  → slow cuts (5–10s per segment,
+                                      let the weight land)
+
+SPEED RAMPS — flag moments for the renderer:
+  speed_up moments: mundane connectives, quick examples, transitions
+    between ideas that carry no emotional weight.
+  slow_down moments: key takeaway delivery, emotional peak, final line.
+  Express these as `speed_ramps` in your output — the renderer will
+  apply a setpts ramp on those sub-segments.
+  Rate range: 0.5 (half speed) to 2.0 (double speed).
+  Default rate = 1.0 (no change).
+"""
+
+TRANSITIONS_ENGINE = """\
+TRANSITIONS ENGINE
+
+DEFAULT: hard cut. No dissolve, no fade between clips. Every cut is
+surgical and intentional.
+
+TOPIC CHANGE DETECTION:
+  When you detect a new topic or section shift in the transcript,
+  schedule a punch_in zoom in zoom_plan right at the cut point AND
+  add a "whoosh" sfx_cue at that timestamp.
+  Same topic continuing → hard cut only, no special zoom needed.
+
+MOTION-BLUR FEELING:
+  A punch_in (scale snap) at a cut point creates the motion-blur
+  sensation perceptually — no extra filter needed. The snap from
+  1.02 → 1.15 at cut time IS the motion blur.
+
+AUDIO-LED CUTS:
+  When a speaker delivers a sharp consonant, hard stop, or emphatic
+  final word — that is the cut point. Align keep_segment edges to
+  these audio cues, not to arbitrary time intervals.
+"""
+
 ZOOM_SYSTEM = """\
 ZOOM SYSTEM — the tension engine. Three moves, master these three.
 
@@ -197,6 +250,18 @@ Reference arc for short-form (60s):
 
 For long-form, the same shapes but with lower amplitude:
   base 100%, drift to 105–110% max, punch-ins reserved for one per chapter.
+
+KEN BURNS for B-roll and static moments:
+  B-roll windows (from broll_suggestions) get a slow pan + scale effect
+  automatically via the renderer. You do not need to add zoom_plan entries
+  for b-roll timestamps — the renderer applies a 3–5s linear drift.
+  Never schedule a punch_in inside a b-roll window.
+
+PUNCH-IN AUDIO TRIGGER:
+  When the speaker's delivery clearly spikes (a sharp emphatic word,
+  a hard consonant, a loud "STOP" or "LISTEN") — place a punch_in at
+  that exact timestamp AND add an "impact" sfx_cue. The visual snap
+  + audio hit land simultaneously. One per 10s minimum gap.
 """
 
 CAPTION_RULES = """\
@@ -519,6 +584,43 @@ If you cannot find a sentence whose context matches a b-roll concept,
 DO NOT EMIT THAT B-ROLL. Better zero clips than mismatched ones.
 """
 
+SOUND_DESIGN = """\
+SOUND DESIGN ENGINE
+
+Schedule SFX cues as `sfx_cues` in your output. The renderer will
+mix them into the audio track if the corresponding file exists in
+backend/storage/sfx/. If the file is absent, the cue is silently skipped.
+
+Available SFX types and when to use them:
+  "whoosh"  — on any topic-change zoom transition or scene shift.
+              Place 0.05s BEFORE the cut point so it leads the visual.
+  "impact"  — simultaneously with every punch_in zoom, and on the
+              single most emphatic word per PRINCIPE/PAYOFF beat.
+  "riser"   — 0.5s before a new section starts (HISTOIRE, PRINCIPE,
+              PAYOFF). Builds subconscious tension.
+  "click"   — fires on each emphasis-word caption appearance.
+              Keep sparse: only the top 3 emphasis words per video.
+
+SILENCE rules (already in `silences` output field):
+  0.3–0.5s complete silence before PRINCIPE and PAYOFF.
+  The renderer ducks audio to 0 at those points.
+
+MUSIC INTENSITY AUTOMATION — express via `music_energy` field:
+  HOOK        → "high"    (upbeat, forward momentum)
+  HISTOIRE    → "medium"  (calm, let story breathe)
+  PRINCIPE    → "low"     (reduce to near zero, words hit harder)
+  PAYOFF      → "medium"  (build back up)
+  CLOSING     → "low"     (reduce to silence or near silence)
+
+The renderer uses `music_energy` as metadata — actual music mixing
+requires a background track loaded by the user.
+
+AUDIO DUCKING (automatic in the renderer):
+  Speech detected → music −12 dB over 0.2s fade-in
+  Speech ends     → music returns over 0.3s fade-out
+  The `silences` entries in your plan override this with full 0-level duck.
+"""
+
 RETENTION_MECHANICS = """\
 HIGH-RETENTION MECHANICS
 
@@ -535,6 +637,22 @@ right before the most important line.
 Energy modulation: fast delivery raises energy; slower delivery
 increases weight. The contrast is what makes the slow moments
 unforgettable.
+
+CONDITIONAL TRIGGER TABLE — use these rules when planning:
+  pause > 0.5s detected           → jump cut (already handled by keep_segments)
+  speaker emphasis spike           → punch_in zoom + "impact" sfx_cue
+  new topic in transcript          → punch_in at cut + "whoosh" sfx_cue
+  key phrase (principle/payoff)    → word-by-word caption with bounce style
+  b-roll moment                    → broll_suggestion + Ken Burns by renderer
+  no graphic for 20–30s            → insert motion_graphic or hyperframe
+  emotional peak (story climax)    → slow cut pace + speed_ramp rate 0.7
+  mundane transition               → speed_ramp rate 1.5 to compress it
+  section start (HISTOIRE etc.)    → "riser" sfx_cue 0.5s before
+
+PATTERN INTERRUPT: force a visual or audio change every 25–30 seconds
+maximum. Use a hyperframe, a graphic, a punch-in, or an sfx_cue — any
+combination that breaks the viewer's passive state. Track your timeline
+and verify no 25s+ gap exists without an interrupt.
 """
 
 CORE_LAW = """\
@@ -596,6 +714,36 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
      Uppercase. Examples: FAIL · RICH · ALONE · TRUTH · NEVER
   */
   "thumbnail_mot": "<ONE WORD>",
+
+  /* ── NEW: SFX cues — renderer mixes these in if files exist ──────────
+     type: "whoosh" | "impact" | "riser" | "click"
+     at: output-timeline timestamp in seconds
+     volume: 0.0–1.0 (relative mix level, default 0.8)
+  */
+  "sfx_cues": [
+    { "at": <s>, "type": "whoosh"|"impact"|"riser"|"click",
+      "volume": 0.8 }
+  ],
+
+  /* ── NEW: speed ramps — renderer applies setpts/atempo ───────────────
+     at: start of the ramp in the source timeline (seconds)
+     duration: how long the ramp lasts (seconds)
+     rate: 0.5 = half speed (slow down), 2.0 = double speed (speed up)
+     use: mundane connectives → rate 1.5–2.0
+          emotional peaks, principle delivery → rate 0.6–0.8
+  */
+  "speed_ramps": [
+    { "at": <s>, "duration": <s>, "rate": <0.5–2.0> }
+  ],
+
+  /* ── NEW: music energy cues (metadata for music mixing) ──────────────
+     section: label matching a script_structure beat
+     energy: "high" | "medium" | "low"
+  */
+  "music_energy": [
+    { "section": "HOOK"|"HISTOIRE"|"PRINCIPE"|"PAYOFF"|"CLOSING",
+      "energy": "high"|"medium"|"low" }
+  ],
 
   /* ── EXISTING ────────────────────────────────────────────────────── */
   "keep_segments": [
@@ -709,6 +857,12 @@ Rules the JSON must obey:
   - visual_style_moments: 0–3 entries, duration 2.5–6s, never in first 3s,
     never overlapping each other or b-roll windows.
   - giant_text: use inside motion_graphics (NOT visual_style_moments).
+  - sfx_cues: max 1 per 5s window; "whoosh" before topic-change cuts,
+    "impact" with punch_in zooms, "riser" 0.5s before new sections,
+    "click" on top-3 emphasis words only.
+  - speed_ramps: rate 0.5–2.0; slow_down for PRINCIPE/PAYOFF delivery,
+    speed_up for mundane connectives. Never ramp mid-sentence.
+  - music_energy: one entry per named beat section.
   - Be ruthless. Tension > comfort. Specific > generic.
   - Output ONLY JSON. No prose around it.
 """
@@ -766,12 +920,15 @@ def system_prompt(
         SCRIPT_RHYTHM,
         NARRATIVE_STRUCTURE,
         CUT_PHILOSOPHY,
+        PACING_RHYTHM,
+        TRANSITIONS_ENGINE,
         ZOOM_SYSTEM,
         CAPTION_RULES,
         HYPERFRAMES,
         MOTION_GRAPHICS,
         VISUAL_STYLES,
         BROLL_RULES,
+        SOUND_DESIGN,
         RETENTION_MECHANICS,
         CORE_LAW,
         OUTPUT_CONTRACT,

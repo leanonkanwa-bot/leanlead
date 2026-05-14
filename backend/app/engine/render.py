@@ -755,6 +755,17 @@ def render(
     for _ in vign_moments:
         cmd += ["-loop", "1", "-i", str(mask_path)]
 
+    # Log speed_ramps from the plan (scheduling data only — actual setpts
+    # ramps are not yet applied here; the timestamps are preserved in the
+    # plan JSON so a future renderer pass can act on them).
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    speed_ramps = plan.speed_ramps or []
+    if speed_ramps:
+        _log.info("speed_ramps scheduled (%d entries) — stored in plan JSON, "
+                  "setpts/atempo application not yet implemented in this pass.",
+                  len(speed_ramps))
+
     # Build audio silence ducks: volume=0 windows before PRINCIPE/PAYOFF lines.
     audio_duck_parts: list[str] = []
     for sil in remapped_silences:
@@ -768,7 +779,37 @@ def render(
             f"volume=enable='between(t,{t0:.3f},{t1:.3f})':volume=0"
         )
 
-    need_filter_complex = rendered_graphics or vign_moments
+    # SFX mixing: blend cue files from backend/storage/sfx/ into the audio.
+    # Known SFX types and their expected filenames. If a file doesn't exist,
+    # the cue is silently skipped — never fails the render.
+    _SFX_DIR = work_dir.parents[1] / "storage" / "sfx"
+    _SFX_FILES = {
+        "whoosh": _SFX_DIR / "whoosh.wav",
+        "impact": _SFX_DIR / "impact.wav",
+        "riser":  _SFX_DIR / "riser.wav",
+        "click":  _SFX_DIR / "click.wav",
+    }
+    sfx_inputs: list[tuple[Path, float, float]] = []  # (file, at, volume)
+    for cue in (plan.sfx_cues or []):
+        try:
+            cue_at  = float(cue.get("at", 0))
+            cue_vol = float(cue.get("volume", 0.8))
+            cue_type = str(cue.get("type", "")).lower()
+        except (TypeError, ValueError):
+            continue
+        sfx_path = _SFX_FILES.get(cue_type)
+        if sfx_path and sfx_path.exists():
+            sfx_inputs.append((sfx_path, cue_at, min(1.0, max(0.0, cue_vol))))
+        else:
+            _log.debug("SFX cue '%s' at %.2fs skipped — file not found: %s",
+                       cue_type, cue_at, sfx_path)
+
+    # Add SFX audio inputs to cmd now that sfx_inputs list is finalized.
+    sfx_base_idx = M + 1 + 2 * V
+    for sfx_path, _at, _vol in sfx_inputs:
+        cmd += ["-i", str(sfx_path)]
+
+    need_filter_complex = bool(rendered_graphics or vign_moments or sfx_inputs)
 
     if need_filter_complex:
         chain_parts: list[str] = []
@@ -828,12 +869,34 @@ def render(
 
         # Captions last.
         chain_parts.append(f"[{prev}]{ass_filter}[final]")
-        if audio_duck_parts:
-            chain_parts.append("[0:a]" + ",".join(audio_duck_parts) + "[a_out]")
+
+        # Audio chain: silence ducks + SFX mix.
+        if audio_duck_parts or sfx_inputs:
+            # Decide intermediate label: if SFX follows, ducks write to a_ducked;
+            # if ducks are the last step, write directly to a_out.
+            duck_out = ("a_ducked" if sfx_inputs else "a_out")
+            if audio_duck_parts:
+                chain_parts.append(
+                    "[0:a]" + ",".join(audio_duck_parts) + f"[{duck_out}]"
+                )
+            if sfx_inputs:
+                cur_audio = duck_out if audio_duck_parts else "0:a"
+                for j, (_, sfx_at, sfx_vol) in enumerate(sfx_inputs):
+                    sfx_idx = sfx_base_idx + j
+                    ms = int(sfx_at * 1000)
+                    chain_parts.append(
+                        f"[{sfx_idx}:a]adelay={ms}|{ms},"
+                        f"volume={sfx_vol:.2f}[sfx{j}]"
+                    )
+                    out_lbl = "a_out" if j == len(sfx_inputs) - 1 else f"a_sfx{j}"
+                    chain_parts.append(
+                        f"[{cur_audio}][sfx{j}]amix=inputs=2:duration=first[{out_lbl}]"
+                    )
+                    cur_audio = out_lbl
 
         filter_complex = ";".join(chain_parts)
         cmd += ["-filter_complex", filter_complex, "-map", "[final]"]
-        cmd += ["-map", "[a_out]"] if audio_duck_parts else ["-map", "0:a"]
+        cmd += ["-map", "[a_out]"] if (audio_duck_parts or sfx_inputs) else ["-map", "0:a"]
     else:
         cmd += ["-vf", f"{base_filter},{ass_filter}"]
         if audio_duck_parts:

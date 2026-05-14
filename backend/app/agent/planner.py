@@ -81,6 +81,18 @@ class EditPlan:
     def visual_style_moments(self) -> list[dict[str, Any]]:
         return self.raw.get("visual_style_moments", [])
 
+    @property
+    def sfx_cues(self) -> list[dict[str, Any]]:
+        return self.raw.get("sfx_cues", [])
+
+    @property
+    def speed_ramps(self) -> list[dict[str, Any]]:
+        return self.raw.get("speed_ramps", [])
+
+    @property
+    def music_energy(self) -> list[dict[str, Any]]:
+        return self.raw.get("music_energy", [])
+
 
 def _decide_format(duration_s: float, hint: FormatHint) -> str:
     if hint in ("short", "long"):
