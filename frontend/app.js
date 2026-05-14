@@ -41,7 +41,14 @@ const planJson = $("planJson");
       appCard.classList.remove("hidden");
     }
   } catch {
+    // Backend is unreachable — show the tool section but with a prominent warning
+    // so the user knows they need to start the server before submitting.
     appCard.classList.remove("hidden");
+    const warn = document.createElement("p");
+    warn.id = "backendWarn";
+    warn.style.cssText = "color:var(--err,#ff5c7a);margin-bottom:1rem;font-size:.9rem";
+    warn.textContent = "⚠ Backend not reachable. Run “python app.py” and reload this page before editing a video.";
+    appCard.querySelector(".tool-head")?.after(warn);
   }
 })();
 
@@ -112,7 +119,12 @@ form.addEventListener("submit", (e) => {
 
   if (file.size > 100 * 1024 * 1024) {
     // Large file → chunked upload (bypasses proxy body-size limits)
-    chunkedUpload(file).catch((err) => fail(String(err)));
+    chunkedUpload(file).catch((err) => {
+      const msg = String(err);
+      fail(msg.includes("Failed to fetch")
+        ? "Cannot reach the server. Make sure "python app.py" is running, then reload and try again."
+        : msg);
+    });
   } else {
     // Small file → single-request upload with XHR progress
     directUpload(file);
@@ -212,7 +224,7 @@ function directUpload(file) {
     }
   });
 
-  xhr.addEventListener("error", () => fail("Network error during upload."));
+  xhr.addEventListener("error", () => fail("Cannot reach the server. Make sure "python app.py" is running, then reload and try again."));
   xhr.addEventListener("abort", () => fail("Upload aborted."));
   xhr.addEventListener("timeout", () => fail("Upload timed out."));
 
