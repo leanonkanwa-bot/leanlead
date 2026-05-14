@@ -72,7 +72,7 @@ loginForm?.addEventListener("submit", async (e) => {
   appCard.scrollIntoView({ behavior: "smooth", block: "start" });
 });
 
-const CHUNK_SIZE = 50 * 1024 * 1024; // 50 MB per chunk
+const CHUNK_SIZE = 200 * 1024 * 1024; // 200 MB per chunk — 20 GB = 100 chunks
 
 videoInput.addEventListener("change", () => {
   const f = videoInput.files?.[0];

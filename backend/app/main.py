@@ -101,7 +101,7 @@ def auth_logout() -> Response:
 async def submit_edit(
     request: Request,
     background: BackgroundTasks,
-    video: UploadFile = File(None),   # optional — omitted when upload_id is used
+    video: UploadFile = File(None, max_upload_size=500 * 1024 * 1024),  # optional — omitted when upload_id is used; 500 MB ceiling for direct uploads
     upload_id: str = Form(""),        # set by chunked-upload flow
     instructions: str = Form(""),
     format_hint: Literal["short", "long", "auto"] = Form("auto"),

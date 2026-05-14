@@ -14,6 +14,7 @@ Public surface stays identical: `transcribe(path) -> Transcript` with
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import tempfile
 from dataclasses import asdict, dataclass
@@ -21,6 +22,12 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import settings
+
+
+def _ffmpeg_bin() -> str:
+    """Return the ffmpeg executable name, using the full path when found."""
+    found = shutil.which("ffmpeg")
+    return found if found else "ffmpeg"
 
 
 _model = None
@@ -53,22 +60,55 @@ def unload_model() -> None:
     gc.collect()
 
 
+def _run_ffmpeg(args: list[str], timeout: int = 300) -> None:
+    subprocess.run(args, check=True, timeout=timeout,
+                   stderr=subprocess.PIPE)
+
+
 def _extract_audio_wav(video_path: Path, wav_path: Path) -> None:
-    """Pre-extract audio to 16kHz mono WAV so faster-whisper doesn't need
-    to hold both the video decoder and the model in memory simultaneously."""
-    subprocess.run(
-        [
-            "ffmpeg", "-y", "-loglevel", "error",
-            "-i", str(video_path),
-            "-vn",                      # drop video
-            "-ac", "1",                 # mono
-            "-ar", "16000",             # 16 kHz — Whisper's native rate
-            "-sample_fmt", "s16",       # 16-bit PCM
-            str(wav_path),
-        ],
-        check=True,
-        timeout=120,
-    )
+    """Pre-extract audio to 16kHz mono WAV for faster-whisper.
+
+    Tries three progressively simpler command variants so that the Windows
+    "shared" FFmpeg build (which is missing some DLLs and returns exit code
+    4294967283 / -13) still works via the fallback.
+
+    Variant 1 — full quality, explicit codec (works on all static/essentials builds)
+    Variant 2 — remove codec flag (handles shared builds that lack libswresample DLLs)
+    Variant 3 — minimal flags only (last resort; accepts whatever sample format ffmpeg picks)
+    """
+    ffmpeg = _ffmpeg_bin()
+    base = [ffmpeg, "-y", "-loglevel", "error", "-i", str(video_path),
+            "-vn", "-ac", "1", "-ar", "16000"]
+
+    variants = [
+        base + ["-acodec", "pcm_s16le", str(wav_path)],        # variant 1
+        base + ["-sample_fmt", "s16", str(wav_path)],           # variant 2
+        base + [str(wav_path)],                                  # variant 3
+    ]
+
+    last_err: Exception | None = None
+    for cmd in variants:
+        try:
+            _run_ffmpeg(cmd)
+            return
+        except subprocess.CalledProcessError as exc:
+            last_err = exc
+            continue
+        except FileNotFoundError:
+            raise RuntimeError(
+                "ffmpeg not found. Install it and make sure it is on PATH. "
+                "On Windows use the 'essentials' or 'full' build from "
+                "https://www.gyan.dev/ffmpeg/builds/ — the 'shared' build "
+                "is missing DLLs and will not work."
+            ) from None
+
+    raise RuntimeError(
+        f"ffmpeg failed to extract audio after {len(variants)} attempts "
+        f"(last exit code: {getattr(last_err, 'returncode', '?')}). "
+        "On Windows, make sure you installed the 'essentials' or 'full' "
+        "FFmpeg build, NOT the 'shared' build. "
+        "Download from https://www.gyan.dev/ffmpeg/builds/"
+    ) from last_err
 
 
 @dataclass
