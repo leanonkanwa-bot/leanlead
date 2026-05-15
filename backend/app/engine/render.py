@@ -925,6 +925,7 @@ def render(
                 filter_complex = filter_complex.replace(f"]{_bad}[", "]null[")
         # Pass filter_complex directly — subprocess list args bypass the Windows
         # shell entirely so there is no 8191-char command-line limit here.
+        filter_complex = filter_complex.rstrip("'")
         cmd += ["-filter_complex", filter_complex, "-map", "[final]"]
         _no_a_chain = not (audio_duck_ranges or sfx_inputs)
         if _no_a_chain:
