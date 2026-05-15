@@ -930,7 +930,7 @@ def render(
         _fc_content = _fc_script.read_text(encoding="utf-8")
         if _fc_content.endswith("'"):
             _fc_script.write_text(_fc_content.rstrip("'"), encoding="utf-8")
-        cmd += ["-filter_complex_script", str(_fc_script), "-map", "[final]"]
+        cmd += ["-/filter_complex", str(_fc_script), "-map", "[final]"]
         _no_a_chain = not (audio_duck_ranges or sfx_inputs)
         if _no_a_chain:
             cmd += ["-map", "0:a"] if _has_audio else ["-an"]
