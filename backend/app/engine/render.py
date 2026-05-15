@@ -739,7 +739,7 @@ def render(
 
     # Build the final filter chain.
     base_filter = (
-        f"zoompan=z='{z_expr}':x='{x_expr}':y='{y_expr}':"
+        f"zoompan=z={z_expr}:x={x_expr}:y={y_expr}:"
         f"d=1:s={target_w}x{target_h}:fps={fps}"
         f"{hyperframe_chain}"
     )
@@ -926,6 +926,10 @@ def render(
         import tempfile as _tempfile2
         _fc_script = Path(_tempfile2.gettempdir()) / f"filter_{work_dir.name}.txt"
         _fc_script.write_text(filter_complex, encoding="utf-8")
+        # Strip any stray trailing quote that could corrupt the filter graph.
+        _fc_content = _fc_script.read_text(encoding="utf-8")
+        if _fc_content.endswith("'"):
+            _fc_script.write_text(_fc_content.rstrip("'"), encoding="utf-8")
         cmd += ["-filter_complex_script", str(_fc_script), "-map", "[final]"]
         _no_a_chain = not (audio_duck_ranges or sfx_inputs)
         if _no_a_chain:
