@@ -740,7 +740,14 @@ def render(
         f"d=1:s={target_w}x{target_h}:fps={fps}"
         f"{hyperframe_chain}"
     )
-    ass_filter = f"ass={ass_path.as_posix()}"
+    import shutil as _shutil
+    import tempfile as _tempfile
+    _tmp_dir = Path(_tempfile.gettempdir())
+    _ass_tmp = _tmp_dir / f"captions_{ass_path.parent.name}.ass"
+    _shutil.copy2(ass_path, _ass_tmp)
+    _ass_str = str(_ass_tmp).replace("\\", "/").replace(":", "\\:")
+    # _nocap_path: first-pass output (no captions), lives in temp dir (no spaces)
+    _nocap_path = _tmp_dir / f"nocap_{output_path.stem}.mp4"
 
     # Assemble FFmpeg inputs.
     # [0] = concat.mp4
@@ -868,8 +875,8 @@ def render(
             )
             prev = nxt_vign
 
-        # Captions last.
-        chain_parts.append(f"[{prev}]{ass_filter}[final]")
+        # Pass through — captions are burned in a separate second pass.
+        chain_parts.append(f"[{prev}]null[final]")
 
         # Audio chain: silence ducks + SFX mix.
         if audio_duck_parts or sfx_inputs:
@@ -896,10 +903,12 @@ def render(
                     cur_audio = out_lbl
 
         filter_complex = ";".join(chain_parts)
-        cmd += ["-filter_complex", filter_complex, "-map", "[final]"]
+        _fc_script = work_dir / "filter.txt"
+        _fc_script.write_text(filter_complex, encoding="utf-8")
+        cmd += ["-filter_complex_script", str(_fc_script), "-map", "[final]"]
         cmd += ["-map", "[a_out]"] if (audio_duck_parts or sfx_inputs) else ["-map", "0:a"]
     else:
-        cmd += ["-vf", f"{base_filter},{ass_filter}"]
+        cmd += ["-vf", base_filter]
         if audio_duck_parts:
             cmd += ["-af", ",".join(audio_duck_parts)]
 
@@ -911,9 +920,28 @@ def render(
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
-        str(output_path),
+        str(_nocap_path),
     ]
     _run(cmd)
+
+    # Second pass: burn captions onto the caption-free first-pass video.
+    # Running this as a separate ffmpeg invocation avoids all filter_complex
+    # path-escaping issues on Windows — the subtitles= value is passed directly
+    # as a subprocess list item (no shell), so only the ffmpeg filter parser
+    # sees it; C\:/ escaping handles the Windows drive-letter colon.
+    _run([
+        FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-i", str(_nocap_path),
+        "-vf", f"subtitles={_ass_str}:force_style='FontName=Arial'",
+        "-c:v", "libx264", "-preset", "superfast", "-crf", "22",
+        "-threads", "2",
+        "-x264-params", "rc-lookahead=0:bframes=0",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "copy",
+        "-movflags", "+faststart",
+        str(output_path),
+    ])
+    _nocap_path.unlink(missing_ok=True)
 
     return {
         "output": str(output_path),
