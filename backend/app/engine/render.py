@@ -923,14 +923,9 @@ def render(
         for _bad in _INVALID_FILTERS:
             if f"]{_bad}[" in filter_complex:
                 filter_complex = filter_complex.replace(f"]{_bad}[", "]null[")
-        import tempfile as _tempfile2
-        _fc_script = Path(_tempfile2.gettempdir()) / f"filter_{work_dir.name}.txt"
-        _fc_script.write_text(filter_complex, encoding="utf-8")
-        # Strip any stray trailing quote that could corrupt the filter graph.
-        _fc_content = _fc_script.read_text(encoding="utf-8")
-        if _fc_content.endswith("'"):
-            _fc_script.write_text(_fc_content.rstrip("'"), encoding="utf-8")
-        cmd += ["-/filter_complex", str(_fc_script), "-map", "[final]"]
+        # Pass filter_complex directly — subprocess list args bypass the Windows
+        # shell entirely so there is no 8191-char command-line limit here.
+        cmd += ["-filter_complex", filter_complex, "-map", "[final]"]
         _no_a_chain = not (audio_duck_ranges or sfx_inputs)
         if _no_a_chain:
             cmd += ["-map", "0:a"] if _has_audio else ["-an"]
