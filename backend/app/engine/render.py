@@ -878,9 +878,11 @@ def render(
             )
             prev = nxt_vign
 
-        # Rename the last overlay output label to [final] directly.
-        # This avoids null/copy passthrough filters which some FFmpeg builds reject.
-        chain_parts[-1] = chain_parts[-1].replace(f"[{prev}]", "[final]")
+        # Rename the last overlay output label to [final] directly by slicing
+        # off the trailing [{prev}] and appending [final]. Using slice instead
+        # of str.replace avoids accidentally hitting [{prev}] where it also
+        # appears as an input label at the start of the same string.
+        chain_parts[-1] = chain_parts[-1][:-len(f"[{prev}]")] + "[final]"
 
         # Probe whether the concat video has an audio stream at all.
         _has_audio = bool(subprocess.run(
