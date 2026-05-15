@@ -376,7 +376,10 @@ def _hex_to_rgb_at(hex6: str) -> str:
 
 
 def _ass_escape_text(text: str) -> str:
-    return text.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    return (text.replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace(":", "\\:")
+                .replace("/", "\\/"))
 
 
 def _build_hyperframe_filters(
