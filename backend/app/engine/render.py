@@ -777,18 +777,17 @@ def render(
                   "setpts/atempo application not yet implemented in this pass.",
                   len(speed_ramps))
 
-    # Build audio silence ducks: volume=0 windows before PRINCIPE/PAYOFF lines.
-    audio_duck_parts: list[str] = []
+    # Build audio silence ducks: collect mute windows as (t0, t1) pairs.
+    # All ranges are merged into ONE volume filter using if()+between() so
+    # FFmpeg never sees multiple volume= filters chained with commas.
+    audio_duck_ranges: list[tuple[float, float]] = []
     for sil in remapped_silences:
         try:
             t0 = float(sil.get("at", 0))
             dur = max(0.1, min(0.5, float(sil.get("duration", 0.3))))
         except (TypeError, ValueError):
             continue
-        t1 = t0 + dur
-        audio_duck_parts.append(
-            f"volume=enable='between(t,{t0:.3f},{t1:.3f})':volume=0"
-        )
+        audio_duck_ranges.append((t0, t0 + dur))
 
     # SFX mixing: blend cue files from backend/storage/sfx/ into the audio.
     # Known SFX types and their expected filenames. If a file doesn't exist,
@@ -894,18 +893,17 @@ def render(
         _audio_src = "0:a" if _has_audio else "anullsrc=r=44100:cl=stereo"
 
         # Audio chain: silence ducks + SFX mix.
-        if audio_duck_parts or sfx_inputs:
-            # Decide intermediate label: if SFX follows, ducks write to a_ducked;
-            # if ducks are the last step, write directly to a_out.
+        if audio_duck_ranges or sfx_inputs:
             duck_out = ("a_ducked" if sfx_inputs else "a_out")
-            if audio_duck_parts:
-                chain_parts.append(
-                    f"[{_audio_src}]" + ",".join(audio_duck_parts) + f"[{duck_out}]"
-                    if _has_audio else
-                    f"{_audio_src}," + ",".join(audio_duck_parts) + f"[{duck_out}]"
+            if audio_duck_ranges:
+                _between = "+".join(
+                    f"between(t,{t0:.3f},{t1:.3f})" for t0, t1 in audio_duck_ranges
                 )
+                _duck_filter = f"volume='if({_between},0,1)'"
+                _src = f"[{_audio_src}]" if _has_audio else _audio_src
+                chain_parts.append(f"{_src}{_duck_filter}[{duck_out}]")
             if sfx_inputs:
-                cur_audio = duck_out if audio_duck_parts else _audio_src
+                cur_audio = duck_out if audio_duck_ranges else _audio_src
                 for j, (_, sfx_at, sfx_vol) in enumerate(sfx_inputs):
                     sfx_idx = sfx_base_idx + j
                     ms = int(sfx_at * 1000)
@@ -928,15 +926,18 @@ def render(
         _fc_script = work_dir / "filter.txt"
         _fc_script.write_text(filter_complex, encoding="utf-8")
         cmd += ["-filter_complex_script", str(_fc_script), "-map", "[final]"]
-        _no_a_chain = not (audio_duck_parts or sfx_inputs)
+        _no_a_chain = not (audio_duck_ranges or sfx_inputs)
         if _no_a_chain:
             cmd += ["-map", "0:a"] if _has_audio else ["-an"]
         else:
             cmd += ["-map", "[a_out]"]
     else:
         cmd += ["-vf", base_filter]
-        if audio_duck_parts:
-            cmd += ["-af", ",".join(audio_duck_parts)]
+        if audio_duck_ranges:
+            _between = "+".join(
+                f"between(t,{t0:.3f},{t1:.3f})" for t0, t1 in audio_duck_ranges
+            )
+            cmd += ["-af", f"volume='if({_between},0,1)'"]
 
     cmd += [
         "-frames:v", str(total_frames),
