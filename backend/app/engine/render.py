@@ -875,8 +875,8 @@ def render(
             )
             prev = nxt_vign
 
-        # Pass through — captions are burned in a separate second pass.
-        chain_parts.append(f"[{prev}]null[final]")
+        # copy is a valid FFmpeg passthrough filter; captions burned in second pass.
+        chain_parts.append(f"[{prev}]copy[final]")
 
         # Audio chain: silence ducks + SFX mix.
         if audio_duck_parts or sfx_inputs:
