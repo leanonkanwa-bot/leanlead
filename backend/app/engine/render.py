@@ -843,7 +843,7 @@ def render(
             nxt = f"mg{i}"
             chain_parts.append(
                 f"[{prev}][{i + 1}:v]overlay="
-                f"x='{rg.x_expr}':y='{rg.y_expr}':"
+                f"x={rg.x_expr}:y={rg.y_expr}:"
                 f"enable='between(t,{t0:.3f},{t1:.3f})'[{nxt}]"
             )
             prev = nxt
