@@ -923,7 +923,8 @@ def render(
         for _bad in _INVALID_FILTERS:
             if f"]{_bad}[" in filter_complex:
                 filter_complex = filter_complex.replace(f"]{_bad}[", "]null[")
-        _fc_script = work_dir / "filter.txt"
+        import tempfile as _tempfile2
+        _fc_script = Path(_tempfile2.gettempdir()) / f"filter_{work_dir.name}.txt"
         _fc_script.write_text(filter_complex, encoding="utf-8")
         cmd += ["-filter_complex_script", str(_fc_script), "-map", "[final]"]
         _no_a_chain = not (audio_duck_ranges or sfx_inputs)
