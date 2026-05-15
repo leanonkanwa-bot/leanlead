@@ -878,8 +878,17 @@ def render(
             )
             prev = nxt_vign
 
-        # copy is a valid FFmpeg passthrough filter; captions burned in second pass.
-        chain_parts.append(f"[{prev}]copy[final]")
+        # null passthrough — captions are burned in a separate second pass.
+        chain_parts.append(f"[{prev}]null[final]")
+
+        # Probe whether the concat video has an audio stream at all.
+        _has_audio = bool(subprocess.run(
+            [FFPROBE_PATH, "-v", "error", "-select_streams", "a:0",
+             "-show_entries", "stream=codec_type", "-of", "csv=p=0",
+             str(concat_path)],
+            capture_output=True, text=True,
+        ).stdout.strip())
+        _audio_src = "0:a" if _has_audio else "anullsrc=r=44100:cl=stereo"
 
         # Audio chain: silence ducks + SFX mix.
         if audio_duck_parts or sfx_inputs:
@@ -888,10 +897,12 @@ def render(
             duck_out = ("a_ducked" if sfx_inputs else "a_out")
             if audio_duck_parts:
                 chain_parts.append(
-                    "[0:a]" + ",".join(audio_duck_parts) + f"[{duck_out}]"
+                    f"[{_audio_src}]" + ",".join(audio_duck_parts) + f"[{duck_out}]"
+                    if _has_audio else
+                    f"{_audio_src}," + ",".join(audio_duck_parts) + f"[{duck_out}]"
                 )
             if sfx_inputs:
-                cur_audio = duck_out if audio_duck_parts else "0:a"
+                cur_audio = duck_out if audio_duck_parts else _audio_src
                 for j, (_, sfx_at, sfx_vol) in enumerate(sfx_inputs):
                     sfx_idx = sfx_base_idx + j
                     ms = int(sfx_at * 1000)
@@ -906,10 +917,19 @@ def render(
                     cur_audio = out_lbl
 
         filter_complex = ";".join(chain_parts)
+        # Sanitise: replace any stray ]copy[ nodes that some FFmpeg builds reject.
+        _INVALID_FILTERS = {"copy"}
+        for _bad in _INVALID_FILTERS:
+            if f"]{_bad}[" in filter_complex:
+                filter_complex = filter_complex.replace(f"]{_bad}[", "]null[")
         _fc_script = work_dir / "filter.txt"
         _fc_script.write_text(filter_complex, encoding="utf-8")
         cmd += ["-filter_complex_script", str(_fc_script), "-map", "[final]"]
-        cmd += ["-map", "[a_out]"] if (audio_duck_parts or sfx_inputs) else ["-map", "0:a"]
+        _no_a_chain = not (audio_duck_parts or sfx_inputs)
+        if _no_a_chain:
+            cmd += ["-map", "0:a"] if _has_audio else ["-an"]
+        else:
+            cmd += ["-map", "[a_out]"]
     else:
         cmd += ["-vf", base_filter]
         if audio_duck_parts:
