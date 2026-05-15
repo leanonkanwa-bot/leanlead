@@ -878,8 +878,9 @@ def render(
             )
             prev = nxt_vign
 
-        # null passthrough — captions are burned in a separate second pass.
-        chain_parts.append(f"[{prev}]null[final]")
+        # Rename the last overlay output label to [final] directly.
+        # This avoids null/copy passthrough filters which some FFmpeg builds reject.
+        chain_parts[-1] = chain_parts[-1].replace(f"[{prev}]", "[final]")
 
         # Probe whether the concat video has an audio stream at all.
         _has_audio = bool(subprocess.run(
