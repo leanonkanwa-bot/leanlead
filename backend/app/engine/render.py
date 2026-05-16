@@ -890,20 +890,18 @@ def render(
              str(concat_path)],
             capture_output=True, text=True,
         ).stdout.strip())
-        _audio_src = "0:a" if _has_audio else "anullsrc=r=44100:cl=stereo"
-
         # Audio chain: silence ducks + SFX mix.
-        if audio_duck_ranges or sfx_inputs:
+        # Skip entirely when there is no audio stream — use -an later.
+        if _has_audio and (audio_duck_ranges or sfx_inputs):
             duck_out = ("a_ducked" if sfx_inputs else "a_out")
             if audio_duck_ranges:
                 _between = "+".join(
                     f"between(t,{t0:.3f},{t1:.3f})" for t0, t1 in audio_duck_ranges
                 )
                 _duck_filter = f"volume=enable='{_between}':volume=0"
-                _src = f"[{_audio_src}]" if _has_audio else _audio_src
-                chain_parts.append(f"{_src}{_duck_filter}[{duck_out}]")
+                chain_parts.append(f"[0:a]{_duck_filter}[{duck_out}]")
             if sfx_inputs:
-                cur_audio = duck_out if audio_duck_ranges else _audio_src
+                cur_audio = duck_out if audio_duck_ranges else "0:a"
                 for j, (_, sfx_at, sfx_vol) in enumerate(sfx_inputs):
                     sfx_idx = sfx_base_idx + j
                     ms = int(sfx_at * 1000)
@@ -927,11 +925,13 @@ def render(
         # shell entirely so there is no 8191-char command-line limit here.
         filter_complex = filter_complex.rstrip("'")
         cmd += ["-filter_complex", filter_complex, "-map", "[final]"]
-        _no_a_chain = not (audio_duck_ranges or sfx_inputs)
-        if _no_a_chain:
-            cmd += ["-map", "0:a"] if _has_audio else ["-an"]
-        else:
+        _has_a_chain = _has_audio and (audio_duck_ranges or sfx_inputs)
+        if _has_a_chain:
             cmd += ["-map", "[a_out]"]
+        elif _has_audio:
+            cmd += ["-map", "0:a"]
+        else:
+            cmd += ["-an"]
     else:
         cmd += ["-vf", base_filter]
         if audio_duck_ranges:
