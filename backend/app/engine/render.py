@@ -405,7 +405,7 @@ def _build_hyperframe_filters(
         # Solid color flash that covers the whole frame.
         parts.append(
             f"drawbox=x=0:y=0:w=iw:h=ih:color={color}:t=fill"
-            f":enable='between(t,{t0:.3f},{t1:.3f})'"
+            f":enable=between(t,{t0:.3f},{t1:.3f})"
         )
 
         if kind in {"word", "number", "image"}:
@@ -419,7 +419,7 @@ def _build_hyperframe_filters(
                     f":fontfile={fonts_dir}/Poppins-ExtraBold.ttf"
                     f":fontcolor=black:fontsize={font_size}"
                     f":x=(w-text_w)/2:y=(h-text_h)/2"
-                    f":enable='between(t,{t0:.3f},{t1:.3f})'"
+                    f":enable=between(t,{t0:.3f},{t1:.3f})"
                 )
     return ("," + ",".join(parts)) if parts else ""
 
@@ -844,7 +844,7 @@ def render(
             chain_parts.append(
                 f"[{prev}][{i + 1}:v]overlay="
                 f"x={rg.x_expr}:y={rg.y_expr}:"
-                f"enable='between(t,{t0:.3f},{t1:.3f})'[{nxt}]"
+                f"enable=between(t,{t0:.3f},{t1:.3f})[{nxt}]"
             )
             prev = nxt
 
@@ -867,13 +867,13 @@ def render(
             nxt_layout = f"vl{i}"
             chain_parts.append(
                 f"[{prev}][{layout_idx}:v]overlay=0:0"
-                f":enable='between(t,{t0:.3f},{t1:.3f})'[{nxt_layout}]"
+                f":enable=between(t,{t0:.3f},{t1:.3f})[{nxt_layout}]"
             )
             # Overlay rounded person vignette at bottom-right.
             nxt_vign = f"vn{i}"
             chain_parts.append(
                 f"[{nxt_layout}][rv{i}]overlay={vx}:{vy}"
-                f":enable='between(t,{t0:.3f},{t1:.3f})'[{nxt_vign}]"
+                f":enable=between(t,{t0:.3f},{t1:.3f})[{nxt_vign}]"
             )
             prev = nxt_vign
 
