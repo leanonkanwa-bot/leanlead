@@ -200,7 +200,7 @@ def plan_edit(
     caption_position: str | None = None,
     caption_font: str | None = None,
     subject_position: dict[str, float] | None = None,
-    aesthetic: str = "dark-pro",
+    aesthetic: str = "high-energy",  # kept for API compat, ignored internally
 ) -> EditPlan:
     """
     Ask Claude to produce an edit plan for the given transcript.
@@ -253,11 +253,10 @@ def plan_edit(
         max_tokens=16000,
         system=system_prompt(
             format_hint=fmt,
-            brand_color=brand_color,
-            caption_color=caption_color,
-            caption_position=caption_position,
-            caption_font=caption_font,
-            aesthetic=aesthetic,
+            brand_color=brand_color or "#FF7751",
+            caption_color=caption_color or "white",
+            caption_position=caption_position or "center",
+            caption_font=caption_font or "Poppins Bold",
         ),
         messages=[user_msg],
     )
