@@ -2,23 +2,38 @@
 .gitignore
 .gitattributes
 .github
-.venv
-backend/.venv
-backend/.env
-backend/.env.local
-backend/storage/uploads/*
-backend/storage/outputs/*
-backend/storage/work/*
+.vscode
+.idea
+
+# Python
+**/.venv
 **/__pycache__
 **/*.pyc
 **/*.pyo
 **/.pytest_cache
 **/.mypy_cache
 **/.ruff_cache
-.vscode
-.idea
-node_modules
+
+# Secrets – never bake into images
+**/.env
+**/.env.local
+
+# SQLite databases – persisted via Docker volume, not baked into image
+**/*.db
+**/*.db-shm
+**/*.db-wal
+
+# Node
+**/node_modules
+
+# Frontend build output (built inside the container)
+frontend/dist
+
+# Legacy directories
+backend/storage/uploads/*
+backend/storage/outputs/*
+backend/storage/work/*
+
+# Misc
 docs
 *.log
-*.md
-!README.md

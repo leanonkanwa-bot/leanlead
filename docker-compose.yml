@@ -1,0 +1,31 @@
+services:
+
+  backend:
+    build:
+      context: ./ai-lead-gen/backend
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      # SQLite DB lives on the named volume so data survives container rebuilds
+      DATABASE_URL: sqlite:////app/data/leanlead.db
+    volumes:
+      - db_data:/app/data
+    restart: unless-stopped
+    # No ports exposed to host – only reachable from within the Docker network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    environment:
+      # Matches the backend service name in this compose file
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db_data:
+    driver: local
