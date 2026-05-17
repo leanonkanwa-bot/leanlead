@@ -898,7 +898,7 @@ def render(
                 _between = "+".join(
                     f"between(t,{t0:.3f},{t1:.3f})" for t0, t1 in audio_duck_ranges
                 )
-                _duck_filter = f"volume=enable='{_between}':volume=0"
+                _duck_filter = f"volume=enable={_between}:volume=0"
                 chain_parts.append(f"[0:a]{_duck_filter}[{duck_out}]")
             if sfx_inputs:
                 cur_audio = duck_out if audio_duck_ranges else "0:a"
@@ -938,7 +938,7 @@ def render(
             _between = "+".join(
                 f"between(t,{t0:.3f},{t1:.3f})" for t0, t1 in audio_duck_ranges
             )
-            cmd += ["-af", f"volume=enable='{_between}':volume=0"]
+            cmd += ["-af", f"volume=enable={_between}:volume=0"]
 
     cmd += [
         "-frames:v", str(total_frames),
