@@ -24,6 +24,10 @@ from fastapi.staticfiles import StaticFiles
 from app.api.jobs import store
 from app.api.pipeline import run_job, run_render_phase
 from app.api.upload import assembled_path, router as upload_router
+from app.api.templates import router as templates_router
+from app.api.brand import router as brand_router
+from app.api.publish import router as publish_router
+from app.api.analytics import router as analytics_router
 from app.core.config import settings
 
 
@@ -37,6 +41,10 @@ app.add_middleware(
 )
 
 app.include_router(upload_router)
+app.include_router(templates_router)
+app.include_router(brand_router)
+app.include_router(publish_router)
+app.include_router(analytics_router)
 
 AUTH_COOKIE = "lle_token"
 
@@ -117,6 +125,8 @@ async def submit_edit(
     desired_emotion: str = Form(""),
     platform: str = Form(""),
     content_type_hint: str = Form(""),
+    # Template Memory (Feature 1)
+    template_id: str = Form(""),
     _: None = Depends(_check_auth),
 ) -> JSONResponse:
     if not settings.anthropic_api_key:
@@ -155,6 +165,7 @@ async def submit_edit(
         desired_emotion=desired_emotion,
         platform=platform,
         content_type_hint=content_type_hint,
+        template_id=template_id,
     )
     store.update(job.id, source_path=str(dest), params=run_params)
 

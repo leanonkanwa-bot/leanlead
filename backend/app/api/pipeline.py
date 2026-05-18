@@ -13,12 +13,15 @@ from pathlib import Path
 from app.agent.planner import FormatHint, analyze_subject_position, plan_edit, rewrite_hook
 from app.api.jobs import store
 from app.core.config import settings
+from app.engine.analytics_engine import build_insights_instructions, load_insights
+from app.engine.brand_engine import BrandEngine, load_brand
 from app.engine.broll_generator import BrollGenerator
 from app.engine.energy_detector import EnergyDetector
 from app.engine.graphics_engine import GraphicSelector, build_video_context, detect_content_type
 from app.engine.render import render
 from app.engine.silence_remover import RhythmAwareSilenceRemover, apply_drops_to_transcript
 from app.engine.speaker_detector import SpeakerDetector
+from app.engine.template_engine import apply_template, get_template
 from app.engine.transcribe import transcribe, unload_model
 
 
@@ -40,6 +43,8 @@ def run_job(
     desired_emotion: str = "",
     platform: str = "",
     content_type_hint: str = "",
+    # Template Memory (Feature 1)
+    template_id: str = "",
 ) -> None:
     """Phase 1: transcription, analysis, planning → status: ready_for_review."""
     try:
@@ -100,10 +105,55 @@ def run_job(
         except Exception:
             speaker_dicts = []
 
-        # ── Step 5: Build enriched instructions from content brief ─────────
+        # ── Step 5a: Load template if specified (Feature 1) ───────────────
+        template: dict = {}
+        if template_id:
+            try:
+                t = get_template(template_id)
+                if t:
+                    template = t
+                    # Apply template caption overrides now so they propagate.
+                    style = t.get("style", {})
+                    cap_style_map = {"one_word": "impact", "phrase": "impact", "full_sentence": "kinetic"}
+                    caption_style = cap_style_map.get(style.get("caption_style", ""), caption_style)
+                    caption_position = style.get("caption_position", caption_position)
+            except Exception:
+                pass
+
+        # ── Step 5b: Load brand kit (Feature 2) ───────────────────────────
+        brand_kit: dict = {}
+        try:
+            brand_kit = load_brand()
+            brand_engine = BrandEngine()
+            brand_primary = brand_kit.get("colors", {}).get("primary", "")
+            if brand_primary and not brand_color:
+                brand_color = brand_primary
+            cap_color_override = brand_kit.get("font", {}).get("caption_color", "")
+            if cap_color_override:
+                from app.engine.brand_engine import _hex_to_name
+                caption_color = _hex_to_name(cap_color_override)
+        except Exception:
+            brand_kit = {}
+
+        # ── Step 5c: Load analytics insights (Feature 4) ──────────────────
+        insights_instructions = ""
+        try:
+            insights = load_insights()
+            insights_instructions = build_insights_instructions(insights)
+            # Bias content_type_hint from analytics if not user-set.
+            if not content_type_hint:
+                content_type_hint = insights.get("recommended_settings", {}).get(
+                    "preferred_content_type", ""
+                )
+        except Exception:
+            pass
+
+        # ── Step 5d: Build enriched instructions from content brief ────────
         enriched_instructions = _build_instructions(
             instructions, target_audience, main_message,
             desired_emotion, platform, content_type_hint,
+            insights_instructions=insights_instructions,
+            template=template,
         )
 
         # Override format_hint based on platform if specified.
@@ -226,6 +276,8 @@ def run_job(
                 "broll_specs": broll_specs_dicts,
                 "speaker_segments": speaker_dicts,
                 "hook_overlay": hook_overlay,
+                "brand_kit": brand_kit,
+                "template": template,
             },
             transcript=transcript_clean,
             subject_pos=subject_pos,
@@ -326,6 +378,21 @@ def run_render_phase(job_id: str, src: Path) -> None:
             content_type=content_type,
         )
 
+        # ── Brand: apply intro/outro bumpers (Feature 2) ──────────────────
+        brand_kit  = plan_data.get("brand_kit", {})
+        final_path = out_path
+        try:
+            if brand_kit:
+                be = BrandEngine()
+                final_path = be.prepend_intro(out_path, brand_kit, work_dir)
+                final_path = be.append_outro(final_path, brand_kit, work_dir)
+                if final_path != out_path:
+                    import shutil as _shutil
+                    _shutil.move(str(final_path), str(out_path))
+                    final_path = out_path
+        except Exception:
+            final_path = out_path
+
         store.update(
             job_id,
             status="done",
@@ -342,6 +409,7 @@ def run_render_phase(job_id: str, src: Path) -> None:
                 "script_structure": plan.script_structure,
                 "content_type": content_type,
                 "hook_overlay": hook_overlay,
+                "brand_applied": bool(brand_kit.get("name")),
             },
         )
     except Exception as e:
@@ -360,8 +428,10 @@ def _build_instructions(
     desired_emotion: str,
     platform: str,
     content_type_hint: str,
+    insights_instructions: str = "",
+    template: dict | None = None,
 ) -> str:
-    """Append content brief fields to the user's instructions."""
+    """Append content brief, template, and analytics hints to the user's instructions."""
     parts = [instructions] if instructions.strip() else []
     if target_audience:
         parts.append(f"TARGET AUDIENCE: {target_audience}")
@@ -373,6 +443,20 @@ def _build_instructions(
         parts.append(f"PLATFORM: Optimise for {platform}.")
     if content_type_hint:
         parts.append(f"CONTENT TYPE: {content_type_hint}")
+    if insights_instructions:
+        parts.append(insights_instructions)
+    if template:
+        style = template.get("style", {})
+        name  = template.get("name", "reference video")
+        parts.append(
+            f"TEMPLATE STYLE (from '{name}'): "
+            f"pacing={style.get('pacing','medium')}, "
+            f"zoom={style.get('zoom_intensity','medium')}, "
+            f"captions={style.get('caption_style','one_word')}, "
+            f"energy={style.get('energy_level','medium')}, "
+            f"cuts/min={style.get('avg_cuts_per_minute',12):.0f}. "
+            f"Match this editing fingerprint as closely as possible."
+        )
     return "\n".join(parts) or "(none — apply default high-retention edit)"
 
 

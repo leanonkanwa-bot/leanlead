@@ -1,5 +1,181 @@
 const $ = (id) => document.getElementById(id);
 
+// ── Brand panel ────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const res = await fetch("/api/brand", { credentials: "same-origin" });
+    if (res.ok) {
+      const b = await res.json();
+      if ($("brandName"))      $("brandName").value      = b.name || "";
+      if ($("brandPrimary"))   $("brandPrimary").value   = b.colors?.primary    || "#FF7751";
+      if ($("brandSecondary")) $("brandSecondary").value = b.colors?.secondary  || "#FFFFFF";
+      if ($("brandBg"))        $("brandBg").value        = b.colors?.background || "#0A0A0A";
+      if ($("brandWatermark")) $("brandWatermark").value = b.watermark?.text    || "";
+      if ($("brandLtName"))    $("brandLtName").value    = b.lower_third?.name_text  || "";
+      if ($("brandLtTitle"))   $("brandLtTitle").value   = b.lower_third?.title_text || "";
+    }
+  } catch {}
+})();
+
+$("brandBtn")?.addEventListener("click", () => {
+  $("brandPanel")?.classList.add("open");
+});
+$("brandClose")?.addEventListener("click", () => {
+  $("brandPanel")?.classList.remove("open");
+});
+
+$("saveBrandBtn")?.addEventListener("click", async () => {
+  const brand = {
+    name: $("brandName")?.value || "",
+    colors: {
+      primary:    $("brandPrimary")?.value   || "#FF7751",
+      secondary:  $("brandSecondary")?.value || "#FFFFFF",
+      background: $("brandBg")?.value        || "#0A0A0A",
+      accent:     $("brandPrimary")?.value   || "#FF7751",
+    },
+    watermark: { text: $("brandWatermark")?.value || "" },
+    lower_third: {
+      name_text:  $("brandLtName")?.value  || "",
+      title_text: $("brandLtTitle")?.value || "",
+      show_on_first_appearance: true,
+      accent_color: $("brandPrimary")?.value || "#FF7751",
+    },
+  };
+  await fetch("/api/brand", {
+    method: "PUT", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(brand),
+  });
+
+  // Upload intro/outro if selected.
+  const intro = $("brandIntro")?.files?.[0];
+  if (intro) {
+    const fd = new FormData(); fd.append("intro", intro);
+    await fetch("/api/brand/intro", { method: "POST", body: fd, credentials: "same-origin" });
+  }
+  const outro = $("brandOutro")?.files?.[0];
+  if (outro) {
+    const fd = new FormData(); fd.append("outro", outro);
+    await fetch("/api/brand/outro", { method: "POST", body: fd, credentials: "same-origin" });
+  }
+
+  const msg = $("brandSaveMsg");
+  if (msg) { msg.style.display = "block"; setTimeout(() => { msg.style.display = "none"; }, 2500); }
+});
+
+// ── Template selector ──────────────────────────────────────────────────────
+(async () => {
+  try {
+    const res = await fetch("/api/templates", { credentials: "same-origin" });
+    if (!res.ok) return;
+    const templates = await res.json();
+    const sel = $("templateSelect");
+    if (!sel) return;
+    templates.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t.id;
+      opt.textContent = t.name;
+      opt.dataset.style = JSON.stringify(t.style_summary || {});
+      sel.appendChild(opt);
+    });
+  } catch {}
+})();
+
+$("templateSelect")?.addEventListener("change", () => {
+  const sel = $("templateSelect");
+  const chips = $("templateChips");
+  if (!sel || !chips) return;
+  const opt = sel.selectedOptions[0];
+  if (!opt || !opt.value) { chips.innerHTML = ""; return; }
+  try {
+    const s = JSON.parse(opt.dataset.style || "{}");
+    chips.innerHTML = [
+      s.pacing         ? `<span class="chip accent">${s.pacing} pacing</span>` : "",
+      s.zoom_intensity ? `<span class="chip">${s.zoom_intensity} zoom</span>`  : "",
+      s.caption_style  ? `<span class="chip">${s.caption_style} captions</span>` : "",
+      s.energy_level   ? `<span class="chip">${s.energy_level} energy</span>`   : "",
+      s.cuts_per_minute ? `<span class="chip">${Math.round(s.cuts_per_minute)} cuts/min</span>` : "",
+    ].join("");
+  } catch { chips.innerHTML = ""; }
+});
+
+$("uploadTemplateBtn")?.addEventListener("click", async () => {
+  const name = prompt("Template name (e.g. 'Hormozi Style'):");
+  if (!name) return;
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = "video/*";
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("name", name);
+    fd.append("video", file);
+    const res = await fetch("/api/templates/analyze", { method: "POST", body: fd, credentials: "same-origin" });
+    if (res.ok) {
+      const t = await res.json();
+      const sel = $("templateSelect");
+      if (sel) {
+        const opt = document.createElement("option");
+        opt.value = t.template_id; opt.textContent = t.name;
+        opt.dataset.style = JSON.stringify(t.style_summary || {});
+        sel.appendChild(opt);
+        sel.value = t.template_id;
+        sel.dispatchEvent(new Event("change"));
+      }
+    }
+  };
+  input.click();
+});
+
+// ── Analytics panel ────────────────────────────────────────────────────────
+$("analyticsLink")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  const panel = $("analyticsPanel");
+  if (!panel) return;
+  const visible = panel.classList.toggle("visible");
+  if (visible) loadAnalytics();
+});
+
+async function loadAnalytics() {
+  try {
+    const [overviewRes, insightsRes] = await Promise.all([
+      fetch("/api/analytics/overview", { credentials: "same-origin" }),
+      fetch("/api/analytics/insights", { credentials: "same-origin" }),
+    ]);
+    if (overviewRes.ok) {
+      const o = await overviewRes.json();
+      if ($("aTotal"))    $("aTotal").textContent    = o.total_videos || 0;
+      if ($("aAvgScore")) $("aAvgScore").textContent = o.avg_score    || "—";
+    }
+    if (insightsRes.ok) {
+      const ins = await insightsRes.json();
+      const list = $("insightsList");
+      if (list) {
+        const items = ins.top_insights || [];
+        list.innerHTML = items.length
+          ? items.map(i => `
+              <div class="insight-row">
+                <div class="insight-text">${i.insight}</div>
+                <div class="insight-action">${i.action}</div>
+                <div class="conf-bar"><div class="conf-fill" style="width:${Math.round((i.confidence||0)*100)}%"></div></div>
+              </div>`).join("")
+          : "<p style='color:var(--muted);font-size:.8rem'>No insights yet — publish videos and connect analytics.</p>";
+      }
+    }
+  } catch {}
+}
+
+$("collectBtn")?.addEventListener("click", async () => {
+  $("collectBtn").textContent = "Collecting…";
+  $("collectBtn").disabled = true;
+  try {
+    await fetch("/api/analytics/collect", { method: "POST", credentials: "same-origin" });
+    await loadAnalytics();
+  } catch {}
+  $("collectBtn").textContent = "Refresh data";
+  $("collectBtn").disabled = false;
+});
+
 const loginCard = $("login");
 const appCard = $("tool");
 const loginForm = $("loginForm");
@@ -374,7 +550,118 @@ function showResult(jobId, result) {
   }
 
   planJson.textContent = JSON.stringify(result?.plan ?? {}, null, 2);
+
+  // Load platform connections and setup publish section.
+  _currentJobId = jobId;
+  await loadPublishConnections();
 }
+
+let _currentJobId = null;
+let _selectedPlatforms = new Set();
+
+async function loadPublishConnections() {
+  try {
+    const res = await fetch("/api/publish/connections", { credentials: "same-origin" });
+    if (!res.ok) return;
+    const connections = await res.json();
+    connections.forEach(c => {
+      const dot = $(`dot-${c.platform}`);
+      const btn = document.querySelector(`[data-platform="${c.platform}"]`);
+      if (dot) dot.classList.toggle("connected", c.connected);
+      if (btn) btn.classList.toggle("connected", c.connected);
+    });
+  } catch {}
+}
+
+document.querySelectorAll(".platform-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const platform = btn.dataset.platform;
+    const dot = $(`dot-${platform}`);
+    const isConnected = dot?.classList.contains("connected");
+
+    if (!isConnected) {
+      // Initiate OAuth flow.
+      const res = await fetch(`/api/publish/connect/${platform}`, {
+        method: "POST", credentials: "same-origin",
+      });
+      if (res.ok) {
+        const { auth_url } = await res.json();
+        window.open(auth_url, "_blank", "width=600,height=700");
+        setTimeout(loadPublishConnections, 5000);
+      }
+      return;
+    }
+
+    // Toggle selection.
+    btn.classList.toggle("selected");
+    if (btn.classList.contains("selected")) {
+      _selectedPlatforms.add(platform);
+    } else {
+      _selectedPlatforms.delete(platform);
+    }
+
+    // Enable publish button if any platform selected.
+    const publishBtn = $("publishNowBtn");
+    if (publishBtn) {
+      publishBtn.disabled = _selectedPlatforms.size === 0;
+      publishBtn.textContent = _selectedPlatforms.size > 0
+        ? `Publish to ${_selectedPlatforms.size} platform${_selectedPlatforms.size > 1 ? "s" : ""} →`
+        : "Publish to selected →";
+    }
+
+    // Load metadata preview.
+    if (_selectedPlatforms.size > 0 && _currentJobId) {
+      try {
+        const mRes = await fetch(`/api/publish/metadata/${_currentJobId}`, {
+          method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platforms: [..._selectedPlatforms] }),
+        });
+        if (mRes.ok) {
+          const meta = await mRes.json();
+          const first = Object.values(meta)[0];
+          if (first && $("publishTitle")) {
+            $("publishTitle").value = first.title || "";
+            $("publishMetaPreview").style.display = "block";
+          }
+        }
+      } catch {}
+    } else {
+      const preview = $("publishMetaPreview");
+      if (preview) preview.style.display = "none";
+    }
+  });
+});
+
+$("publishNowBtn")?.addEventListener("click", async () => {
+  if (!_currentJobId || _selectedPlatforms.size === 0) return;
+  const btn = $("publishNowBtn");
+  btn.disabled = true;
+  btn.textContent = "Publishing…";
+  const statusEl = $("publishStatus");
+  if (statusEl) statusEl.textContent = "";
+
+  try {
+    const res = await fetch(`/api/publish/${_currentJobId}`, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ platforms: [..._selectedPlatforms], privacy: "public" }),
+    });
+    const data = await res.json();
+    const results = data.results || [];
+    const msgs = results.map(r =>
+      r.status === "success"
+        ? `✓ ${r.platform}${r.url ? ` — <a href="${r.url}" target="_blank">view</a>` : ""}`
+        : `✗ ${r.platform}: ${r.error || "failed"}`
+    ).join(" · ");
+    if (statusEl) statusEl.innerHTML = msgs;
+  } catch (err) {
+    if (statusEl) statusEl.textContent = `Publish error: ${err.message}`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = `Publish to ${_selectedPlatforms.size} platform${_selectedPlatforms.size > 1 ? "s" : ""} →`;
+});
 
 // ── CONTENT BRIEF TOGGLE ──────────────────────────────────────────────────────
 const briefToggle = $("briefToggle");
