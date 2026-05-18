@@ -24,11 +24,27 @@ from fastapi.staticfiles import StaticFiles
 from app.api.jobs import store
 from app.api.pipeline import run_job, run_render_phase
 from app.api.upload import assembled_path, router as upload_router
-from app.api.templates import router as templates_router
-from app.api.brand import router as brand_router
-from app.api.publish import router as publish_router
-from app.api.analytics import router as analytics_router
 from app.core.config import settings
+
+try:
+    from app.api.templates import router as templates_router
+except Exception:
+    templates_router = None
+
+try:
+    from app.api.brand import router as brand_router
+except Exception:
+    brand_router = None
+
+try:
+    from app.api.publish import router as publish_router
+except Exception:
+    publish_router = None
+
+try:
+    from app.api.analytics import router as analytics_router
+except Exception:
+    analytics_router = None
 
 
 app = FastAPI(title="AI Video Editor Agent", version="0.1.0")
@@ -41,10 +57,14 @@ app.add_middleware(
 )
 
 app.include_router(upload_router)
-app.include_router(templates_router)
-app.include_router(brand_router)
-app.include_router(publish_router)
-app.include_router(analytics_router)
+if templates_router:
+    app.include_router(templates_router)
+if brand_router:
+    app.include_router(brand_router)
+if publish_router:
+    app.include_router(publish_router)
+if analytics_router:
+    app.include_router(analytics_router)
 
 AUTH_COOKIE = "lle_token"
 
