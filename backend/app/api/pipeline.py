@@ -9,6 +9,7 @@ from pathlib import Path
 from app.agent.planner import FormatHint, analyze_subject_position, plan_edit
 from app.api.jobs import store
 from app.core.config import settings
+from app.engine.graphics_engine import GraphicSelector, build_video_context
 from app.engine.render import render
 from app.engine.transcribe import transcribe, unload_model
 
@@ -52,6 +53,25 @@ def run_job(
             aesthetic=aesthetic,
         )
 
+        # Build adaptive graphic specs from the edit plan's script structure.
+        # Each beat segment gets the best graphic type for its content.
+        selector  = GraphicSelector()
+        video_ctx = build_video_context(transcript, plan)
+        selector.configure(video_ctx["content_type"])
+        graphic_specs = []
+        for seg in (plan.script_structure or []):
+            seg_text = " ".join(seg.get("lines", []))
+            seg_role = seg.get("beat", "")
+            try:
+                seg_start = float(seg.get("start", 0.0))
+                seg_end   = float(seg.get("end", seg_start + 3.0))
+            except (TypeError, ValueError):
+                continue
+            seg_dur = max(1.0, seg_end - seg_start)
+            spec = selector.select(seg_text, seg_role, seg_start, seg_dur, video_ctx)
+            if spec is not None:
+                graphic_specs.append(spec)
+
         # Reclaim ~250 MB of RAM before ffmpeg fires up — otherwise the
         # encoder gets OOM-killed on small dynos (no stderr, exit signal 9).
         unload_model()
@@ -73,6 +93,7 @@ def run_job(
             brand_color=brand_color,
             aesthetic=aesthetic,
             subject_position=subject_pos,
+            graphic_specs=graphic_specs,
         )
 
         store.update(

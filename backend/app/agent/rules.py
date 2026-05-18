@@ -902,6 +902,93 @@ Rules the JSON must obey:
 """
 
 
+SIMPLE_HEAVY = """\
+SIMPLE BUT HEAVY — THE GOLDEN RULE
+
+No more than 2 visual elements on screen simultaneously: speaker + ONE graphic.
+Every cut must have a clear PURPOSE — advancing story OR introducing new information.
+If a cut does neither, remove it.
+
+ZOOM — barely perceptible:
+Drift: maximum +0.4% scale per second. If the viewer notices the zoom, it is too fast.
+Punch-in: maximum +12% instant snap — reserve for ONE word per major section only.
+
+SILENCE PRESERVATION:
+The 0.4s pause before the most important line of each segment is sacred.
+Do NOT cut it. Do NOT speed-ramp it. Let it land. This pause IS the edit.
+
+B-ROLL BUDGET BY CONTENT TYPE:
+  coaching / motivation → 0 clips. Face and words carry everything.
+  education → max 1 clip, at the single clearest "show don't tell" moment.
+  story → max 1 clip, at the emotional peak only.
+
+COLOR LAW:
+  Accent: #FF7751 salmon only. No other accent colors.
+  Text: pure white #FFFFFF.
+  Background overlays: near-black #111111 at 75–85% opacity.
+  No gradients. No shadows. No competing accent colors.
+"""
+
+AUDIENCE_CONTEXT = """\
+TARGET AUDIENCE: Business owners, coaches, entrepreneurs
+
+LEAD WITH THE RESULT — always:
+  ✓ "Here's how to close 10 clients this month"
+  ✗ "Today I'm going to explain lead generation"
+  The result must be clear in the first 8 words. No setup. No "today we'll cover."
+
+EVERY PRINCIPLE MUST BE IMMEDIATELY ACTIONABLE:
+  ✓ "Send 20 cold DMs before 9am — that's the only rule"
+  ✗ "Consistency is important for growing your business"
+  If the viewer cannot act on it by tomorrow morning, the principle is too vague.
+
+PROOF HIERARCHY for this audience:
+  Data > Social proof > Story > Opinion
+  A number ("47% of businesses fail at X") carries 3× the weight of a story.
+  Lead each principle with data. Follow with the story that proves the data.
+
+DIRECT ADDRESS — mandatory throughout:
+  ✓ "your revenue", "your clients", "you need to"
+  ✗ "entrepreneurs", "people", "business owners" (third person feels generic)
+  Every sentence should feel like it was written specifically for THIS viewer.
+
+STRUCTURE for maximum action:
+  Hook with result → show the problem → reveal the mechanism → CTA
+  Skip backstory unless it directly proves the mechanism.
+"""
+
+CONTENT_DETECTION = """\
+CONTENT TYPE DETECTION — do this FIRST, before building the edit plan
+
+STEP 1 — CLASSIFY:
+  Analyze the full transcript and determine:
+    content_type: coaching | education | story | motivation
+    Signals — coaching: "client", "revenue", "sales", "funnel", "close"
+               education: "how to", "learn", "works", "method", "framework"
+               story: "I was", "when I", "one day", "I remember"
+               motivation: "you can", "mindset", "possible", "potential"
+
+STEP 2 — FIND THE HOOK MOMENT:
+  Scan the ENTIRE transcript for the single most counterintuitive, surprising,
+  or conflict-raising claim. This is the sentence that would stop a scroll.
+  It is almost never the opening line (speakers warm up).
+  Record its timestamp as hook_moment.
+
+STEP 3 — HOOK FIRST (ABSOLUTE):
+  The segment at hook_moment MUST be first in keep_segments.
+  The viewer does not get intro or setup before the hook.
+  Reorder keep_segments so hook appears at t=0 in the edit.
+
+STEP 4 — TENSION MECHANICS:
+  For every setup (question / problem / curiosity gap):
+    Find its payoff (answer / solution / resolution).
+    The payoff must appear AT LEAST 20s after the setup in the output edit.
+    If setup and payoff are adjacent, INSERT a story or principle between them.
+  The viewer who feels "I'm about to find out" never skips.
+
+Output content_type in the `summary` field of the JSON.
+"""
+
 _EDUTAINMENT_BRAND = (
     "edutainment — Visualize Value / Ali Abdaal / Iman Gadzhi style.\n"
     "  accent: #FF7751 (salmon), dark bg #0A0A0A, white text #FFFFFF.\n"
@@ -919,7 +1006,7 @@ def system_prompt(
     caption_position: str | None = None,
     caption_font: str | None = None,
 ) -> str:
-    blocks = [CORE_VOICE]
+    blocks = [CORE_VOICE, SIMPLE_HEAVY, AUDIENCE_CONTEXT]
 
     effective_brand = brand_color or "#FF7751"
     blocks.append(
@@ -928,6 +1015,7 @@ def system_prompt(
     )
 
     blocks.extend([
+        CONTENT_DETECTION,
         TRANSCRIPT_INTEGRITY,
         SCRIPT_RHYTHM,
         NARRATIVE_STRUCTURE,
