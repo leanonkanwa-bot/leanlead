@@ -250,14 +250,18 @@ def download(job_id: str, request: Request, _: None = Depends(_check_auth)):
     return FileResponse(out, media_type="video/mp4", filename=f"edited-{job_id}.mp4")
 
 
-frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
-if frontend_dir.exists():
+editor_dir = Path(__file__).resolve().parents[2] / "editor_frontend"
+if not editor_dir.exists():
+    # fallback for local dev where files live in frontend/
+    editor_dir = Path(__file__).resolve().parents[2] / "frontend"
+
+if editor_dir.exists():
     @app.get("/", include_in_schema=False)
-    def landing():
-        return FileResponse(str(frontend_dir / "landing.html"))
+    def index():
+        return FileResponse(str(editor_dir / "index.html"))
 
     @app.get("/app", include_in_schema=False)
     def app_page():
-        return FileResponse(str(frontend_dir / "index.html"))
+        return FileResponse(str(editor_dir / "index.html"))
 
-    app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="frontend")
+    app.mount("/static", StaticFiles(directory=str(editor_dir)), name="frontend")
