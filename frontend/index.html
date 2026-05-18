@@ -200,6 +200,62 @@
       summary { cursor: pointer; font-size: .8rem; color: var(--muted); user-select: none; }
       pre { margin-top: .5rem; font-family: var(--mono); font-size: .7rem; color: var(--muted); overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
 
+      /* ── BRIEF ──────────────────────────────────────────── */
+      .brief-toggle {
+        display: flex; align-items: center; justify-content: space-between;
+        cursor: pointer; padding: .6rem 0; font-size: .85rem;
+        font-weight: 600; color: var(--muted); user-select: none;
+        border-top: 1px solid var(--border); margin-top: .75rem;
+        transition: color .15s;
+      }
+      .brief-toggle:hover { color: var(--text); }
+      .brief-toggle .arrow { transition: transform .2s; }
+      .brief-body { display: none; padding-top: .75rem; }
+      .brief-body.open { display: block; }
+
+      input[type="text"], select {
+        width: 100%; padding: .65rem .75rem; border-radius: 8px;
+        background: var(--bg); border: 1px solid var(--border);
+        color: var(--text); font-family: var(--font); font-size: .875rem;
+        transition: border-color .15s; appearance: none;
+      }
+      input[type="text"]:focus, select:focus { outline: none; border-color: var(--salmon); }
+      select { cursor: pointer; }
+
+      /* ── PREVIEW PANEL ───────────────────────────────────── */
+      .preview-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+      .preview-header h2 { font-size: 1.1rem; font-weight: 700; }
+      .preview-actions { display: flex; gap: .6rem; }
+
+      .preview-stat { display: flex; flex-direction: column; }
+      .preview-stat .val { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
+      .preview-stat .lbl { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+      .preview-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin-bottom: 1.25rem; }
+      .preview-stat-card {
+        background: var(--bg); border: 1px solid var(--border);
+        border-radius: 8px; padding: .7rem .85rem;
+        display: flex; flex-direction: column; gap: .2rem;
+      }
+
+      .preview-timeline { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
+      .tl-row {
+        display: flex; align-items: baseline; gap: .6rem;
+        padding: .5rem .75rem; border-radius: 6px;
+        background: var(--bg); border: 1px solid var(--border);
+        font-size: .8rem;
+      }
+      .tl-num { color: var(--salmon); font-weight: 700; min-width: 1.4rem; }
+      .tl-role { color: var(--muted); flex: 1; }
+      .tl-time { color: var(--muted); font-size: .72rem; font-family: var(--mono); }
+
+      .hook-rewrite {
+        padding: .75rem 1rem; border-radius: 8px;
+        border-left: 3px solid var(--salmon);
+        background: var(--salmon-dim); margin-bottom: 1rem;
+        font-size: .875rem; font-style: italic;
+      }
+
       /* ── FOOTER ──────────────────────────────────────────── */
       .foot {
         text-align: center; padding: 2rem 1rem;
@@ -306,6 +362,59 @@
             ></textarea>
           </div>
 
+          <!-- Content Brief (collapsible, Feature 6) -->
+          <div class="brief-toggle" id="briefToggle" role="button" tabindex="0" aria-expanded="false">
+            <span>Customize brief</span>
+            <span class="arrow" id="briefArrow">↓</span>
+          </div>
+          <div class="brief-body" id="briefBody">
+            <div class="field">
+              <span>Target audience</span>
+              <input type="text" name="target_audience" placeholder="e.g. entrepreneurs aged 25–40 trying to grow on social media" />
+            </div>
+            <div class="field">
+              <span>Core message</span>
+              <input type="text" name="main_message" placeholder="e.g. You don't need more content — you need better editing" />
+            </div>
+            <div class="field">
+              <span>Desired emotion</span>
+              <select name="desired_emotion">
+                <option value="">— choose —</option>
+                <option value="inspired">Inspired</option>
+                <option value="educated">Educated</option>
+                <option value="motivated">Motivated</option>
+                <option value="challenged">Challenged</option>
+                <option value="curious">Curious</option>
+              </select>
+            </div>
+            <div class="field">
+              <span>Platform</span>
+              <div class="seg" role="tablist">
+                <input type="radio" name="platform" id="plt-auto" value="" checked />
+                <label for="plt-auto">Auto</label>
+                <input type="radio" name="platform" id="plt-shorts" value="YouTube Shorts" />
+                <label for="plt-shorts">Shorts</label>
+                <input type="radio" name="platform" id="plt-reels" value="Reels" />
+                <label for="plt-reels">Reels</label>
+                <input type="radio" name="platform" id="plt-yt" value="YouTube" />
+                <label for="plt-yt">YouTube</label>
+              </div>
+            </div>
+            <div class="field">
+              <span>Content type</span>
+              <div class="seg" role="tablist">
+                <input type="radio" name="content_type_hint" id="ct-auto" value="" checked />
+                <label for="ct-auto">Auto</label>
+                <input type="radio" name="content_type_hint" id="ct-coaching" value="coaching" />
+                <label for="ct-coaching">Coaching</label>
+                <input type="radio" name="content_type_hint" id="ct-edu" value="education" />
+                <label for="ct-edu">Education</label>
+                <input type="radio" name="content_type_hint" id="ct-story" value="story" />
+                <label for="ct-story">Story</label>
+              </div>
+            </div>
+          </div>
+
           <button type="submit" class="btn btn-primary btn-lg" id="submit">
             <span class="btn-label">Edit my video</span>
             <span class="btn-shimmer" aria-hidden="true"></span>
@@ -327,6 +436,50 @@
           <p class="muted" style="margin-bottom:.5rem">Your video is still on the server — no need to re-upload.</p>
           <button id="retryBtn" class="btn btn-primary">Retry job</button>
         </div>
+      </section>
+
+      <!-- PREVIEW (ready_for_review) -->
+      <section class="card hidden" id="previewCard">
+        <div class="preview-header">
+          <h2>Review edit plan</h2>
+          <div class="preview-actions">
+            <button id="replanBtn" class="btn btn-ghost">Re-plan</button>
+            <button id="renderBtn" class="btn btn-primary">Render video →</button>
+          </div>
+        </div>
+
+        <div id="hookRewrite" class="hook-rewrite hidden">
+          <span class="tag" style="margin-bottom:.3rem">Rewritten hook</span>
+          <p id="hookText"></p>
+        </div>
+
+        <div class="preview-stats">
+          <div class="preview-stat-card">
+            <span class="val" id="prevOrigDur">—</span>
+            <span class="lbl">Original</span>
+          </div>
+          <div class="preview-stat-card">
+            <span class="val" id="prevEditDur">—</span>
+            <span class="lbl">After edit</span>
+          </div>
+          <div class="preview-stat-card">
+            <span class="val" id="prevSegments">—</span>
+            <span class="lbl">Segments kept</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:.75rem;margin-bottom:1rem;font-size:.8rem;color:var(--muted)">
+          <span id="prevContentType"></span>
+          <span id="prevSpeakers"></span>
+          <span id="prevGraphics"></span>
+        </div>
+
+        <div class="preview-timeline" id="previewTimeline"></div>
+
+        <details style="margin-top:.5rem">
+          <summary>Raw plan JSON</summary>
+          <pre id="previewJson"></pre>
+        </details>
       </section>
 
       <!-- RESULT -->

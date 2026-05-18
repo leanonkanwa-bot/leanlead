@@ -267,6 +267,59 @@ def plan_edit(
     return EditPlan(raw=plan)
 
 
+def rewrite_hook(
+    transcript_text: str,
+    original_hook_segment: str,
+    brand_color: str = "#FF7751",
+) -> dict[str, Any]:
+    """
+    Ask Claude to rewrite the hook opening line for maximum retention.
+    Returns: {rewritten_hook, hook_type, display_style, confidence}
+    If confidence < 0.7 the caller should skip the overlay.
+    Falls back to a safe default dict on any error.
+    """
+    try:
+        resp = _client().messages.create(
+            model=settings.anthropic_model,
+            max_tokens=256,
+            messages=[{
+                "role": "user",
+                "content": (
+                    "You are a viral video hook specialist. Rewrite the following opening "
+                    "line to maximise scroll-stop retention.\n\n"
+                    "RULES:\n"
+                    "  - Max 12 words.\n"
+                    "  - Start with the most counterintuitive or specific claim.\n"
+                    "  - No filler ('In this video...', 'Today I want to...').\n"
+                    "  - Match the speaker's voice.\n"
+                    "  - hook_type: one of: question | statement | number | contrast | story\n"
+                    "  - display_style: bold_overlay | subtitle | none\n"
+                    "  - confidence: 0.0–1.0 (how sure you are this improves the original)\n\n"
+                    f"ORIGINAL HOOK: {original_hook_segment}\n\n"
+                    f"FULL TRANSCRIPT EXCERPT (first 300 chars): {transcript_text[:300]}\n\n"
+                    "Reply ONLY with JSON:\n"
+                    '{"rewritten_hook":"...","hook_type":"...","display_style":"...",'
+                    '"confidence":0.0}'
+                ),
+            }],
+        )
+        text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+        data = _extract_json(text)
+        return {
+            "rewritten_hook": str(data.get("rewritten_hook", original_hook_segment)),
+            "hook_type":      str(data.get("hook_type",      "statement")),
+            "display_style":  str(data.get("display_style",  "bold_overlay")),
+            "confidence":     float(data.get("confidence",   0.0)),
+        }
+    except Exception:
+        return {
+            "rewritten_hook": original_hook_segment,
+            "hook_type":      "statement",
+            "display_style":  "none",
+            "confidence":     0.0,
+        }
+
+
 def _extract_json(text: str) -> dict[str, Any]:
     text = text.strip()
     if text.startswith("```"):

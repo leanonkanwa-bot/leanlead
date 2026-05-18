@@ -484,6 +484,19 @@ def _render_vignette_layouts(
     return layout_paths, mask_path
 
 
+def _color_grade_filter(content_type: str) -> str:
+    """Return an FFmpeg video filter string for the given content type.
+    Applied FIRST in the filter chain so all subsequent overlays inherit the grade.
+    """
+    profiles: dict[str, str] = {
+        "coaching":   "eq=contrast=1.15:saturation=1.1,colorbalance=rs=0.05:bs=-0.03",
+        "education":  "eq=brightness=0.05:contrast=1.1,unsharp=5:5:1.0:5:5:0.0",
+        "motivation": "eq=contrast=1.2:gamma=0.95,colorbalance=rs=0.08:gs=0.03",
+        "story":      "eq=saturation=0.9:contrast=1.05,colorbalance=rs=0.03",
+    }
+    return profiles.get(content_type.lower(), "eq=contrast=1.1:saturation=1.05")
+
+
 def render(
     src: Path,
     transcript: dict[str, Any],
@@ -498,6 +511,8 @@ def render(
     brand_color: str | None = None,
     aesthetic: str = "dark-pro",
     subject_position: dict | None = None,
+    graphic_specs: list | None = None,
+    content_type: str = "coaching",
 ) -> dict[str, Any]:
     work_dir.mkdir(parents=True, exist_ok=True)
 
@@ -738,7 +753,10 @@ def render(
     vw, vh, vx, vy, _cr = _vignette_dims(short_form) if V > 0 else (0, 0, 0, 0, 0)
 
     # Build the final filter chain.
+    # Color grade is FIRST so all overlays (zoom, graphics, captions) inherit the look.
+    color_grade = _color_grade_filter(content_type)
     base_filter = (
+        f"{color_grade},"
         f"zoompan=z={z_expr}:x={x_expr}:y={y_expr}:"
         f"d=1:s={target_w}x{target_h}:fps={fps}"
         f"{hyperframe_chain}"

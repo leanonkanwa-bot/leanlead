@@ -23,6 +23,7 @@ const statusPip = $("statusPip");
 const barFill = $("barFill");
 
 const resultCard = $("resultCard");
+const previewCard = $("previewCard");
 const player = $("player");
 const downloadLink = $("downloadLink");
 const pkgTitle = $("pkgTitle");
@@ -268,6 +269,7 @@ async function poll(jobId) {
     const job = await res.json();
     setStatus(job.status, job.message || "", job.progress || 0);
     if (job.status === "done") return showResult(jobId, job.result);
+    if (job.status === "ready_for_review") return showPreview(jobId, job.preview);
     if (job.status === "error") return fail(job.error || "Unknown error", jobId);
   }
 }
@@ -276,15 +278,17 @@ const STATUS_LABELS = {
   queued: "Queued",
   transcribing: "Transcribing",
   planning: "Planning the edit",
+  ready_for_review: "Review plan",
   rendering: "Rendering",
   done: "Done",
   error: "Error",
 };
 const STATUS_PIPS = {
-  queued: "1/4",
-  transcribing: "2/4",
-  planning: "3/4",
-  rendering: "4/4",
+  queued: "1/5",
+  transcribing: "2/5",
+  planning: "3/5",
+  ready_for_review: "4/5",
+  rendering: "4/5",
   done: "✓",
   error: "✗",
 };
@@ -350,6 +354,7 @@ $("retryBtn")?.addEventListener("click", async () => {
 function showResult(jobId, result) {
   submitBtn.disabled = false;
   submitBtn.querySelector(".btn-label").textContent = "Edit another";
+  previewCard?.classList.add("hidden");
   resultCard.classList.remove("hidden");
   resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
   player.src = `/api/download/${jobId}`;
@@ -370,3 +375,108 @@ function showResult(jobId, result) {
 
   planJson.textContent = JSON.stringify(result?.plan ?? {}, null, 2);
 }
+
+// ── CONTENT BRIEF TOGGLE ──────────────────────────────────────────────────────
+const briefToggle = $("briefToggle");
+const briefBody   = $("briefBody");
+const briefArrow  = $("briefArrow");
+
+briefToggle?.addEventListener("click", () => {
+  const open = briefBody.classList.toggle("open");
+  briefArrow.textContent = open ? "↑" : "↓";
+  briefToggle.setAttribute("aria-expanded", String(open));
+});
+briefToggle?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); briefToggle.click(); }
+});
+
+// ── PREVIEW PANEL (ready_for_review) ─────────────────────────────────────────
+let _reviewJobId = null;
+
+function showPreview(jobId, preview) {
+  _reviewJobId = jobId;
+  submitBtn.disabled = false;
+  submitBtn.querySelector(".btn-label").textContent = "Edit another";
+  statusCard.classList.add("hidden");
+
+  if (!previewCard || !preview) return;
+  previewCard.classList.remove("hidden");
+  previewCard.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Hook rewrite.
+  const hook = preview.hook_rewrite;
+  const hookConf = preview.hook_confidence || 0;
+  if (hook && hookConf >= 0.7) {
+    $("hookText").textContent = hook;
+    $("hookRewrite")?.classList.remove("hidden");
+  } else {
+    $("hookRewrite")?.classList.add("hidden");
+  }
+
+  // Stats.
+  const fmt = (s) => s >= 60 ? `${Math.round(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`;
+  if ($("prevOrigDur")) $("prevOrigDur").textContent = fmt(preview.total_duration_original || 0);
+  if ($("prevEditDur")) $("prevEditDur").textContent = fmt(preview.total_duration_edited || 0);
+  if ($("prevSegments")) $("prevSegments").textContent = preview.segments_kept || 0;
+
+  // Metadata chips.
+  if ($("prevContentType")) $("prevContentType").textContent = preview.content_type ? `Type: ${preview.content_type}` : "";
+  if ($("prevSpeakers"))    $("prevSpeakers").textContent    = preview.speakers_detected > 1 ? `${preview.speakers_detected} speakers` : "";
+  if ($("prevGraphics"))    $("prevGraphics").textContent    = preview.graphics_planned ? `${preview.graphics_planned} graphics` : "";
+
+  // Timeline.
+  const tl = $("previewTimeline");
+  if (tl) {
+    const segs = preview.edit_plan || [];
+    tl.innerHTML = segs.slice(0, 20).map((s) =>
+      `<div class="tl-row">
+        <span class="tl-num">${s.order}</span>
+        <span class="tl-role">${s.role || "—"}</span>
+        <span class="tl-time">${s.original_time || ""} → ${s.edit_dur || ""}</span>
+      </div>`
+    ).join("") || "<p style='color:var(--muted);font-size:.8rem'>No segments</p>";
+  }
+
+  if ($("previewJson")) $("previewJson").textContent = JSON.stringify(preview, null, 2);
+}
+
+// Render button — approves the plan and starts Phase 2.
+$("renderBtn")?.addEventListener("click", async () => {
+  if (!_reviewJobId) return;
+  previewCard?.classList.add("hidden");
+  statusCard.classList.remove("hidden");
+  setStatus("rendering", "Sending to renderer…", 70);
+  try {
+    const res = await fetch(`/api/jobs/${_reviewJobId}/approve`, {
+      method: "POST", credentials: "same-origin",
+    });
+    if (!res.ok) return fail(`Render start failed: ${res.status}`);
+    poll(_reviewJobId);
+  } catch (err) {
+    fail(`Render error: ${err.message}`);
+  }
+});
+
+// Re-plan button — puts job back to planning state and re-polls.
+$("replanBtn")?.addEventListener("click", async () => {
+  if (!_reviewJobId) return;
+  const job = await (await fetch(`/api/jobs/${_reviewJobId}`, { credentials: "same-origin" })).json();
+  if (!job.source_path) return fail("No source file — please re-upload.");
+
+  previewCard?.classList.add("hidden");
+  statusCard.classList.remove("hidden");
+  setStatus("queued", "Re-planning with existing file…", 5);
+
+  // Trigger a retry which re-runs the full Phase 1.
+  try {
+    const res = await fetch(`/api/retry/${_reviewJobId}`, {
+      method: "POST", credentials: "same-origin",
+    });
+    if (!res.ok) return fail(`Re-plan failed: ${res.status}`);
+    const { job_id } = await res.json();
+    _reviewJobId = job_id;
+    poll(job_id);
+  } catch (err) {
+    fail(`Re-plan error: ${err.message}`);
+  }
+});
