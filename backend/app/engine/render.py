@@ -484,6 +484,19 @@ def _render_vignette_layouts(
     return layout_paths, mask_path
 
 
+def _color_grade_filter(content_type: str) -> str:
+    """Return an FFmpeg video filter string for the given content type.
+    Applied FIRST in the filter chain so all subsequent overlays inherit the grade.
+    """
+    profiles: dict[str, str] = {
+        "coaching":   "eq=contrast=1.15:saturation=1.1,colorbalance=rs=0.05:bs=-0.03",
+        "education":  "eq=brightness=0.05:contrast=1.1,unsharp=5:5:1.0:5:5:0.0",
+        "motivation": "eq=contrast=1.2:gamma=0.95,colorbalance=rs=0.08:gs=0.03",
+        "story":      "eq=saturation=0.9:contrast=1.05,colorbalance=rs=0.03",
+    }
+    return profiles.get(content_type.lower(), "eq=contrast=1.1:saturation=1.05")
+
+
 def render(
     src: Path,
     transcript: dict[str, Any],
@@ -499,12 +512,14 @@ def render(
     aesthetic: str = "dark-pro",
     subject_position: dict | None = None,
     graphic_specs: list | None = None,
+    content_type: str = "coaching",
 ) -> dict[str, Any]:
     work_dir.mkdir(parents=True, exist_ok=True)
 
     short_form = plan.format == "short"
     target_w, target_h = (1080, 1920) if short_form else (1920, 1080)
     fps = 30
+    pad = SHORT_PAD_S if short_form else LONG_PAD_S
 
     keep = plan.keep_segments or [
         {"start": 0.0, "end": float(transcript.get("duration", 0.0))}
@@ -512,18 +527,10 @@ def render(
     words = _flat_words(transcript)
     src_duration = float(transcript.get("duration", 0.0)) or _probe_duration(src)
 
-    # Never downscale: probe source resolution and use it as the target so the
-    # output always matches the input. Also re-derive short_form from the actual
-    # aspect ratio — portrait (h > w) is short-form regardless of duration hint.
+    # Proxy: if the source is a heavy-decode format (ProRes, HEVC) or larger
+    # than the target resolution, pre-transcode it once to a target-res H.264.
+    # All segment cuts then use stream-copy on the proxy → zero decode RAM.
     video_info = _probe_video_info(src)
-    src_w = video_info.get("width", 0)
-    src_h = video_info.get("height", 0)
-    if src_w > 0 and src_h > 0:
-        target_w, target_h = src_w, src_h
-        short_form = target_h > target_w
-
-    pad = SHORT_PAD_S if short_form else LONG_PAD_S
-
     use_proxy = _needs_proxy(video_info, target_w, target_h)
     if use_proxy:
         proxy_path = work_dir / "proxy.mp4"
@@ -745,32 +752,14 @@ def render(
     V = len(vign_moments)
     vw, vh, vx, vy, _cr = _vignette_dims(short_form) if V > 0 else (0, 0, 0, 0, 0)
 
-    # Adaptive graphic filters from GraphicSelector (drawtext/drawbox only,
-    # no extra input streams). Remap source timestamps to cut timeline.
-    adaptive_graphic_chain = ""
-    if graphic_specs:
-        gfilters: list[str] = []
-        for gspec in graphic_specs:
-            run = 0.0
-            for seg in keep:
-                ss, ee = float(seg["start"]), float(seg["end"])
-                if ss <= gspec.at <= ee and ee > ss:
-                    rt0 = run + (gspec.at - ss)
-                    rt1 = rt0 + gspec.duration
-                    gf  = gspec.to_filter_chain(target_w, target_h, rt0, rt1)
-                    if gf:
-                        gfilters.append(gf)
-                    break
-                run += max(0.0, ee - ss)
-        if gfilters:
-            adaptive_graphic_chain = "," + ",".join(gfilters)
-
     # Build the final filter chain.
+    # Color grade is FIRST so all overlays (zoom, graphics, captions) inherit the look.
+    color_grade = _color_grade_filter(content_type)
     base_filter = (
+        f"{color_grade},"
         f"zoompan=z={z_expr}:x={x_expr}:y={y_expr}:"
         f"d=1:s={target_w}x{target_h}:fps={fps}"
         f"{hyperframe_chain}"
-        f"{adaptive_graphic_chain}"
     )
     import shutil as _shutil
     import tempfile as _tempfile
@@ -971,11 +960,11 @@ def render(
 
     cmd += [
         "-frames:v", str(total_frames),
-        "-c:v", "libx264", "-preset", "slow", "-crf", "18",
-        "-threads", "2",
-        "-x264-params", "rc-lookahead=10:bframes=0",
+        "-c:v", "libx264", "-preset", "superfast", "-crf", "22",
+        "-threads", "2",   # Whisper is freed before this point → safe to use 2 cores
+        "-x264-params", "rc-lookahead=0:bframes=0",
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+        "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
         str(_nocap_path),
     ]
@@ -990,9 +979,9 @@ def render(
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(_nocap_path),
         "-vf", f"subtitles={_ass_str}:force_style='FontName=Arial'",
-        "-c:v", "libx264", "-preset", "slow", "-crf", "18",
+        "-c:v", "libx264", "-preset", "superfast", "-crf", "22",
         "-threads", "2",
-        "-x264-params", "rc-lookahead=10:bframes=0",
+        "-x264-params", "rc-lookahead=0:bframes=0",
         "-pix_fmt", "yuv420p",
         "-c:a", "copy",
         "-movflags", "+faststart",

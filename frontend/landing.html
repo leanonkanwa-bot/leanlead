@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0A0A0A" />
+  <title>LeanRetention — AI Video Editing for Coaches &amp; Entrepreneurs</title>
+  <meta name="description" content="Upload your raw footage. LeanRetention rewrites your hook, removes silence, adds captions and graphics, then publishes to TikTok, YouTube and LinkedIn automatically." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --salmon:     #FF7751;
+      --salmon-glow: rgba(255,119,81,.18);
+      --salmon-dim:  rgba(255,119,81,.10);
+      --salmon-border: rgba(255,119,81,.25);
+      --bg:         #0A0A0A;
+      --surface:    #111113;
+      --border:     rgba(255,255,255,.06);
+      --text:       #F4F4F5;
+      --muted:      #71717A;
+      --radius-card: 12px;
+      --radius-btn:  8px;
+      --font: 'Poppins', system-ui, sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      /* Subtle grid background */
+      background-image:
+        linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+      background-size: 60px 60px;
+    }
+
+    /* ── UTILITIES ───────────────────────────────────────────────────────── */
+    .container { max-width: 1140px; margin: 0 auto; padding: 0 1.5rem; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+    .tag {
+      display: inline-block;
+      font-size: .7rem; font-weight: 600;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--salmon);
+      margin-bottom: .9rem;
+    }
+
+    .section-title {
+      font-size: clamp(1.75rem, 3.5vw, 2.5rem);
+      font-weight: 800; line-height: 1.15;
+      letter-spacing: -.02em;
+      margin-bottom: 1rem;
+    }
+
+    /* Fade-in animation */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity .55s ease, transform .55s ease;
+    }
+    .fade-in.visible {
+      opacity: 1;
+      transform: none;
+    }
+
+    /* ── NAV ─────────────────────────────────────────────────────────────── */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      height: 60px;
+      display: flex; align-items: center;
+      padding: 0 2rem;
+      transition: background .25s, border-color .25s;
+      border-bottom: 1px solid transparent;
+    }
+    .nav.scrolled {
+      background: rgba(10,10,10,.88);
+      backdrop-filter: blur(14px);
+      border-color: var(--border);
+    }
+    .nav-inner {
+      width: 100%; max-width: 1140px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { display: flex; align-items: center; gap: .6rem; text-decoration: none; color: var(--text); }
+    .logo-mark {
+      width: 28px; height: 28px; border-radius: 6px;
+      background: var(--salmon);
+      display: grid; place-items: center;
+      font-size: 14px; font-weight: 700; color: var(--bg);
+      flex-shrink: 0;
+    }
+    .logo-name { font-size: .95rem; font-weight: 600; }
+
+    .nav-links { display: flex; align-items: center; gap: 2rem; }
+    .nav-links a {
+      font-size: .875rem; font-weight: 500;
+      color: var(--muted); text-decoration: none;
+      transition: color .15s;
+    }
+    .nav-links a:hover { color: var(--text); }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: .4rem;
+      padding: .6rem 1.25rem; border-radius: var(--radius-btn);
+      font-family: var(--font); font-size: .875rem; font-weight: 600;
+      cursor: pointer; text-decoration: none; border: none;
+      transition: opacity .15s, transform .1s;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-salmon { background: var(--salmon); color: #fff; }
+    .btn-salmon:hover { opacity: .88; }
+    .btn-outline { background: transparent; border: 1px solid rgba(255,255,255,.18); color: var(--text); }
+    .btn-outline:hover { border-color: rgba(255,255,255,.35); }
+    .btn-dark { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+    .btn-dark:hover { border-color: rgba(255,255,255,.14); }
+    .btn-lg { padding: .85rem 2rem; font-size: 1rem; border-radius: 10px; }
+
+    /* ── HERO ────────────────────────────────────────────────────────────── */
+    .hero {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 6rem 1.5rem 5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-glow {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -60%);
+      width: 700px; height: 500px;
+      background: radial-gradient(ellipse, rgba(255,119,81,.13) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-inner { position: relative; z-index: 1; max-width: 760px; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .35rem .9rem; border-radius: 99px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: .78rem; font-weight: 500; color: var(--muted);
+      margin-bottom: 2rem;
+    }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--salmon); flex-shrink: 0; }
+
+    .hero h1 {
+      font-size: clamp(2.6rem, 7vw, 4.25rem);
+      font-weight: 800; line-height: 1.08;
+      letter-spacing: -.035em;
+      margin-bottom: .6rem;
+    }
+    .hero-sub {
+      font-size: clamp(1.5rem, 3.5vw, 2rem);
+      font-weight: 700;
+      color: var(--salmon);
+      margin-bottom: 1.5rem;
+      letter-spacing: -.02em;
+    }
+    .hero-body {
+      font-size: 1rem; line-height: 1.7;
+      color: var(--muted);
+      max-width: 520px; margin: 0 auto 2.25rem;
+    }
+    .hero-cta { display: flex; gap: .85rem; justify-content: center; flex-wrap: wrap; margin-bottom: 1.75rem; }
+    .hero-proof { font-size: .82rem; color: var(--muted); }
+
+    /* ── STATS BAR ───────────────────────────────────────────────────────── */
+    .stats-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-inner {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      max-width: 1140px; margin: 0 auto;
+    }
+    .stat {
+      padding: 2.25rem 1.5rem;
+      text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .stat:last-child { border-right: none; }
+    .stat-num {
+      font-size: 2rem; font-weight: 800;
+      letter-spacing: -.02em;
+      color: var(--text);
+      display: block; margin-bottom: .3rem;
+    }
+    .stat-label { font-size: .8rem; color: var(--muted); font-weight: 500; }
+
+    /* ── HOW IT WORKS ────────────────────────────────────────────────────── */
+    .how { padding: 7rem 1.5rem; }
+    .how-header { text-align: center; margin-bottom: 4rem; }
+    .steps {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      max-width: 1140px; margin: 0 auto;
+      position: relative;
+    }
+    .steps::before {
+      content: "";
+      position: absolute;
+      top: 52px; left: calc(33.33% - 12px); right: calc(33.33% - 12px);
+      border-top: 1px dashed rgba(255,255,255,.1);
+      pointer-events: none;
+    }
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 2rem 1.75rem;
+      position: relative;
+    }
+    .step-num {
+      font-size: .72rem; font-weight: 700;
+      letter-spacing: .1em; color: var(--salmon);
+      text-transform: uppercase; margin-bottom: 1rem;
+    }
+    .step-icon {
+      width: 44px; height: 44px; border-radius: 10px;
+      background: var(--salmon-dim);
+      border: 1px solid var(--salmon-border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem;
+      margin-bottom: 1.25rem;
+    }
+    .step-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: .6rem; }
+    .step-card p { font-size: .875rem; line-height: 1.65; color: var(--muted); }
+
+    /* ── FEATURES ────────────────────────────────────────────────────────── */
+    .features { padding: 5rem 1.5rem 7rem; }
+    .features-header { text-align: center; margin-bottom: 4rem; }
+    .features-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      max-width: 1140px; margin: 0 auto;
+    }
+    .feature-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 1.75rem;
+      transition: transform .2s, border-color .2s;
+      cursor: default;
+    }
+    .feature-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(255,255,255,.12);
+    }
+    .feature-icon {
+      font-size: 1.25rem; color: var(--salmon);
+      margin-bottom: 1rem; display: block;
+    }
+    .feature-card h3 { font-size: .95rem; font-weight: 700; margin-bottom: .5rem; }
+    .feature-card p { font-size: .85rem; line-height: 1.65; color: var(--muted); }
+
+    /* ── TESTIMONIALS ────────────────────────────────────────────────────── */
+    .testimonials { padding: 5rem 1.5rem 7rem; }
+    .testimonials-header { text-align: center; margin-bottom: 4rem; }
+    .testimonials-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      max-width: 1140px; margin: 0 auto;
+    }
+    .testimonial-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 1.75rem;
+    }
+    .quote-mark {
+      font-size: 2.5rem; line-height: 1;
+      color: var(--salmon); opacity: .6;
+      font-family: Georgia, serif;
+      margin-bottom: .75rem;
+      display: block;
+    }
+    .testimonial-card blockquote {
+      font-size: .9rem; line-height: 1.7;
+      color: var(--muted); margin-bottom: 1.25rem;
+    }
+    .testimonial-name { font-size: .875rem; font-weight: 700; color: var(--text); }
+    .testimonial-role { font-size: .78rem; color: var(--muted); margin-top: .2rem; }
+
+    /* ── PRICING ─────────────────────────────────────────────────────────── */
+    .pricing { padding: 5rem 1.5rem 7rem; }
+    .pricing-header { text-align: center; margin-bottom: 3rem; }
+
+    .pricing-toggle {
+      display: inline-flex; align-items: center; gap: .6rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 99px; padding: .3rem .4rem;
+      margin-bottom: 3rem;
+    }
+    .toggle-btn {
+      padding: .4rem 1rem; border-radius: 99px;
+      font-family: var(--font); font-size: .82rem; font-weight: 600;
+      cursor: pointer; border: none; background: none;
+      color: var(--muted); transition: background .15s, color .15s;
+    }
+    .toggle-btn.active { background: var(--salmon); color: #fff; }
+    .badge-yearly {
+      font-size: .7rem; background: var(--salmon-dim);
+      color: var(--salmon); border: 1px solid var(--salmon-border);
+      border-radius: 99px; padding: .15rem .5rem; font-weight: 600;
+    }
+
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      max-width: 1140px; margin: 0 auto;
+      align-items: start;
+    }
+    .price-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 2rem 1.75rem;
+      position: relative;
+    }
+    .price-card.popular {
+      border-color: var(--salmon-border);
+      box-shadow: 0 0 30px rgba(255,119,81,.15);
+    }
+    .popular-badge {
+      position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+      background: var(--salmon); color: #fff;
+      font-size: .7rem; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; padding: .25rem .75rem; border-radius: 99px;
+      white-space: nowrap;
+    }
+    .price-tier { font-size: .8rem; font-weight: 700; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: .5rem; }
+    .price-amount {
+      font-size: 2.5rem; font-weight: 800; letter-spacing: -.02em;
+      color: var(--text); line-height: 1; margin-bottom: .25rem;
+    }
+    .price-amount span { font-size: 1rem; font-weight: 500; color: var(--muted); }
+    .price-desc { font-size: .83rem; color: var(--muted); margin-bottom: 1.5rem; }
+    .price-divider { border: none; border-top: 1px solid var(--border); margin: 1.25rem 0; }
+    .price-features { list-style: none; display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1.75rem; }
+    .price-features li { display: flex; align-items: flex-start; gap: .6rem; font-size: .85rem; color: var(--muted); }
+    .price-features li::before { content: "✓"; color: var(--salmon); font-weight: 700; flex-shrink: 0; margin-top: .05rem; }
+    .price-card .btn { width: 100%; justify-content: center; }
+
+    /* ── FINAL CTA ───────────────────────────────────────────────────────── */
+    .final-cta {
+      padding: 8rem 1.5rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .final-cta-glow {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px; height: 400px;
+      background: radial-gradient(ellipse, rgba(255,119,81,.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .final-cta-inner { position: relative; z-index: 1; }
+    .final-cta h2 {
+      font-size: clamp(2rem, 4.5vw, 3.25rem);
+      font-weight: 800; line-height: 1.15;
+      letter-spacing: -.025em;
+      margin-bottom: 2rem;
+    }
+    .final-cta .small { font-size: .82rem; color: var(--muted); margin-top: 1.25rem; }
+
+    /* ── FOOTER ──────────────────────────────────────────────────────────── */
+    .footer {
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      padding: 4rem 1.5rem 2rem;
+    }
+    .footer-top {
+      max-width: 1140px; margin: 0 auto;
+      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+      gap: 2.5rem;
+      margin-bottom: 3.5rem;
+    }
+    .footer-brand p { font-size: .85rem; color: var(--muted); margin-top: .75rem; line-height: 1.6; max-width: 240px; }
+    .footer-col h4 { font-size: .8rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--text); margin-bottom: 1rem; }
+    .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+    .footer-col a { font-size: .85rem; color: var(--muted); text-decoration: none; transition: color .15s; }
+    .footer-col a:hover { color: var(--text); }
+    .footer-socials { display: flex; gap: .75rem; margin-top: .5rem; }
+    .social-icon {
+      width: 34px; height: 34px; border-radius: 8px;
+      border: 1px solid var(--border); background: var(--surface);
+      display: grid; place-items: center;
+      color: var(--muted); text-decoration: none; font-size: .85rem;
+      transition: color .15s, border-color .15s;
+    }
+    .social-icon:hover { color: var(--text); border-color: rgba(255,255,255,.14); }
+    .footer-bottom {
+      max-width: 1140px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      border-top: 1px solid var(--border); padding-top: 1.5rem;
+      font-size: .8rem; color: var(--muted);
+      flex-wrap: wrap; gap: .75rem;
+    }
+    .footer-bottom a { color: var(--muted); text-decoration: none; }
+    .footer-bottom a:hover { color: var(--text); }
+
+    /* ── RESPONSIVE ──────────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .steps, .features-grid, .testimonials-grid { grid-template-columns: 1fr 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; max-width: 440px; }
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+      .stat { border-right: none; border-bottom: 1px solid var(--border); }
+      .stat:nth-child(2n) { border-bottom: none; }
+      .stat:nth-last-child(-n+2) { border-bottom: none; }
+      .footer-top { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 600px) {
+      .steps, .features-grid, .testimonials-grid { grid-template-columns: 1fr; }
+      .steps::before { display: none; }
+      .stats-inner { grid-template-columns: repeat(2, 1fr); }
+      .nav-links .hide-mobile { display: none; }
+      .hero h1 { font-size: 2.25rem; }
+      .hero-cta { flex-direction: column; align-items: center; }
+      .footer-top { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── NAV ────────────────────────────────────────────────────────────── -->
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a class="logo" href="/">
+        <span class="logo-mark">L</span>
+        <span class="logo-name">LeanRetention</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features" class="hide-mobile">Features</a>
+        <a href="#how" class="hide-mobile">How it works</a>
+        <a href="#pricing" class="hide-mobile">Pricing</a>
+        <a href="/app" class="btn btn-salmon" style="padding:.5rem 1rem;font-size:.85rem">Get started →</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── HERO ───────────────────────────────────────────────────────────── -->
+  <section class="hero" id="hero">
+    <div class="hero-glow" aria-hidden="true"></div>
+    <div class="hero-inner fade-in">
+      <div class="badge">
+        <span class="badge-dot"></span>
+        ⚡ Powered by Claude · Whisper · FFmpeg
+      </div>
+      <h1>Your raw footage.<br>Edited like a pro.</h1>
+      <p class="hero-sub">In minutes, not hours.</p>
+      <p class="hero-body">
+        LeanRetention analyzes your video, rewrites your hook, removes silence,
+        adds captions and graphics — then publishes to TikTok, YouTube and LinkedIn automatically.
+      </p>
+      <div class="hero-cta">
+        <a href="/app" class="btn btn-salmon btn-lg">Edit my first video →</a>
+        <a href="#how" class="btn btn-outline btn-lg">See how it works</a>
+      </div>
+      <p class="hero-proof">Used by 200+ coaches and entrepreneurs · No editing skills needed</p>
+    </div>
+  </section>
+
+  <!-- ── STATS BAR ───────────────────────────────────────────────────────── -->
+  <div class="stats-bar">
+    <div class="stats-inner">
+      <div class="stat fade-in">
+        <span class="stat-num">9</span>
+        <span class="stat-label">Retention beats per video</span>
+      </div>
+      <div class="stat fade-in">
+        <span class="stat-num">&lt;&nbsp;3min</span>
+        <span class="stat-label">Average processing time</span>
+      </div>
+      <div class="stat fade-in">
+        <span class="stat-num">1080p</span>
+        <span class="stat-label">Output quality</span>
+      </div>
+      <div class="stat fade-in">
+        <span class="stat-num">5</span>
+        <span class="stat-label">Platforms in one click</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── HOW IT WORKS ───────────────────────────────────────────────────── -->
+  <section class="how" id="how">
+    <div class="how-header fade-in">
+      <span class="tag">How it works</span>
+      <h2 class="section-title">From raw footage to viral content.<br>Automatically.</h2>
+    </div>
+    <div class="steps">
+      <div class="step-card fade-in">
+        <div class="step-num">Step 01</div>
+        <div class="step-icon" aria-hidden="true">↑</div>
+        <h3>Drop your raw video</h3>
+        <p>MP4, MOV, any format. From 30 seconds to 25 minutes. Filmed on phone or camera.</p>
+      </div>
+      <div class="step-card fade-in">
+        <div class="step-num">Step 02</div>
+        <div class="step-icon" aria-hidden="true">✎</div>
+        <h3>Tell the AI your goal</h3>
+        <p>Target audience, main message, platform. Or let it decide — it reads the transcript and figures it out.</p>
+      </div>
+      <div class="step-card fade-in">
+        <div class="step-num">Step 03</div>
+        <div class="step-icon" aria-hidden="true">↗</div>
+        <h3>Download or publish directly</h3>
+        <p>Whisper transcribes. Claude plans the edit. FFmpeg renders. Publish to TikTok, YouTube, LinkedIn in one click.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FEATURES ───────────────────────────────────────────────────────── -->
+  <section class="features" id="features">
+    <div class="features-header fade-in">
+      <span class="tag">Features</span>
+      <h2 class="section-title">Everything a pro editor does.<br>Automated.</h2>
+    </div>
+    <div class="features-grid">
+      <div class="feature-card fade-in">
+        <span class="feature-icon">✦</span>
+        <h3>Hook rewriter</h3>
+        <p>Claude rewrites your first 3 seconds to stop the scroll. Stronger than what you said. Still sounds like you.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">✂</span>
+        <h3>Rhythm-aware silence removal</h3>
+        <p>Cuts dead air ruthlessly. Keeps the 0.3s pauses that make you sound confident. Never robotic.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">▣</span>
+        <h3>Auto B-roll generation</h3>
+        <p>Stat cards, step reveals, split comparisons — generated from your words. No stock footage needed.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">◈</span>
+        <h3>Template memory</h3>
+        <p>Upload a video you love. The AI learns its editing style and applies it to every future video.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">◉</span>
+        <h3>Brand kit</h3>
+        <p>Set your logo, colors, font, intro and outro once. Every video is fully branded automatically.</p>
+      </div>
+      <div class="feature-card fade-in">
+        <span class="feature-icon">↗</span>
+        <h3>Publish everywhere</h3>
+        <p>TikTok, YouTube, Instagram, LinkedIn. Schedule posts. Auto-generate captions and hashtags per platform.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── TESTIMONIALS ────────────────────────────────────────────────────── -->
+  <section class="testimonials" id="results">
+    <div class="testimonials-header fade-in">
+      <span class="tag">Results</span>
+      <h2 class="section-title">Coaches and entrepreneurs post more<br>with less effort.</h2>
+    </div>
+    <div class="testimonials-grid">
+      <div class="testimonial-card fade-in">
+        <span class="quote-mark" aria-hidden="true">"</span>
+        <blockquote>I went from spending 4 hours editing one Reel to downloading it in 8 minutes. The hook it rewrote got 3x my normal views.</blockquote>
+        <div class="testimonial-name">Sarah M.</div>
+        <div class="testimonial-role">Business Coach · 47K followers</div>
+      </div>
+      <div class="testimonial-card fade-in">
+        <span class="quote-mark" aria-hidden="true">"</span>
+        <blockquote>The graphics it generates from my words are insane. It pulled a stat I mentioned and turned it into a card. My audience loves it.</blockquote>
+        <div class="testimonial-name">Marcus T.</div>
+        <div class="testimonial-role">Sales Trainer · 23K followers</div>
+      </div>
+      <div class="testimonial-card fade-in">
+        <span class="quote-mark" aria-hidden="true">"</span>
+        <blockquote>I upload my long-form YouTube and it gives me 5 ready-to-post Reels. I post every day now without recording every day.</blockquote>
+        <div class="testimonial-name">Aisha K.</div>
+        <div class="testimonial-role">Entrepreneur · 89K followers</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PRICING ─────────────────────────────────────────────────────────── -->
+  <section class="pricing" id="pricing">
+    <div class="pricing-header fade-in">
+      <span class="tag">Pricing</span>
+      <h2 class="section-title">One price. Unlimited editing.</h2>
+      <div style="margin-top:1.5rem">
+        <div class="pricing-toggle">
+          <button class="toggle-btn active" id="btnMonthly">Monthly</button>
+          <button class="toggle-btn" id="btnYearly">
+            Yearly <span class="badge-yearly">2 months free</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="pricing-grid">
+
+      <!-- STARTER -->
+      <div class="price-card fade-in">
+        <div class="price-tier">Starter</div>
+        <div class="price-amount"><span data-monthly="29€" data-yearly="24€">29€</span><span>/mo</span></div>
+        <div class="price-desc">For creators just getting started</div>
+        <hr class="price-divider" />
+        <ul class="price-features">
+          <li>10 videos / month</li>
+          <li>AI hook rewriter</li>
+          <li>Auto captions</li>
+          <li>1080p export</li>
+          <li>1 platform publishing</li>
+        </ul>
+        <a href="/app" class="btn btn-dark">Start free trial</a>
+      </div>
+
+      <!-- GROWTH -->
+      <div class="price-card popular fade-in">
+        <div class="popular-badge">Most popular</div>
+        <div class="price-tier">Growth</div>
+        <div class="price-amount"><span data-monthly="79€" data-yearly="66€">79€</span><span>/mo</span></div>
+        <div class="price-desc">For coaches and entrepreneurs scaling content</div>
+        <hr class="price-divider" />
+        <ul class="price-features">
+          <li>Unlimited videos</li>
+          <li>Everything in Starter</li>
+          <li>Template memory</li>
+          <li>Brand kit</li>
+          <li>5 platform publishing</li>
+          <li>Analytics feedback loop</li>
+          <li>Edit preview before render</li>
+          <li>Priority processing</li>
+        </ul>
+        <a href="/app" class="btn btn-salmon">Choose Growth →</a>
+      </div>
+
+      <!-- STUDIO -->
+      <div class="price-card fade-in">
+        <div class="price-tier">Studio</div>
+        <div class="price-amount"><span style="font-size:1.6rem;letter-spacing:-.01em">Custom</span></div>
+        <div class="price-desc">For agencies and content teams</div>
+        <hr class="price-divider" />
+        <ul class="price-features">
+          <li>Everything in Growth</li>
+          <li>Multi-user workspace</li>
+          <li>Batch processing (10+ videos)</li>
+          <li>API access</li>
+          <li>Dedicated support</li>
+          <li>Custom brand setup</li>
+        </ul>
+        <a href="mailto:hello@leanretention.com" class="btn btn-dark">Contact us</a>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ── FINAL CTA ───────────────────────────────────────────────────────── -->
+  <section class="final-cta">
+    <div class="final-cta-glow" aria-hidden="true"></div>
+    <div class="final-cta-inner fade-in">
+      <h2>Stop spending hours editing.<br>Start posting content that converts.</h2>
+      <a href="/app" class="btn btn-salmon btn-lg">Edit my first video free →</a>
+      <p class="small">No credit card required · First video free · Cancel anytime</p>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ──────────────────────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <a class="logo" href="/" style="margin-bottom:.75rem;display:inline-flex">
+          <span class="logo-mark">L</span>
+          <span class="logo-name" style="margin-left:.6rem">LeanRetention</span>
+        </a>
+        <p>AI video editing for creators who mean business.</p>
+        <div class="footer-socials" style="margin-top:1rem">
+          <a href="#" class="social-icon" aria-label="TikTok">T</a>
+          <a href="#" class="social-icon" aria-label="YouTube">▶</a>
+          <a href="#" class="social-icon" aria-label="LinkedIn">in</a>
+          <a href="#" class="social-icon" aria-label="Twitter/X">𝕏</a>
+        </div>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#pricing">Pricing</a></li>
+          <li><a href="#">Templates</a></li>
+          <li><a href="#">Changelog</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Academy</a></li>
+          <li><a href="#">Case studies</a></li>
+          <li><a href="#">API docs</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="#">About</a></li>
+          <li><a href="mailto:hello@leanretention.com">Contact</a></li>
+          <li><a href="#">Careers</a></li>
+          <li><a href="#">Press</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 LeanRetention · Paris</span>
+      <div style="display:flex;gap:1.25rem">
+        <a href="#">Mentions légales</a>
+        <a href="#">CGU</a>
+        <a href="#">Privacy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ── Nav scroll effect ──────────────────────────────────────────────────
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      nav.classList.toggle('scrolled', window.scrollY > 20);
+    }, { passive: true });
+
+    // ── Fade-in on scroll ──────────────────────────────────────────────────
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.12 });
+
+    document.querySelectorAll('.fade-in').forEach((el, i) => {
+      // Stagger siblings inside the same grid parent.
+      const parent = el.parentElement;
+      const siblings = [...parent.querySelectorAll(':scope > .fade-in')];
+      const idx = siblings.indexOf(el);
+      if (idx > 0) el.style.transitionDelay = `${idx * 0.08}s`;
+      observer.observe(el);
+    });
+
+    // ── Pricing toggle ─────────────────────────────────────────────────────
+    const btnMonthly = document.getElementById('btnMonthly');
+    const btnYearly  = document.getElementById('btnYearly');
+    const priceSpans = document.querySelectorAll('[data-monthly]');
+
+    function setPricing(mode) {
+      btnMonthly.classList.toggle('active', mode === 'monthly');
+      btnYearly.classList.toggle('active',  mode === 'yearly');
+      priceSpans.forEach(el => {
+        el.textContent = mode === 'yearly' ? el.dataset.yearly : el.dataset.monthly;
+      });
+    }
+
+    btnMonthly.addEventListener('click', () => setPricing('monthly'));
+    btnYearly.addEventListener('click',  () => setPricing('yearly'));
+  </script>
+</body>
+</html>

@@ -1,5 +1,181 @@
 const $ = (id) => document.getElementById(id);
 
+// ── Brand panel ────────────────────────────────────────────────────────────
+(async () => {
+  try {
+    const res = await fetch("/api/brand", { credentials: "same-origin" });
+    if (res.ok) {
+      const b = await res.json();
+      if ($("brandName"))      $("brandName").value      = b.name || "";
+      if ($("brandPrimary"))   $("brandPrimary").value   = b.colors?.primary    || "#FF7751";
+      if ($("brandSecondary")) $("brandSecondary").value = b.colors?.secondary  || "#FFFFFF";
+      if ($("brandBg"))        $("brandBg").value        = b.colors?.background || "#0A0A0A";
+      if ($("brandWatermark")) $("brandWatermark").value = b.watermark?.text    || "";
+      if ($("brandLtName"))    $("brandLtName").value    = b.lower_third?.name_text  || "";
+      if ($("brandLtTitle"))   $("brandLtTitle").value   = b.lower_third?.title_text || "";
+    }
+  } catch {}
+})();
+
+$("brandBtn")?.addEventListener("click", () => {
+  $("brandPanel")?.classList.add("open");
+});
+$("brandClose")?.addEventListener("click", () => {
+  $("brandPanel")?.classList.remove("open");
+});
+
+$("saveBrandBtn")?.addEventListener("click", async () => {
+  const brand = {
+    name: $("brandName")?.value || "",
+    colors: {
+      primary:    $("brandPrimary")?.value   || "#FF7751",
+      secondary:  $("brandSecondary")?.value || "#FFFFFF",
+      background: $("brandBg")?.value        || "#0A0A0A",
+      accent:     $("brandPrimary")?.value   || "#FF7751",
+    },
+    watermark: { text: $("brandWatermark")?.value || "" },
+    lower_third: {
+      name_text:  $("brandLtName")?.value  || "",
+      title_text: $("brandLtTitle")?.value || "",
+      show_on_first_appearance: true,
+      accent_color: $("brandPrimary")?.value || "#FF7751",
+    },
+  };
+  await fetch("/api/brand", {
+    method: "PUT", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(brand),
+  });
+
+  // Upload intro/outro if selected.
+  const intro = $("brandIntro")?.files?.[0];
+  if (intro) {
+    const fd = new FormData(); fd.append("intro", intro);
+    await fetch("/api/brand/intro", { method: "POST", body: fd, credentials: "same-origin" });
+  }
+  const outro = $("brandOutro")?.files?.[0];
+  if (outro) {
+    const fd = new FormData(); fd.append("outro", outro);
+    await fetch("/api/brand/outro", { method: "POST", body: fd, credentials: "same-origin" });
+  }
+
+  const msg = $("brandSaveMsg");
+  if (msg) { msg.style.display = "block"; setTimeout(() => { msg.style.display = "none"; }, 2500); }
+});
+
+// ── Template selector ──────────────────────────────────────────────────────
+(async () => {
+  try {
+    const res = await fetch("/api/templates", { credentials: "same-origin" });
+    if (!res.ok) return;
+    const templates = await res.json();
+    const sel = $("templateSelect");
+    if (!sel) return;
+    templates.forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t.id;
+      opt.textContent = t.name;
+      opt.dataset.style = JSON.stringify(t.style_summary || {});
+      sel.appendChild(opt);
+    });
+  } catch {}
+})();
+
+$("templateSelect")?.addEventListener("change", () => {
+  const sel = $("templateSelect");
+  const chips = $("templateChips");
+  if (!sel || !chips) return;
+  const opt = sel.selectedOptions[0];
+  if (!opt || !opt.value) { chips.innerHTML = ""; return; }
+  try {
+    const s = JSON.parse(opt.dataset.style || "{}");
+    chips.innerHTML = [
+      s.pacing         ? `<span class="chip accent">${s.pacing} pacing</span>` : "",
+      s.zoom_intensity ? `<span class="chip">${s.zoom_intensity} zoom</span>`  : "",
+      s.caption_style  ? `<span class="chip">${s.caption_style} captions</span>` : "",
+      s.energy_level   ? `<span class="chip">${s.energy_level} energy</span>`   : "",
+      s.cuts_per_minute ? `<span class="chip">${Math.round(s.cuts_per_minute)} cuts/min</span>` : "",
+    ].join("");
+  } catch { chips.innerHTML = ""; }
+});
+
+$("uploadTemplateBtn")?.addEventListener("click", async () => {
+  const name = prompt("Template name (e.g. 'Hormozi Style'):");
+  if (!name) return;
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = "video/*";
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append("name", name);
+    fd.append("video", file);
+    const res = await fetch("/api/templates/analyze", { method: "POST", body: fd, credentials: "same-origin" });
+    if (res.ok) {
+      const t = await res.json();
+      const sel = $("templateSelect");
+      if (sel) {
+        const opt = document.createElement("option");
+        opt.value = t.template_id; opt.textContent = t.name;
+        opt.dataset.style = JSON.stringify(t.style_summary || {});
+        sel.appendChild(opt);
+        sel.value = t.template_id;
+        sel.dispatchEvent(new Event("change"));
+      }
+    }
+  };
+  input.click();
+});
+
+// ── Analytics panel ────────────────────────────────────────────────────────
+$("analyticsLink")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  const panel = $("analyticsPanel");
+  if (!panel) return;
+  const visible = panel.classList.toggle("visible");
+  if (visible) loadAnalytics();
+});
+
+async function loadAnalytics() {
+  try {
+    const [overviewRes, insightsRes] = await Promise.all([
+      fetch("/api/analytics/overview", { credentials: "same-origin" }),
+      fetch("/api/analytics/insights", { credentials: "same-origin" }),
+    ]);
+    if (overviewRes.ok) {
+      const o = await overviewRes.json();
+      if ($("aTotal"))    $("aTotal").textContent    = o.total_videos || 0;
+      if ($("aAvgScore")) $("aAvgScore").textContent = o.avg_score    || "—";
+    }
+    if (insightsRes.ok) {
+      const ins = await insightsRes.json();
+      const list = $("insightsList");
+      if (list) {
+        const items = ins.top_insights || [];
+        list.innerHTML = items.length
+          ? items.map(i => `
+              <div class="insight-row">
+                <div class="insight-text">${i.insight}</div>
+                <div class="insight-action">${i.action}</div>
+                <div class="conf-bar"><div class="conf-fill" style="width:${Math.round((i.confidence||0)*100)}%"></div></div>
+              </div>`).join("")
+          : "<p style='color:var(--muted);font-size:.8rem'>No insights yet — publish videos and connect analytics.</p>";
+      }
+    }
+  } catch {}
+}
+
+$("collectBtn")?.addEventListener("click", async () => {
+  $("collectBtn").textContent = "Collecting…";
+  $("collectBtn").disabled = true;
+  try {
+    await fetch("/api/analytics/collect", { method: "POST", credentials: "same-origin" });
+    await loadAnalytics();
+  } catch {}
+  $("collectBtn").textContent = "Refresh data";
+  $("collectBtn").disabled = false;
+});
+
 const loginCard = $("login");
 const appCard = $("tool");
 const loginForm = $("loginForm");
@@ -23,6 +199,7 @@ const statusPip = $("statusPip");
 const barFill = $("barFill");
 
 const resultCard = $("resultCard");
+const previewCard = $("previewCard");
 const player = $("player");
 const downloadLink = $("downloadLink");
 const pkgTitle = $("pkgTitle");
@@ -268,6 +445,7 @@ async function poll(jobId) {
     const job = await res.json();
     setStatus(job.status, job.message || "", job.progress || 0);
     if (job.status === "done") return showResult(jobId, job.result);
+    if (job.status === "ready_for_review") return showPreview(jobId, job.preview);
     if (job.status === "error") return fail(job.error || "Unknown error", jobId);
   }
 }
@@ -276,15 +454,17 @@ const STATUS_LABELS = {
   queued: "Queued",
   transcribing: "Transcribing",
   planning: "Planning the edit",
+  ready_for_review: "Review plan",
   rendering: "Rendering",
   done: "Done",
   error: "Error",
 };
 const STATUS_PIPS = {
-  queued: "1/4",
-  transcribing: "2/4",
-  planning: "3/4",
-  rendering: "4/4",
+  queued: "1/5",
+  transcribing: "2/5",
+  planning: "3/5",
+  ready_for_review: "4/5",
+  rendering: "4/5",
   done: "✓",
   error: "✗",
 };
@@ -350,6 +530,7 @@ $("retryBtn")?.addEventListener("click", async () => {
 function showResult(jobId, result) {
   submitBtn.disabled = false;
   submitBtn.querySelector(".btn-label").textContent = "Edit another";
+  previewCard?.classList.add("hidden");
   resultCard.classList.remove("hidden");
   resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
   player.src = `/api/download/${jobId}`;
@@ -369,4 +550,220 @@ function showResult(jobId, result) {
   }
 
   planJson.textContent = JSON.stringify(result?.plan ?? {}, null, 2);
+
+  // Load platform connections and setup publish section.
+  _currentJobId = jobId;
+  await loadPublishConnections();
 }
+
+let _currentJobId = null;
+let _selectedPlatforms = new Set();
+
+async function loadPublishConnections() {
+  try {
+    const res = await fetch("/api/publish/connections", { credentials: "same-origin" });
+    if (!res.ok) return;
+    const connections = await res.json();
+    connections.forEach(c => {
+      const dot = $(`dot-${c.platform}`);
+      const btn = document.querySelector(`[data-platform="${c.platform}"]`);
+      if (dot) dot.classList.toggle("connected", c.connected);
+      if (btn) btn.classList.toggle("connected", c.connected);
+    });
+  } catch {}
+}
+
+document.querySelectorAll(".platform-btn").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const platform = btn.dataset.platform;
+    const dot = $(`dot-${platform}`);
+    const isConnected = dot?.classList.contains("connected");
+
+    if (!isConnected) {
+      // Initiate OAuth flow.
+      const res = await fetch(`/api/publish/connect/${platform}`, {
+        method: "POST", credentials: "same-origin",
+      });
+      if (res.ok) {
+        const { auth_url } = await res.json();
+        window.open(auth_url, "_blank", "width=600,height=700");
+        setTimeout(loadPublishConnections, 5000);
+      }
+      return;
+    }
+
+    // Toggle selection.
+    btn.classList.toggle("selected");
+    if (btn.classList.contains("selected")) {
+      _selectedPlatforms.add(platform);
+    } else {
+      _selectedPlatforms.delete(platform);
+    }
+
+    // Enable publish button if any platform selected.
+    const publishBtn = $("publishNowBtn");
+    if (publishBtn) {
+      publishBtn.disabled = _selectedPlatforms.size === 0;
+      publishBtn.textContent = _selectedPlatforms.size > 0
+        ? `Publish to ${_selectedPlatforms.size} platform${_selectedPlatforms.size > 1 ? "s" : ""} →`
+        : "Publish to selected →";
+    }
+
+    // Load metadata preview.
+    if (_selectedPlatforms.size > 0 && _currentJobId) {
+      try {
+        const mRes = await fetch(`/api/publish/metadata/${_currentJobId}`, {
+          method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ platforms: [..._selectedPlatforms] }),
+        });
+        if (mRes.ok) {
+          const meta = await mRes.json();
+          const first = Object.values(meta)[0];
+          if (first && $("publishTitle")) {
+            $("publishTitle").value = first.title || "";
+            $("publishMetaPreview").style.display = "block";
+          }
+        }
+      } catch {}
+    } else {
+      const preview = $("publishMetaPreview");
+      if (preview) preview.style.display = "none";
+    }
+  });
+});
+
+$("publishNowBtn")?.addEventListener("click", async () => {
+  if (!_currentJobId || _selectedPlatforms.size === 0) return;
+  const btn = $("publishNowBtn");
+  btn.disabled = true;
+  btn.textContent = "Publishing…";
+  const statusEl = $("publishStatus");
+  if (statusEl) statusEl.textContent = "";
+
+  try {
+    const res = await fetch(`/api/publish/${_currentJobId}`, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ platforms: [..._selectedPlatforms], privacy: "public" }),
+    });
+    const data = await res.json();
+    const results = data.results || [];
+    const msgs = results.map(r =>
+      r.status === "success"
+        ? `✓ ${r.platform}${r.url ? ` — <a href="${r.url}" target="_blank">view</a>` : ""}`
+        : `✗ ${r.platform}: ${r.error || "failed"}`
+    ).join(" · ");
+    if (statusEl) statusEl.innerHTML = msgs;
+  } catch (err) {
+    if (statusEl) statusEl.textContent = `Publish error: ${err.message}`;
+  }
+
+  btn.disabled = false;
+  btn.textContent = `Publish to ${_selectedPlatforms.size} platform${_selectedPlatforms.size > 1 ? "s" : ""} →`;
+});
+
+// ── CONTENT BRIEF TOGGLE ──────────────────────────────────────────────────────
+const briefToggle = $("briefToggle");
+const briefBody   = $("briefBody");
+const briefArrow  = $("briefArrow");
+
+briefToggle?.addEventListener("click", () => {
+  const open = briefBody.classList.toggle("open");
+  briefArrow.textContent = open ? "↑" : "↓";
+  briefToggle.setAttribute("aria-expanded", String(open));
+});
+briefToggle?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); briefToggle.click(); }
+});
+
+// ── PREVIEW PANEL (ready_for_review) ─────────────────────────────────────────
+let _reviewJobId = null;
+
+function showPreview(jobId, preview) {
+  _reviewJobId = jobId;
+  submitBtn.disabled = false;
+  submitBtn.querySelector(".btn-label").textContent = "Edit another";
+  statusCard.classList.add("hidden");
+
+  if (!previewCard || !preview) return;
+  previewCard.classList.remove("hidden");
+  previewCard.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Hook rewrite.
+  const hook = preview.hook_rewrite;
+  const hookConf = preview.hook_confidence || 0;
+  if (hook && hookConf >= 0.7) {
+    $("hookText").textContent = hook;
+    $("hookRewrite")?.classList.remove("hidden");
+  } else {
+    $("hookRewrite")?.classList.add("hidden");
+  }
+
+  // Stats.
+  const fmt = (s) => s >= 60 ? `${Math.round(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`;
+  if ($("prevOrigDur")) $("prevOrigDur").textContent = fmt(preview.total_duration_original || 0);
+  if ($("prevEditDur")) $("prevEditDur").textContent = fmt(preview.total_duration_edited || 0);
+  if ($("prevSegments")) $("prevSegments").textContent = preview.segments_kept || 0;
+
+  // Metadata chips.
+  if ($("prevContentType")) $("prevContentType").textContent = preview.content_type ? `Type: ${preview.content_type}` : "";
+  if ($("prevSpeakers"))    $("prevSpeakers").textContent    = preview.speakers_detected > 1 ? `${preview.speakers_detected} speakers` : "";
+  if ($("prevGraphics"))    $("prevGraphics").textContent    = preview.graphics_planned ? `${preview.graphics_planned} graphics` : "";
+
+  // Timeline.
+  const tl = $("previewTimeline");
+  if (tl) {
+    const segs = preview.edit_plan || [];
+    tl.innerHTML = segs.slice(0, 20).map((s) =>
+      `<div class="tl-row">
+        <span class="tl-num">${s.order}</span>
+        <span class="tl-role">${s.role || "—"}</span>
+        <span class="tl-time">${s.original_time || ""} → ${s.edit_dur || ""}</span>
+      </div>`
+    ).join("") || "<p style='color:var(--muted);font-size:.8rem'>No segments</p>";
+  }
+
+  if ($("previewJson")) $("previewJson").textContent = JSON.stringify(preview, null, 2);
+}
+
+// Render button — approves the plan and starts Phase 2.
+$("renderBtn")?.addEventListener("click", async () => {
+  if (!_reviewJobId) return;
+  previewCard?.classList.add("hidden");
+  statusCard.classList.remove("hidden");
+  setStatus("rendering", "Sending to renderer…", 70);
+  try {
+    const res = await fetch(`/api/jobs/${_reviewJobId}/approve`, {
+      method: "POST", credentials: "same-origin",
+    });
+    if (!res.ok) return fail(`Render start failed: ${res.status}`);
+    poll(_reviewJobId);
+  } catch (err) {
+    fail(`Render error: ${err.message}`);
+  }
+});
+
+// Re-plan button — puts job back to planning state and re-polls.
+$("replanBtn")?.addEventListener("click", async () => {
+  if (!_reviewJobId) return;
+  const job = await (await fetch(`/api/jobs/${_reviewJobId}`, { credentials: "same-origin" })).json();
+  if (!job.source_path) return fail("No source file — please re-upload.");
+
+  previewCard?.classList.add("hidden");
+  statusCard.classList.remove("hidden");
+  setStatus("queued", "Re-planning with existing file…", 5);
+
+  // Trigger a retry which re-runs the full Phase 1.
+  try {
+    const res = await fetch(`/api/retry/${_reviewJobId}`, {
+      method: "POST", credentials: "same-origin",
+    });
+    if (!res.ok) return fail(`Re-plan failed: ${res.status}`);
+    const { job_id } = await res.json();
+    _reviewJobId = job_id;
+    poll(job_id);
+  } catch (err) {
+    fail(`Re-plan error: ${err.message}`);
+  }
+});

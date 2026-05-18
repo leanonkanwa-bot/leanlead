@@ -200,6 +200,120 @@
       summary { cursor: pointer; font-size: .8rem; color: var(--muted); user-select: none; }
       pre { margin-top: .5rem; font-family: var(--mono); font-size: .7rem; color: var(--muted); overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; }
 
+      /* ── BRIEF ──────────────────────────────────────────── */
+      .brief-toggle {
+        display: flex; align-items: center; justify-content: space-between;
+        cursor: pointer; padding: .6rem 0; font-size: .85rem;
+        font-weight: 600; color: var(--muted); user-select: none;
+        border-top: 1px solid var(--border); margin-top: .75rem;
+        transition: color .15s;
+      }
+      .brief-toggle:hover { color: var(--text); }
+      .brief-toggle .arrow { transition: transform .2s; }
+      .brief-body { display: none; padding-top: .75rem; }
+      .brief-body.open { display: block; }
+
+      input[type="text"], select {
+        width: 100%; padding: .65rem .75rem; border-radius: 8px;
+        background: var(--bg); border: 1px solid var(--border);
+        color: var(--text); font-family: var(--font); font-size: .875rem;
+        transition: border-color .15s; appearance: none;
+      }
+      input[type="text"]:focus, select:focus { outline: none; border-color: var(--salmon); }
+      select { cursor: pointer; }
+
+      /* ── PREVIEW PANEL ───────────────────────────────────── */
+      .preview-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+      .preview-header h2 { font-size: 1.1rem; font-weight: 700; }
+      .preview-actions { display: flex; gap: .6rem; }
+
+      .preview-stat { display: flex; flex-direction: column; }
+      .preview-stat .val { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; }
+      .preview-stat .lbl { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+      .preview-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; margin-bottom: 1.25rem; }
+      .preview-stat-card {
+        background: var(--bg); border: 1px solid var(--border);
+        border-radius: 8px; padding: .7rem .85rem;
+        display: flex; flex-direction: column; gap: .2rem;
+      }
+
+      .preview-timeline { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
+      .tl-row {
+        display: flex; align-items: baseline; gap: .6rem;
+        padding: .5rem .75rem; border-radius: 6px;
+        background: var(--bg); border: 1px solid var(--border);
+        font-size: .8rem;
+      }
+      .tl-num { color: var(--salmon); font-weight: 700; min-width: 1.4rem; }
+      .tl-role { color: var(--muted); flex: 1; }
+      .tl-time { color: var(--muted); font-size: .72rem; font-family: var(--mono); }
+
+      .hook-rewrite {
+        padding: .75rem 1rem; border-radius: 8px;
+        border-left: 3px solid var(--salmon);
+        background: var(--salmon-dim); margin-bottom: 1rem;
+        font-size: .875rem; font-style: italic;
+      }
+
+      /* ── BRAND PANEL (slide-in) ──────────────────────────── */
+      .brand-panel {
+        position: fixed; top: 0; right: -420px; width: 400px; height: 100vh;
+        background: var(--surface); border-left: 1px solid var(--border);
+        z-index: 200; overflow-y: auto; padding: 1.5rem;
+        transition: right .3s ease; box-shadow: -4px 0 24px rgba(0,0,0,.4);
+      }
+      .brand-panel.open { right: 0; }
+      .brand-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+      .brand-panel-head h3 { font-size: 1rem; font-weight: 700; }
+      .brand-close { background: none; border: none; color: var(--muted); font-size: 1.2rem; cursor: pointer; padding: .25rem; }
+      .brand-close:hover { color: var(--text); }
+      .brand-section { margin-bottom: 1.25rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+      .brand-section h4 { font-size: .8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .75rem; }
+      .color-row { display: flex; gap: .6rem; flex-wrap: wrap; }
+      .color-swatch { display: flex; flex-direction: column; gap: .3rem; align-items: center; }
+      .color-swatch label { font-size: .7rem; color: var(--muted); }
+      input[type="color"] { width: 40px; height: 40px; border: none; border-radius: 8px; cursor: pointer; padding: 2px; background: var(--bg); }
+
+      /* ── TEMPLATE SELECTOR ───────────────────────────────── */
+      .template-row { display: flex; align-items: center; gap: .6rem; margin-bottom: 1.25rem; }
+      .template-chips { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .4rem; }
+      .chip {
+        font-size: .72rem; font-weight: 500; padding: .2rem .55rem;
+        border-radius: 99px; border: 1px solid var(--border);
+        color: var(--muted); background: var(--bg);
+      }
+      .chip.accent { border-color: var(--salmon-border); color: var(--salmon); background: var(--salmon-dim); }
+
+      /* ── PUBLISH SECTION ─────────────────────────────────── */
+      .publish-section { margin-top: 1.25rem; }
+      .publish-section h3 { font-size: .9rem; font-weight: 700; margin-bottom: .75rem; }
+      .platform-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-bottom: 1rem; }
+      .platform-btn {
+        display: flex; align-items: center; gap: .5rem; padding: .6rem .85rem;
+        border-radius: 8px; border: 1px solid var(--border); background: var(--bg);
+        font-size: .8rem; font-weight: 500; cursor: pointer; color: var(--muted);
+        transition: border-color .15s, color .15s;
+      }
+      .platform-btn:hover { border-color: rgba(255,255,255,.2); color: var(--text); }
+      .platform-btn.selected { border-color: var(--salmon); color: var(--text); background: var(--salmon-dim); }
+      .platform-btn.connected::after { content: " ✓"; color: var(--salmon); }
+      .platform-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+      .platform-dot.connected { background: #22c55e; }
+
+      /* ── ANALYTICS TAB ───────────────────────────────────── */
+      #analyticsPanel { display: none; }
+      #analyticsPanel.visible { display: block; }
+      .analytics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; margin-bottom: 1.25rem; }
+      .analytics-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: .85rem 1rem; }
+      .analytics-card .big { font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; }
+      .analytics-card .sub { font-size: .75rem; color: var(--muted); margin-top: .1rem; }
+      .insight-row { padding: .65rem .85rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: .4rem; background: var(--bg); }
+      .insight-text { font-size: .825rem; margin-bottom: .3rem; }
+      .insight-action { font-size: .72rem; color: var(--salmon); }
+      .conf-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: .4rem; }
+      .conf-fill { height: 100%; background: var(--salmon); border-radius: 2px; }
+
       /* ── FOOTER ──────────────────────────────────────────── */
       .foot {
         text-align: center; padding: 2rem 1rem;
@@ -228,9 +342,64 @@
       </a>
       <div class="nav-links">
         <a href="#tool">Try it</a>
+        <a href="#" id="analyticsLink">Analytics</a>
+        <button id="brandBtn" class="btn btn-ghost" style="padding:.35rem .7rem;font-size:.8rem" title="Brand Kit">⚙ Brand</button>
         <a href="https://github.com/leanonkanwa-bot/leanlead" target="_blank" rel="noopener">GitHub ↗</a>
       </div>
     </nav>
+
+    <!-- BRAND PANEL -->
+    <aside class="brand-panel" id="brandPanel" aria-label="Brand Kit">
+      <div class="brand-panel-head">
+        <h3>Brand Kit</h3>
+        <button class="brand-close" id="brandClose" aria-label="Close">✕</button>
+      </div>
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:1rem">Set once. Applied to every video automatically.</p>
+
+      <div class="field">
+        <span>Brand name</span>
+        <input type="text" id="brandName" placeholder="e.g. Riche Avec Dieu" />
+      </div>
+
+      <div class="brand-section">
+        <h4>Colors</h4>
+        <div class="color-row">
+          <div class="color-swatch"><input type="color" id="brandPrimary" value="#FF7751" /><label>Primary</label></div>
+          <div class="color-swatch"><input type="color" id="brandSecondary" value="#FFFFFF" /><label>Secondary</label></div>
+          <div class="color-swatch"><input type="color" id="brandBg" value="#0A0A0A" /><label>Background</label></div>
+        </div>
+      </div>
+
+      <div class="brand-section">
+        <h4>Watermark</h4>
+        <div class="field"><span>Handle / text</span>
+          <input type="text" id="brandWatermark" placeholder="@yourhandle" />
+        </div>
+      </div>
+
+      <div class="brand-section">
+        <h4>Lower Third</h4>
+        <div class="field"><span>Name</span>
+          <input type="text" id="brandLtName" placeholder="Your Name" />
+        </div>
+        <div class="field"><span>Title</span>
+          <input type="text" id="brandLtTitle" placeholder="Your Title / Channel" />
+        </div>
+      </div>
+
+      <div class="brand-section">
+        <h4>Intro &amp; Outro</h4>
+        <div class="field"><span>Intro video (max 10s)</span>
+          <input type="file" id="brandIntro" accept="video/*" style="color:var(--muted);font-size:.8rem" />
+        </div>
+        <div class="field"><span>Outro video (max 10s)</span>
+          <input type="file" id="brandOutro" accept="video/*" style="color:var(--muted);font-size:.8rem" />
+        </div>
+      </div>
+
+      <button id="saveBrandBtn" class="btn btn-primary" style="width:100%;margin-top:.5rem">Save Brand Kit</button>
+      <p id="brandSaveMsg" style="font-size:.8rem;color:var(--salmon);margin-top:.5rem;display:none">Saved ✓</p>
+    </aside>
 
     <main>
 
@@ -285,6 +454,18 @@
             <input id="video" name="video" type="file" accept="video/*" required />
           </label>
 
+          <!-- Template selector (Feature 1) -->
+          <div class="field" id="templateField">
+            <span>Style template <em style="font-weight:400;color:var(--muted)">(optional)</em></span>
+            <div class="template-row">
+              <select id="templateSelect" name="template_id" style="flex:1">
+                <option value="">No template — AI decides</option>
+              </select>
+              <button type="button" id="uploadTemplateBtn" class="btn btn-ghost" style="white-space:nowrap;font-size:.8rem">+ Upload reference</button>
+            </div>
+            <div class="template-chips" id="templateChips"></div>
+          </div>
+
           <div class="field">
             <span>Format</span>
             <div class="seg" role="tablist">
@@ -304,6 +485,59 @@
               rows="3"
               placeholder="e.g. Hook must start with the money moment. Cut everything after the 3-minute mark."
             ></textarea>
+          </div>
+
+          <!-- Content Brief (collapsible, Feature 6) -->
+          <div class="brief-toggle" id="briefToggle" role="button" tabindex="0" aria-expanded="false">
+            <span>Customize brief</span>
+            <span class="arrow" id="briefArrow">↓</span>
+          </div>
+          <div class="brief-body" id="briefBody">
+            <div class="field">
+              <span>Target audience</span>
+              <input type="text" name="target_audience" placeholder="e.g. entrepreneurs aged 25–40 trying to grow on social media" />
+            </div>
+            <div class="field">
+              <span>Core message</span>
+              <input type="text" name="main_message" placeholder="e.g. You don't need more content — you need better editing" />
+            </div>
+            <div class="field">
+              <span>Desired emotion</span>
+              <select name="desired_emotion">
+                <option value="">— choose —</option>
+                <option value="inspired">Inspired</option>
+                <option value="educated">Educated</option>
+                <option value="motivated">Motivated</option>
+                <option value="challenged">Challenged</option>
+                <option value="curious">Curious</option>
+              </select>
+            </div>
+            <div class="field">
+              <span>Platform</span>
+              <div class="seg" role="tablist">
+                <input type="radio" name="platform" id="plt-auto" value="" checked />
+                <label for="plt-auto">Auto</label>
+                <input type="radio" name="platform" id="plt-shorts" value="YouTube Shorts" />
+                <label for="plt-shorts">Shorts</label>
+                <input type="radio" name="platform" id="plt-reels" value="Reels" />
+                <label for="plt-reels">Reels</label>
+                <input type="radio" name="platform" id="plt-yt" value="YouTube" />
+                <label for="plt-yt">YouTube</label>
+              </div>
+            </div>
+            <div class="field">
+              <span>Content type</span>
+              <div class="seg" role="tablist">
+                <input type="radio" name="content_type_hint" id="ct-auto" value="" checked />
+                <label for="ct-auto">Auto</label>
+                <input type="radio" name="content_type_hint" id="ct-coaching" value="coaching" />
+                <label for="ct-coaching">Coaching</label>
+                <input type="radio" name="content_type_hint" id="ct-edu" value="education" />
+                <label for="ct-edu">Education</label>
+                <input type="radio" name="content_type_hint" id="ct-story" value="story" />
+                <label for="ct-story">Story</label>
+              </div>
+            </div>
           </div>
 
           <button type="submit" class="btn btn-primary btn-lg" id="submit">
@@ -327,6 +561,50 @@
           <p class="muted" style="margin-bottom:.5rem">Your video is still on the server — no need to re-upload.</p>
           <button id="retryBtn" class="btn btn-primary">Retry job</button>
         </div>
+      </section>
+
+      <!-- PREVIEW (ready_for_review) -->
+      <section class="card hidden" id="previewCard">
+        <div class="preview-header">
+          <h2>Review edit plan</h2>
+          <div class="preview-actions">
+            <button id="replanBtn" class="btn btn-ghost">Re-plan</button>
+            <button id="renderBtn" class="btn btn-primary">Render video →</button>
+          </div>
+        </div>
+
+        <div id="hookRewrite" class="hook-rewrite hidden">
+          <span class="tag" style="margin-bottom:.3rem">Rewritten hook</span>
+          <p id="hookText"></p>
+        </div>
+
+        <div class="preview-stats">
+          <div class="preview-stat-card">
+            <span class="val" id="prevOrigDur">—</span>
+            <span class="lbl">Original</span>
+          </div>
+          <div class="preview-stat-card">
+            <span class="val" id="prevEditDur">—</span>
+            <span class="lbl">After edit</span>
+          </div>
+          <div class="preview-stat-card">
+            <span class="val" id="prevSegments">—</span>
+            <span class="lbl">Segments kept</span>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:.75rem;margin-bottom:1rem;font-size:.8rem;color:var(--muted)">
+          <span id="prevContentType"></span>
+          <span id="prevSpeakers"></span>
+          <span id="prevGraphics"></span>
+        </div>
+
+        <div class="preview-timeline" id="previewTimeline"></div>
+
+        <details style="margin-top:.5rem">
+          <summary>Raw plan JSON</summary>
+          <pre id="previewJson"></pre>
+        </details>
       </section>
 
       <!-- RESULT -->
@@ -358,6 +636,50 @@
           <summary>Edit plan (raw JSON)</summary>
           <pre id="planJson"></pre>
         </details>
+
+        <!-- Publish section (Feature 3) -->
+        <div class="publish-section" id="publishSection">
+          <h3>Publish</h3>
+          <div class="platform-grid" id="platformGrid">
+            <button type="button" class="platform-btn" data-platform="youtube">
+              <span class="platform-dot" id="dot-youtube"></span> YouTube
+            </button>
+            <button type="button" class="platform-btn" data-platform="tiktok">
+              <span class="platform-dot" id="dot-tiktok"></span> TikTok
+            </button>
+            <button type="button" class="platform-btn" data-platform="instagram">
+              <span class="platform-dot" id="dot-instagram"></span> Instagram
+            </button>
+            <button type="button" class="platform-btn" data-platform="linkedin">
+              <span class="platform-dot" id="dot-linkedin"></span> LinkedIn
+            </button>
+          </div>
+          <div id="publishMetaPreview" style="display:none;margin-bottom:1rem">
+            <div class="field"><span>Title / Caption</span>
+              <input type="text" id="publishTitle" placeholder="Auto-generated…" />
+            </div>
+          </div>
+          <div style="display:flex;gap:.6rem;align-items:center">
+            <button type="button" id="publishNowBtn" class="btn btn-primary" style="flex:1" disabled>
+              Publish to selected →
+            </button>
+          </div>
+          <p id="publishStatus" style="font-size:.8rem;color:var(--muted);margin-top:.5rem"></p>
+        </div>
+      </section>
+
+      <!-- ANALYTICS PANEL (Feature 4) -->
+      <section class="card" id="analyticsPanel">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem">
+          <h2 style="font-size:1.1rem;font-weight:700">Analytics</h2>
+          <button type="button" id="collectBtn" class="btn btn-ghost" style="font-size:.8rem">Refresh data</button>
+        </div>
+        <div class="analytics-grid">
+          <div class="analytics-card"><div class="big" id="aTotal">—</div><div class="sub">Videos edited</div></div>
+          <div class="analytics-card"><div class="big" id="aAvgScore">—</div><div class="sub">Avg score / 10</div></div>
+        </div>
+        <div id="insightsList" style="margin-bottom:1rem"></div>
+        <div id="videoTable" style="overflow-x:auto"></div>
       </section>
 
     </main>
@@ -367,6 +689,6 @@
       <a href="https://github.com/leanonkanwa-bot/leanlead" target="_blank" rel="noopener">View source ↗</a>
     </footer>
 
-    <script src="./app.js"></script>
+    <script src="/static/app.js"></script>
   </body>
 </html>

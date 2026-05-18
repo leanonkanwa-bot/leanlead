@@ -22,8 +22,12 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api.jobs import store
-from app.api.pipeline import run_job
+from app.api.pipeline import run_job, run_render_phase
 from app.api.upload import assembled_path, router as upload_router
+from app.api.templates import router as templates_router
+from app.api.brand import router as brand_router
+from app.api.publish import router as publish_router
+from app.api.analytics import router as analytics_router
 from app.core.config import settings
 
 
@@ -37,6 +41,10 @@ app.add_middleware(
 )
 
 app.include_router(upload_router)
+app.include_router(templates_router)
+app.include_router(brand_router)
+app.include_router(publish_router)
+app.include_router(analytics_router)
 
 AUTH_COOKIE = "lle_token"
 
@@ -111,6 +119,14 @@ async def submit_edit(
     caption_style: Literal["impact", "kinetic"] = Form("impact"),
     brand_color: str = Form(""),
     theme: str = Form("dark-pro"),
+    # Content brief fields (Feature 6)
+    target_audience: str = Form(""),
+    main_message: str = Form(""),
+    desired_emotion: str = Form(""),
+    platform: str = Form(""),
+    content_type_hint: str = Form(""),
+    # Template Memory (Feature 1)
+    template_id: str = Form(""),
     _: None = Depends(_check_auth),
 ) -> JSONResponse:
     if not settings.anthropic_api_key:
@@ -144,6 +160,12 @@ async def submit_edit(
         caption_style=caption_style,
         brand_color=brand_color or None,
         aesthetic=theme,
+        target_audience=target_audience,
+        main_message=main_message,
+        desired_emotion=desired_emotion,
+        platform=platform,
+        content_type_hint=content_type_hint,
+        template_id=template_id,
     )
     store.update(job.id, source_path=str(dest), params=run_params)
 
@@ -184,6 +206,42 @@ async def retry_job(
     return JSONResponse({"job_id": new_job.id})
 
 
+@app.get("/api/jobs/{job_id}/plan")
+def get_plan(job_id: str, request: Request, _: None = Depends(_check_auth)) -> dict:
+    """Return the edit plan preview for a job that is in ready_for_review status."""
+    job = store.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if job.status != "ready_for_review":
+        raise HTTPException(400, f"Job is not ready for review (status: {job.status})")
+    return {"plan_preview": job.preview or {}, "plan_data": job.plan_data or {}}
+
+
+@app.post("/api/jobs/{job_id}/approve")
+async def approve_job(
+    job_id: str,
+    background: BackgroundTasks,
+    request: Request,
+    _: None = Depends(_check_auth),
+) -> JSONResponse:
+    """Approve an edit plan and trigger the render phase (Phase 2)."""
+    job = store.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if job.status != "ready_for_review":
+        raise HTTPException(400, f"Job is not in ready_for_review state (status: {job.status})")
+    if not job.source_path:
+        raise HTTPException(400, "No source file stored for this job")
+    src = Path(job.source_path)
+    if not src.exists():
+        raise HTTPException(400, "Source video is no longer on disk — please re-upload")
+
+    store.update(job_id, status="rendering", progress=70,
+                 message="Approved — starting render…")
+    background.add_task(run_render_phase, job_id, src)
+    return JSONResponse({"job_id": job_id, "status": "rendering"})
+
+
 @app.get("/api/download/{job_id}")
 def download(job_id: str, request: Request, _: None = Depends(_check_auth)):
     out = settings.outputs_dir / f"{job_id}.mp4"
@@ -194,4 +252,12 @@ def download(job_id: str, request: Request, _: None = Depends(_check_auth)):
 
 frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
 if frontend_dir.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+    @app.get("/", include_in_schema=False)
+    def landing():
+        return FileResponse(str(frontend_dir / "landing.html"))
+
+    @app.get("/app", include_in_schema=False)
+    def app_page():
+        return FileResponse(str(frontend_dir / "index.html"))
+
+    app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="frontend")
