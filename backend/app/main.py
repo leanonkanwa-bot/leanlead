@@ -252,4 +252,12 @@ def download(job_id: str, request: Request, _: None = Depends(_check_auth)):
 
 frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
 if frontend_dir.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")
+    @app.get("/", include_in_schema=False)
+    def landing():
+        return FileResponse(str(frontend_dir / "landing.html"))
+
+    @app.get("/app", include_in_schema=False)
+    def app_page():
+        return FileResponse(str(frontend_dir / "index.html"))
+
+    app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="frontend")
