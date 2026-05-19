@@ -114,19 +114,19 @@ class BrollSpec:
         filters = [
             # Dark card background.
             f"drawbox=x={cx}:y={cy}:w={cw}:h={ch}:"
-            f"color=0x0A0A0A@0.92:t=fill:enable='{enable}'",
+            f"color=0x0A0A0A@0.92:t=fill:enable={enable}",
             # Salmon accent bar on left edge.
             f"drawbox=x={cx}:y={cy}:w=4:h={ch}:"
-            f"color=0xFF7751@1.0:t=fill:enable='{enable}'",
+            f"color=0xFF7751@1.0:t=fill:enable={enable}",
             # Number (large).
-            f"drawtext=text='{_esc(number)}':"
+            f"drawtext=text={_esc(number)}:"
             f"fontsize={fs_num}:fontcolor=white:fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            f"x={cx + 16}:y={cy + 8}:enable='{enable}'",
+            f"x={cx + 16}:y={cy + 8}:enable={enable}",
             # Label (smaller, muted).
-            f"drawtext=text='{_esc(label)}':"
+            f"drawtext=text={_esc(label)}:"
             f"fontsize={fs_lbl}:fontcolor=0xFFFFFF@0.7:"
             f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
-            f"x={cx + 16}:y={cy + fs_num + 14}:enable='{enable}'",
+            f"x={cx + 16}:y={cy + fs_num + 14}:enable={enable}",
         ]
         return ",".join(filters)
 
@@ -136,21 +136,21 @@ class BrollSpec:
         fs       = max(18, min(36, h // 18))
         filters = [
             f"drawbox=x={cx}:y={cy}:w={cw}:h={ch}:"
-            f"color=0x0A0A0A@0.90:t=fill:enable='{enable}'",
+            f"color=0x0A0A0A@0.90:t=fill:enable={enable}",
             # Salmon circle indicator.
             f"drawbox=x={cx + 8}:y={cy + (ch - 36) // 2}:w=36:h=36:"
-            f"color=0xFF7751@1.0:t=fill:enable='{enable}'",
+            f"color=0xFF7751@1.0:t=fill:enable={enable}",
             # Step number inside circle.
-            f"drawtext=text='{_esc(step_num)}':"
+            f"drawtext=text={_esc(step_num)}:"
             f"fontsize={max(16,fs - 4)}:fontcolor=white:"
             f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
             f"x={cx + 8 + 18 - (len(step_num) * 5)}:y={cy + (ch - 36) // 2 + 8}:"
-            f"enable='{enable}'",
+            f"enable={enable}",
             # Step text.
-            f"drawtext=text='{_esc(text)}':"
+            f"drawtext=text={_esc(text)}:"
             f"fontsize={fs}:fontcolor=white:"
             f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            f"x={cx + 56}:y={cy + (ch - fs) // 2}:enable='{enable}'",
+            f"x={cx + 56}:y={cy + (ch - fs) // 2}:enable={enable}",
         ]
         return ",".join(filters)
 
@@ -163,18 +163,18 @@ class BrollSpec:
         filters = [
             # Red half (left).
             f"drawbox=x=0:y={cy}:w={w // 2}:h={bar_h}:"
-            f"color=0xcc2222@0.85:t=fill:enable='{enable}'",
+            f"color=0xcc2222@0.85:t=fill:enable={enable}",
             # Green half (right).
             f"drawbox=x={w // 2}:y={cy}:w={w // 2}:h={bar_h}:"
-            f"color=0x22aa44@0.85:t=fill:enable='{enable}'",
-            f"drawtext=text='{_esc(left_label)}':"
+            f"color=0x22aa44@0.85:t=fill:enable={enable}",
+            f"drawtext=text={_esc(left_label)}:"
             f"fontsize={fs}:fontcolor=white:"
             f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            f"x=(w/4 - text_w/2):y={cy + (bar_h - fs) // 2}:enable='{enable}'",
-            f"drawtext=text='{_esc(right_label)}':"
+            f"x=(w/4 - text_w/2):y={cy + (bar_h - fs) // 2}:enable={enable}",
+            f"drawtext=text={_esc(right_label)}:"
             f"fontsize={fs}:fontcolor=white:"
             f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            f"x=(3*w/4 - text_w/2):y={cy + (bar_h - fs) // 2}:enable='{enable}'",
+            f"x=(3*w/4 - text_w/2):y={cy + (bar_h - fs) // 2}:enable={enable}",
         ]
         return ",".join(filters)
 
@@ -187,13 +187,13 @@ class BrollSpec:
         py = max(10, cy - ph // 2)
         filters = [
             f"drawbox=x={px}:y={py}:w={pw}:h={ph}:"
-            f"color=0x1A1A1A@0.95:t=fill:enable='{enable}'",
+            f"color=0x1A1A1A@0.95:t=fill:enable={enable}",
             f"drawbox=x={px + 2}:y={py + 2}:w={pw - 4}:h={ph - 4}:"
-            f"color=0xFF7751@1.0:t=2:enable='{enable}'",
-            f"drawtext=text='{_esc(label)}':"
+            f"color=0xFF7751@1.0:t=2:enable={enable}",
+            f"drawtext=text={_esc(label)}:"
             f"fontsize={fs}:fontcolor=white:"
             f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            f"x={cx + 10}:y={cy + (ch - fs) // 2}:enable='{enable}'",
+            f"x={cx + 10}:y={cy + (ch - fs) // 2}:enable={enable}",
         ]
         return ",".join(filters)
 
@@ -205,27 +205,27 @@ class BrollSpec:
         sw  = cw // max(1, len(steps))
         filters = [
             f"drawbox=x={cx}:y={cy}:w={cw}:h={ch}:"
-            f"color=0x0A0A0A@0.90:t=fill:enable='{enable}'",
+            f"color=0x0A0A0A@0.90:t=fill:enable={enable}",
         ]
         for i, step in enumerate(steps):
             bx = cx + i * sw + 4
             filters.append(
                 f"drawbox=x={bx}:y={cy + 8}:w={sw - 8}:h={ch - 16}:"
-                f"color=0x1A1A1A@0.95:t=fill:enable='{enable}'"
+                f"color=0x1A1A1A@0.95:t=fill:enable={enable}"
             )
             filters.append(
-                f"drawtext=text='{_esc(str(step)[:15])}':"
+                f"drawtext=text={_esc(str(step)[:15])}:"
                 f"fontsize={fs}:fontcolor=white:"
                 f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:"
-                f"x={bx + 6}:y={cy + (ch - fs) // 2}:enable='{enable}'"
+                f"x={bx + 6}:y={cy + (ch - fs) // 2}:enable={enable}"
             )
             if i < len(steps) - 1:
                 ax = bx + sw - 4
                 filters.append(
-                    f"drawtext=text='>':"
+                    f"drawtext=text=>:"
                     f"fontsize={fs}:fontcolor=0xFF7751:"
                     f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                    f"x={ax}:y={cy + (ch - fs) // 2}:enable='{enable}'"
+                    f"x={ax}:y={cy + (ch - fs) // 2}:enable={enable}"
                 )
         return ",".join(filters)
 
@@ -236,20 +236,20 @@ class BrollSpec:
         fs_a = max(12, min(18, h // 36))
         filters = [
             f"drawbox=x={cx}:y={cy}:w={cw}:h={ch}:"
-            f"color=0x0A0A0A@0.92:t=fill:enable='{enable}'",
+            f"color=0x0A0A0A@0.92:t=fill:enable={enable}",
             f"drawbox=x={cx}:y={cy}:w={cw}:h=3:"
-            f"color=0xFF7751@1.0:t=fill:enable='{enable}'",
-            f"drawtext=text='\"{_esc(text)}\"':"
+            f"color=0xFF7751@1.0:t=fill:enable={enable}",
+            f"drawtext=text={_esc(text)}:"
             f"fontsize={fs}:fontcolor=white:"
             f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Oblique.ttf:"
-            f"x={cx + 12}:y={cy + 14}:enable='{enable}'",
+            f"x={cx + 12}:y={cy + 14}:enable={enable}",
         ]
         if author:
             filters.append(
-                f"drawtext=text='— {_esc(author)}':"
+                f"drawtext=text=- {_esc(author)}:"
                 f"fontsize={fs_a}:fontcolor=0xFF7751:"
                 f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-                f"x={cx + 12}:y={cy + ch - fs_a - 10}:enable='{enable}'"
+                f"x={cx + 12}:y={cy + ch - fs_a - 10}:enable={enable}"
             )
         return ",".join(filters)
 

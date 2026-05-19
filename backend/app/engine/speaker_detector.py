@@ -53,17 +53,25 @@ class SpeakerSegment:
         return ",".join([
             # Dark background bar.
             f"drawbox=x={bar_x}:y={bar_y}:w={bar_w}:h={bar_h}:"
-            f"color=0x0A0A0A@0.90:t=fill:enable='{enable}'",
+            f"color=0x0A0A0A@0.90:t=fill:enable={enable}",
             # Salmon accent strip.
             f"drawbox=x={bar_x}:y={bar_y}:w=4:h={bar_h}:"
-            f"color=0xFF7751@1.0:t=fill:enable='{enable}'",
+            f"color=0xFF7751@1.0:t=fill:enable={enable}",
             # Speaker name.
-            f"drawtext=text='{name}':"
+            f"drawtext=text={_esc_spk(name)}:"
             f"fontsize={fs}:fontcolor=white:"
             f"fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            f"x={bar_x + 10}:y={bar_y + (bar_h - fs) // 2}:enable='{enable}'",
+            f"x={bar_x + 10}:y={bar_y + (bar_h - fs) // 2}:enable={enable}",
         ])
 
+
+
+def _esc_spk(text: str) -> str:
+    """Escape text for FFmpeg drawtext (no shell, no single-quote wrapping)."""
+    return (text.replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace(":", "\\:")
+                .replace("%", "\\%"))
 
 class SpeakerDetector:
     """Detects speaker boundaries in a media file."""
