@@ -4,16 +4,14 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /app/backend
 
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend/ ./backend/
-COPY frontend/ ./frontend/
-COPY editor_frontend/ ./editor_frontend/
-
-WORKDIR /app/backend
+COPY backend/ ./
+COPY editor_frontend/ /app/editor_frontend/
+COPY frontend/ /app/frontend/
 
 EXPOSE 8000
 
