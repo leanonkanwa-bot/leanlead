@@ -278,7 +278,7 @@ if not editor_dir.exists():
 if editor_dir.exists():
     @app.get("/", include_in_schema=False)
     def index():
-        return FileResponse(str(editor_dir / "index.html"))
+        return FileResponse(str(editor_dir / "landing.html"))
 
     @app.get("/app", include_in_schema=False)
     def app_page():

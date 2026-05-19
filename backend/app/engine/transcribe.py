@@ -39,22 +39,13 @@ from app.core.config import settings
 #
 # On Linux / macOS we fall back to shutil.which() → bare name.
 # ---------------------------------------------------------------------------
-_WIN_BIN = (
-    r"C:\Users\KANWAGI\Downloads"
-    r"\ffmpeg-master-latest-win64-gpl-shared"
-    r"\ffmpeg-master-latest-win64-gpl-shared"
-    r"\bin"
-)
-
 if sys.platform == "win32":
-    import os as _os
-    if _WIN_BIN not in _os.environ.get("PATH", ""):
-        _os.environ["PATH"] = _WIN_BIN + _os.pathsep + _os.environ.get("PATH", "")
+    _WIN_BIN = r"C:\Users\KANWAGI\Downloads\ffmpeg-master-latest-win64-gpl-shared\ffmpeg-master-latest-win64-gpl-shared\bin"
     FFMPEG_PATH: str = _WIN_BIN + r"\ffmpeg.exe"
     FFPROBE_PATH: str = _WIN_BIN + r"\ffprobe.exe"
 else:
-    FFMPEG_PATH = shutil.which("ffmpeg") or "ffmpeg"
-    FFPROBE_PATH = shutil.which("ffprobe") or "ffprobe"
+    FFMPEG_PATH: str = shutil.which("ffmpeg") or "ffmpeg"
+    FFPROBE_PATH: str = shutil.which("ffprobe") or "ffprobe"
 
 
 _model = None
