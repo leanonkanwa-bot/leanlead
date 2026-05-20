@@ -299,7 +299,7 @@ form.addEventListener("submit", (e) => {
   statusCard.scrollIntoView({ behavior: "smooth", block: "center" });
   setStatus("queued", "Starting upload…", 0);
   submitBtn.disabled = true;
-  submitBtn.querySelector(".btn-label").textContent = "Working…";
+  submitBtn.querySelector(".btn-label").textContent = "Traitement…";
 
   const file = videoInput.files?.[0];
   if (!file) return fail("No file selected.");
@@ -359,7 +359,7 @@ async function chunkedUpload(file) {
     appCard.classList.add("hidden");
     statusCard.classList.add("hidden");
     submitBtn.disabled = false;
-    submitBtn.querySelector(".btn-label").textContent = "Edit my video";
+    submitBtn.querySelector(".btn-label").textContent = "Éditer ma vidéo";
     return;
   }
   if (!editRes.ok) throw new Error(`Edit start failed: ${editRes.status} ${await editRes.text()}`);
@@ -393,7 +393,7 @@ function directUpload(file) {
       appCard.classList.add("hidden");
       statusCard.classList.add("hidden");
       submitBtn.disabled = false;
-      submitBtn.querySelector(".btn-label").textContent = "Edit my video";
+      submitBtn.querySelector(".btn-label").textContent = "Éditer ma vidéo";
       return;
     }
     if (xhr.status < 200 || xhr.status >= 300) {
@@ -498,7 +498,7 @@ let _retryJobId = null;
 
 function fail(msg, jobId) {
   submitBtn.disabled = false;
-  submitBtn.querySelector(".btn-label").textContent = "Edit my video";
+  submitBtn.querySelector(".btn-label").textContent = "Éditer ma vidéo";
   setStatus("error", msg, 100);
 
   // Show Retry button when the server restarted mid-job (video still on disk).
@@ -516,7 +516,7 @@ $("retryBtn")?.addEventListener("click", async () => {
   statusCard.classList.remove("hidden");
   setStatus("queued", "Retrying with existing file…", 5);
   submitBtn.disabled = true;
-  submitBtn.querySelector(".btn-label").textContent = "Working…";
+  submitBtn.querySelector(".btn-label").textContent = "Traitement…";
   try {
     const res = await apiFetch(`/api/retry/${_retryJobId}`, { method: "POST" });
     if (!res.ok) {
@@ -532,9 +532,9 @@ $("retryBtn")?.addEventListener("click", async () => {
   }
 });
 
-function showResult(jobId, result) {
+async function showResult(jobId, result) {
   submitBtn.disabled = false;
-  submitBtn.querySelector(".btn-label").textContent = "Edit another";
+  submitBtn.querySelector(".btn-label").textContent = "Éditer une autre";
   previewCard?.classList.add("hidden");
   resultCard.classList.remove("hidden");
   resultCard.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -686,7 +686,7 @@ let _reviewJobId = null;
 function showPreview(jobId, preview) {
   _reviewJobId = jobId;
   submitBtn.disabled = false;
-  submitBtn.querySelector(".btn-label").textContent = "Edit another";
+  submitBtn.querySelector(".btn-label").textContent = "Éditer une autre";
   statusCard.classList.add("hidden");
 
   if (!previewCard || !preview) return;

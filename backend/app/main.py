@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import secrets
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
 from fastapi import (
     BackgroundTasks,
+    Body,
     Depends,
     FastAPI,
     File,
@@ -262,6 +265,41 @@ async def approve_job(
                  message="Approved — starting render…")
     background.add_task(run_render_phase, job_id, src)
     return JSONResponse({"job_id": job_id, "status": "rendering"})
+
+
+_WAITLIST_FILE = Path(__file__).resolve().parents[2] / "storage" / "waitlist.json"
+
+
+def _load_waitlist() -> list[dict]:
+    try:
+        return json.loads(_WAITLIST_FILE.read_text())
+    except Exception:
+        return []
+
+
+def _save_waitlist(entries: list[dict]) -> None:
+    _WAITLIST_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _WAITLIST_FILE.write_text(json.dumps(entries, indent=2, ensure_ascii=False))
+
+
+@app.post("/api/waitlist")
+def waitlist_join(payload: dict = Body(...)) -> dict:
+    email = (payload.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(400, "Invalid email")
+    entries = _load_waitlist()
+    if not any(e.get("email") == email for e in entries):
+        entries.append({
+            "email": email,
+            "timestamp": payload.get("timestamp") or datetime.utcnow().isoformat(),
+        })
+        _save_waitlist(entries)
+    return {"success": True, "count": len(entries)}
+
+
+@app.get("/api/waitlist/count")
+def waitlist_count() -> dict:
+    return {"count": len(_load_waitlist())}
 
 
 @app.get("/api/download/{job_id}")
