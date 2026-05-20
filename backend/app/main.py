@@ -96,7 +96,9 @@ def auth_status(request: Request) -> dict:
     if not _auth_required():
         return {"required": False, "authed": True}
     cookie = request.cookies.get(AUTH_COOKIE)
-    authed = bool(cookie) and secrets.compare_digest(cookie, settings.access_password)
+    header_token = request.headers.get("x-access-token")
+    token = cookie or header_token
+    authed = bool(token) and secrets.compare_digest(token, settings.access_password)
     return {"required": True, "authed": authed}
 
 
@@ -113,7 +115,7 @@ def auth_login(password: str = Form(...)) -> Response:
         httponly=True,
         samesite="lax",
         max_age=60 * 60 * 24 * 30,
-        secure=False,
+        secure=True,
     )
     return resp
 

@@ -1,9 +1,18 @@
 const $ = (id) => document.getElementById(id);
 
+// ── Auth helpers ────────────────────────────────────────────────────────────
+function getToken() { return sessionStorage.getItem("lle_token") || ""; }
+function authHeaders() { const t = getToken(); return t ? { "x-access-token": t } : {}; }
+function apiFetch(url, opts = {}) {
+  opts.credentials = opts.credentials || "same-origin";
+  opts.headers = { ...authHeaders(), ...(opts.headers || {}) };
+  return fetch(url, opts);
+}
+
 // ── Brand panel ────────────────────────────────────────────────────────────
 (async () => {
   try {
-    const res = await fetch("/api/brand", { credentials: "same-origin" });
+    const res = await apiFetch("/api/brand");
     if (res.ok) {
       const b = await res.json();
       if ($("brandName"))      $("brandName").value      = b.name || "";
@@ -41,8 +50,8 @@ $("saveBrandBtn")?.addEventListener("click", async () => {
       accent_color: $("brandPrimary")?.value || "#FF7751",
     },
   };
-  await fetch("/api/brand", {
-    method: "PUT", credentials: "same-origin",
+  await apiFetch("/api/brand", {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(brand),
   });
@@ -51,12 +60,12 @@ $("saveBrandBtn")?.addEventListener("click", async () => {
   const intro = $("brandIntro")?.files?.[0];
   if (intro) {
     const fd = new FormData(); fd.append("intro", intro);
-    await fetch("/api/brand/intro", { method: "POST", body: fd, credentials: "same-origin" });
+    await apiFetch("/api/brand/intro", { method: "POST", body: fd });
   }
   const outro = $("brandOutro")?.files?.[0];
   if (outro) {
     const fd = new FormData(); fd.append("outro", outro);
-    await fetch("/api/brand/outro", { method: "POST", body: fd, credentials: "same-origin" });
+    await apiFetch("/api/brand/outro", { method: "POST", body: fd });
   }
 
   const msg = $("brandSaveMsg");
@@ -66,7 +75,7 @@ $("saveBrandBtn")?.addEventListener("click", async () => {
 // ── Template selector ──────────────────────────────────────────────────────
 (async () => {
   try {
-    const res = await fetch("/api/templates", { credentials: "same-origin" });
+    const res = await apiFetch("/api/templates");
     if (!res.ok) return;
     const templates = await res.json();
     const sel = $("templateSelect");
@@ -110,7 +119,7 @@ $("uploadTemplateBtn")?.addEventListener("click", async () => {
     const fd = new FormData();
     fd.append("name", name);
     fd.append("video", file);
-    const res = await fetch("/api/templates/analyze", { method: "POST", body: fd, credentials: "same-origin" });
+    const res = await apiFetch("/api/templates/analyze", { method: "POST", body: fd });
     if (res.ok) {
       const t = await res.json();
       const sel = $("templateSelect");
@@ -139,8 +148,8 @@ $("analyticsLink")?.addEventListener("click", (e) => {
 async function loadAnalytics() {
   try {
     const [overviewRes, insightsRes] = await Promise.all([
-      fetch("/api/analytics/overview", { credentials: "same-origin" }),
-      fetch("/api/analytics/insights", { credentials: "same-origin" }),
+      apiFetch("/api/analytics/overview"),
+      apiFetch("/api/analytics/insights"),
     ]);
     if (overviewRes.ok) {
       const o = await overviewRes.json();
@@ -169,7 +178,7 @@ $("collectBtn")?.addEventListener("click", async () => {
   $("collectBtn").textContent = "Collecting…";
   $("collectBtn").disabled = true;
   try {
-    await fetch("/api/analytics/collect", { method: "POST", credentials: "same-origin" });
+    await apiFetch("/api/analytics/collect", { method: "POST" });
     await loadAnalytics();
   } catch {}
   $("collectBtn").textContent = "Refresh data";
@@ -209,7 +218,7 @@ const planJson = $("planJson");
 
 (async () => {
   try {
-    const res = await fetch("/api/auth/status", { credentials: "same-origin" });
+    const res = await apiFetch("/api/auth/status");
     const j = await res.json();
     if (j.required && !j.authed) {
       loginCard.classList.remove("hidden");
@@ -243,6 +252,7 @@ loginForm?.addEventListener("submit", async (e) => {
     loginErr.textContent = "Wrong password.";
     return;
   }
+  sessionStorage.setItem("lle_token", loginPwd.value);
   loginCard.classList.add("hidden");
   appCard.classList.remove("hidden");
   document.querySelectorAll('a[href="#login"]').forEach((a) => { a.href = "#tool"; });
@@ -313,9 +323,7 @@ async function chunkedUpload(file) {
   const totalMb = (file.size / (1024 * 1024)).toFixed(0);
 
   // 1. Init session
-  const initRes = await fetch("/api/upload/init", {
-    method: "POST", credentials: "same-origin",
-  });
+  const initRes = await apiFetch("/api/upload/init", { method: "POST" });
   if (!initRes.ok) throw new Error(`Upload init failed: ${initRes.status}`);
   const { upload_id } = await initRes.json();
 
@@ -325,19 +333,18 @@ async function chunkedUpload(file) {
     const sentMb = Math.min((i * CHUNK_SIZE) / (1024 * 1024), file.size / (1024 * 1024)).toFixed(0);
     const uiPct = Math.round(((i + 1) / totalChunks) * 25);
     setStatus("queued", `Uploading ${sentMb} / ${totalMb} MB (chunk ${i + 1}/${totalChunks})…`, uiPct);
-    const res = await fetch(`/api/upload/chunk/${upload_id}/${i}`, {
-      method: "PUT", body: chunk, credentials: "same-origin",
+    const res = await apiFetch(`/api/upload/chunk/${upload_id}/${i}`, {
+      method: "PUT", body: chunk,
     });
     if (!res.ok) throw new Error(`Chunk ${i} failed: ${res.status}`);
   }
 
   // 3. Assemble
   setStatus("queued", "Assembling file on server…", 26);
-  const asmRes = await fetch(`/api/upload/assemble/${upload_id}`, {
+  const asmRes = await apiFetch(`/api/upload/assemble/${upload_id}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ filename: file.name }),
-    credentials: "same-origin",
   });
   if (!asmRes.ok) throw new Error(`Assembly failed: ${asmRes.status}`);
 
@@ -346,9 +353,7 @@ async function chunkedUpload(file) {
   const fd = new FormData(form);
   fd.delete("video");
   fd.set("upload_id", upload_id);
-  const editRes = await fetch("/api/edit", {
-    method: "POST", body: fd, credentials: "same-origin",
-  });
+  const editRes = await apiFetch("/api/edit", { method: "POST", body: fd });
   if (editRes.status === 401) {
     loginCard.classList.remove("hidden");
     appCard.classList.add("hidden");
@@ -367,6 +372,8 @@ function directUpload(file) {
   const xhr = new XMLHttpRequest();
   xhr.open("POST", "/api/edit");
   xhr.withCredentials = true;
+  const _t = getToken();
+  if (_t) xhr.setRequestHeader("x-access-token", _t);
 
   let lastShown = 0;
   xhr.upload.addEventListener("progress", (ev) => {
@@ -415,7 +422,7 @@ async function poll(jobId) {
     await new Promise((r) => setTimeout(r, 1500));
     let res;
     try {
-      res = await fetch(`/api/jobs/${jobId}`, { credentials: "same-origin" });
+      res = await apiFetch(`/api/jobs/${jobId}`);
     } catch (err) {
       // Network blip — give it a few tries before giving up.
       if (++consecutive5xx > 5) return fail("Lost the connection to the server.");
@@ -511,9 +518,7 @@ $("retryBtn")?.addEventListener("click", async () => {
   submitBtn.disabled = true;
   submitBtn.querySelector(".btn-label").textContent = "Working…";
   try {
-    const res = await fetch(`/api/retry/${_retryJobId}`, {
-      method: "POST", credentials: "same-origin",
-    });
+    const res = await apiFetch(`/api/retry/${_retryJobId}`, { method: "POST" });
     if (!res.ok) {
       const txt = await res.text();
       return fail(txt.includes("no longer on disk")
@@ -561,7 +566,7 @@ let _selectedPlatforms = new Set();
 
 async function loadPublishConnections() {
   try {
-    const res = await fetch("/api/publish/connections", { credentials: "same-origin" });
+    const res = await apiFetch("/api/publish/connections");
     if (!res.ok) return;
     const connections = await res.json();
     connections.forEach(c => {
@@ -581,9 +586,7 @@ document.querySelectorAll(".platform-btn").forEach(btn => {
 
     if (!isConnected) {
       // Initiate OAuth flow.
-      const res = await fetch(`/api/publish/connect/${platform}`, {
-        method: "POST", credentials: "same-origin",
-      });
+      const res = await apiFetch(`/api/publish/connect/${platform}`, { method: "POST" });
       if (res.ok) {
         const { auth_url } = await res.json();
         window.open(auth_url, "_blank", "width=600,height=700");
@@ -612,8 +615,8 @@ document.querySelectorAll(".platform-btn").forEach(btn => {
     // Load metadata preview.
     if (_selectedPlatforms.size > 0 && _currentJobId) {
       try {
-        const mRes = await fetch(`/api/publish/metadata/${_currentJobId}`, {
-          method: "POST", credentials: "same-origin",
+        const mRes = await apiFetch(`/api/publish/metadata/${_currentJobId}`, {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ platforms: [..._selectedPlatforms] }),
         });
@@ -642,8 +645,8 @@ $("publishNowBtn")?.addEventListener("click", async () => {
   if (statusEl) statusEl.textContent = "";
 
   try {
-    const res = await fetch(`/api/publish/${_currentJobId}`, {
-      method: "POST", credentials: "same-origin",
+    const res = await apiFetch(`/api/publish/${_currentJobId}`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ platforms: [..._selectedPlatforms], privacy: "public" }),
     });
@@ -734,9 +737,7 @@ $("renderBtn")?.addEventListener("click", async () => {
   statusCard.classList.remove("hidden");
   setStatus("rendering", "Sending to renderer…", 70);
   try {
-    const res = await fetch(`/api/jobs/${_reviewJobId}/approve`, {
-      method: "POST", credentials: "same-origin",
-    });
+    const res = await apiFetch(`/api/jobs/${_reviewJobId}/approve`, { method: "POST" });
     if (!res.ok) return fail(`Render start failed: ${res.status}`);
     poll(_reviewJobId);
   } catch (err) {
@@ -747,7 +748,7 @@ $("renderBtn")?.addEventListener("click", async () => {
 // Re-plan button — puts job back to planning state and re-polls.
 $("replanBtn")?.addEventListener("click", async () => {
   if (!_reviewJobId) return;
-  const job = await (await fetch(`/api/jobs/${_reviewJobId}`, { credentials: "same-origin" })).json();
+  const job = await (await apiFetch(`/api/jobs/${_reviewJobId}`)).json();
   if (!job.source_path) return fail("No source file — please re-upload.");
 
   previewCard?.classList.add("hidden");
@@ -756,9 +757,7 @@ $("replanBtn")?.addEventListener("click", async () => {
 
   // Trigger a retry which re-runs the full Phase 1.
   try {
-    const res = await fetch(`/api/retry/${_reviewJobId}`, {
-      method: "POST", credentials: "same-origin",
-    });
+    const res = await apiFetch(`/api/retry/${_reviewJobId}`, { method: "POST" });
     if (!res.ok) return fail(`Re-plan failed: ${res.status}`);
     const { job_id } = await res.json();
     _reviewJobId = job_id;
