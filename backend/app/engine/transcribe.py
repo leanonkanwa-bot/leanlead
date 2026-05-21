@@ -1,8 +1,3 @@
-import os
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["MKL_NUM_THREADS"] = "1"
-os.environ["OPENBLAS_NUM_THREADS"] = "1"
-
 """Word-level transcription powered by faster-whisper.
 
 We use faster-whisper (CTranslate2 backend) instead of openai-whisper
@@ -16,8 +11,12 @@ We use faster-whisper (CTranslate2 backend) instead of openai-whisper
 Public surface stays identical: `transcribe(path) -> Transcript` with
 `segments[i].words[j].{text,start,end}`.
 """
-
 from __future__ import annotations
+
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 import shutil
 import subprocess
