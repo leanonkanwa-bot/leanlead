@@ -44,11 +44,10 @@ ALLOWED_POSITIONS = {"center", "bottom", "side-left", "side-right"}
 # Caption styles — each is a different visual treatment of the one-word card.
 ALLOWED_STYLES = {"impact", "kinetic"}
 
-# Single consistent caption size: ~7% of PlayResY.
-# One size for all captions — no tier system, no inconsistency between renders.
+# Caption size: ~5% of PlayResY — readable without overwhelming the face.
 # ASS PlayResY is 1920 for short form, 1080 for long form.
-CAP_SIZE_SHORT = 134    # 7.0% of 1920
-CAP_SIZE_LONG = 76      # 7.0% of 1080
+CAP_SIZE_SHORT = 96     # 5.0% of 1920
+CAP_SIZE_LONG  = 54     # 5.0% of 1080
 
 PUNCT_RE = re.compile(r"[.,!?;:\"'()\[\]…–—]")
 
@@ -88,21 +87,28 @@ def _hex_to_ass_bgr(hex6: str) -> str:
     return f"&H00{b}{g}{r}"
 
 
-def _alignment_for(position: str) -> tuple[int, int, int, int]:
+def _alignment_for(position: str, short_form: bool = True) -> tuple[int, int, int, int]:
     """Return (Alignment, MarginL, MarginR, MarginV) for ASS Default style.
 
     Alignment numbers:
        1 = bottom-left, 2 = bottom-center, 3 = bottom-right,
        4 = mid-left,    5 = mid-center,    6 = mid-right,
        7 = top-left,    8 = top-center,    9 = top-right.
+
+    MarginV for bottom-aligned styles is distance from the bottom edge.
+    Target: bottom 25% of frame (y ≈ 75–78%), never covering the face.
+    Short form (1920px tall): 25% from bottom = 480px margin.
+    Long form  (1080px tall): 25% from bottom = 270px margin.
     """
+    margin_v = 480 if short_form else 270
     if position == "bottom":
-        return (2, 60, 60, 320)
+        return (2, 60, 60, margin_v)
     if position == "side-left":
         return (4, 80, 60, 0)
     if position == "side-right":
         return (6, 60, 80, 0)
-    return (5, 60, 60, 0)  # center default
+    # "center" → treat as bottom-third for readability / face avoidance
+    return (2, 60, 60, margin_v)
 
 
 def _ass_header(
@@ -113,7 +119,7 @@ def _ass_header(
     style: str = "impact",
 ) -> str:
     primary = _hex_to_ass_bgr(color_hex)
-    align, ml, mr, mv = _alignment_for(position)
+    align, ml, mr, mv = _alignment_for(position, short_form=short_form)
 
     cap_size = CAP_SIZE_SHORT if short_form else CAP_SIZE_LONG
 
@@ -189,8 +195,24 @@ def build_ass(
     caption card — sparse, punchy, high-retention. When False, every spoken
     word gets a card (legacy behavior).
     """
-    if font not in ALLOWED_FONTS:
-        font = "Poppins Bold"
+    # Map UI font names → fonts actually installed on the render server.
+    # Railway ships Debian with DejaVu; Poppins/Montserrat/Inter are NOT
+    # installed unless added to the Dockerfile.
+    _FONT_MAP = {
+        "Poppins Bold":        "DejaVu Sans Bold",
+        "Poppins ExtraBold":   "DejaVu Sans Bold",
+        "Poppins SemiBold":    "DejaVu Sans Bold",
+        "Inter Bold":          "DejaVu Sans Bold",
+        "Montserrat Bold":     "DejaVu Sans Bold",
+        "Montserrat Black":    "DejaVu Sans Bold",
+        "Roboto Bold":         "DejaVu Sans Bold",
+        "DM Sans Bold":        "DejaVu Sans Bold",
+        "Space Grotesk Bold":  "DejaVu Sans Bold",
+        "Bebas Neue":          "DejaVu Sans Bold",
+    }
+    font = _FONT_MAP.get(font, font)
+    if font not in ALLOWED_FONTS and font not in _FONT_MAP.values():
+        font = "DejaVu Sans Bold"
     color_hex = ALLOWED_COLORS.get(color.lower(), color if color.startswith("#") else "FFFFFF")
     if position not in ALLOWED_POSITIONS:
         position = "center"
@@ -205,22 +227,25 @@ def build_ass(
 
     lines = [_ass_header(short_form, font, color_hex, position, style)]
 
-    for w in words:
-        clean = _strip_punct(w.text).upper()
-        if not clean:
+    for idx, w in enumerate(words):
+        clean_lower = _strip_punct(w.text).lower()
+        if not clean_lower:
             continue
         # Hard rule: no captions during B-roll windows.
         if _in_window((w.start + w.end) / 2, broll_list):
             continue
-        is_emphasis = clean.lower() in emphasis_set
+        is_emphasis = clean_lower in emphasis_set
         if emphasis_only and not is_emphasis:
             continue
+        # Mixed case: emphasis words → Title Case, others → sentence case
+        # (capitalise only the first letter, lowercase the rest).
+        display = clean_lower.capitalize() if not is_emphasis else clean_lower.title()
         style_name = "Emphasis" if is_emphasis else "Default"
         # Apply 1-frame lead: caption appears slightly before the word is
         # fully spoken so perception stays in sync (Typography Engine rule).
         start = max(0.0, w.start - CAPTION_LEAD_S)
         lines.append(
-            f"Dialogue: 0,{_ts(start)},{_ts(w.end)},{style_name},,0,0,0,,{clean}"
+            f"Dialogue: 0,{_ts(start)},{_ts(w.end)},{style_name},,0,0,0,,{display}"
         )
 
     out_path.write_text("\n".join(lines), encoding="utf-8")

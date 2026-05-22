@@ -843,6 +843,20 @@
       localStorage.setItem('coach_profile', JSON.stringify(profile));
       localStorage.setItem('onboarded', 'true');
 
+      // Persist profile to backend so it survives cache clears
+      try {
+        const existingId = localStorage.getItem('profile_id');
+        const res = await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...profile, profile_id: existingId || undefined }),
+        });
+        if (res.ok) {
+          const { profile_id } = await res.json();
+          localStorage.setItem('profile_id', profile_id);
+        }
+      } catch {}
+
       // Post email to waitlist
       try {
         await fetch('/api/waitlist', {

@@ -715,11 +715,15 @@ def render(
     _log.info("render: filter_complex disabled — using simple -vf pipeline")
 
     color_grade = _color_grade_filter(content_type)
-    vf_simple = (
-        f"{color_grade},"
-        f"scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-        f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2"
-    )
+    # Scale preserving aspect ratio: -2 tells FFmpeg to compute the other
+    # dimension to the nearest even number. No distortion, no mirroring.
+    # Short form (portrait 1080×1920): fix height=1920, width auto.
+    # Long form (landscape 1920×1080): fix width=1920, height auto.
+    if short_form:
+        scale_filter = "scale=-2:1920"
+    else:
+        scale_filter = "scale=1920:-2"
+    vf_simple = f"{color_grade},{scale_filter}"
 
     import shutil as _shutil
     import tempfile as _tempfile
@@ -734,9 +738,9 @@ def render(
         "-i", str(concat_path),
         "-vf", vf_simple,
         "-frames:v", str(total_frames),
-        "-c:v", "libx264", "-preset", "superfast", "-crf", "22",
+        "-c:v", "libx264", "-preset", "slow", "-crf", "18",
         "-threads", "2",
-        "-x264-params", "rc-lookahead=0:bframes=0",
+        "-x264-params", "rc-lookahead=32:bframes=3",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k",
         "-movflags", "+faststart",
@@ -751,10 +755,10 @@ def render(
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(_nocap_path),
-        "-vf", f"subtitles={_ass_str}:force_style='FontName=Arial'",
-        "-c:v", "libx264", "-preset", "superfast", "-crf", "22",
+        "-vf", f"subtitles={_ass_str}",
+        "-c:v", "libx264", "-preset", "slow", "-crf", "18",
         "-threads", "2",
-        "-x264-params", "rc-lookahead=0:bframes=0",
+        "-x264-params", "rc-lookahead=32:bframes=3",
         "-pix_fmt", "yuv420p",
         "-c:a", "copy",
         "-movflags", "+faststart",

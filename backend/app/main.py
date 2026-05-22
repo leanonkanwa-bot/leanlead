@@ -438,6 +438,34 @@ def waitlist_count() -> dict:
     return {"count": len(_load_waitlist())}
 
 
+_PROFILES_DIR = Path(__file__).resolve().parents[2] / "storage" / "profiles"
+
+
+@app.post("/api/profile")
+async def save_profile(payload: dict = Body(...)) -> dict:
+    """Persist a coach profile to disk. Returns a stable profile_id."""
+    _PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+    profile_id = payload.get("profile_id") or secrets.token_urlsafe(12)
+    profile_path = _PROFILES_DIR / f"{profile_id}.json"
+    profile_path.write_text(
+        json.dumps({**payload, "profile_id": profile_id}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    return {"profile_id": profile_id}
+
+
+@app.get("/api/profile/{profile_id}")
+async def get_profile(profile_id: str) -> dict:
+    """Fetch a previously saved coach profile."""
+    profile_path = _PROFILES_DIR / f"{profile_id}.json"
+    if not profile_path.exists():
+        raise HTTPException(404, "Profile not found")
+    try:
+        return json.loads(profile_path.read_text(encoding="utf-8"))
+    except Exception:
+        raise HTTPException(500, "Corrupt profile file")
+
+
 @app.get("/api/download/{job_id}")
 def download(job_id: str, request: Request, _: None = Depends(_check_auth)):
     out = settings.outputs_dir / f"{job_id}.mp4"

@@ -30,9 +30,25 @@ document.querySelectorAll(".nav-tab[data-target]").forEach(tab => {
 $("dashEditBtn")?.addEventListener("click", () => switchSection("editorArea"));
 
 // ── Init: decide which section to show (Issues 6 & 7) ───────────────────────
-(function initSection() {
+(async function initSection() {
   try {
-    const raw = localStorage.getItem("coach_profile");
+    let raw = localStorage.getItem("coach_profile");
+
+    // If no local profile but we have a backend profile_id, restore from server
+    if (!raw) {
+      const profileId = localStorage.getItem("profile_id");
+      if (profileId) {
+        try {
+          const res = await fetch(`/api/profile/${profileId}`);
+          if (res.ok) {
+            const restored = await res.json();
+            localStorage.setItem("coach_profile", JSON.stringify(restored));
+            raw = JSON.stringify(restored);
+          }
+        } catch {}
+      }
+    }
+
     if (!raw) { switchSection("editorArea"); return; }
     const p = JSON.parse(raw);
 

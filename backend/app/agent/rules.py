@@ -654,6 +654,18 @@ TENSION BEFORE PAYOFF:
   resolve both simultaneously at the end.
   The viewer who feels they're "almost there" will never skip.
 
+  HARD RULE — CLOSE LOOPS AT END ONLY:
+  NEVER resolve a question, tension, or open loop before the final
+  PAYOFF segment (last 30 seconds of the edit). If a segment in the
+  source answers a setup too early, move it AFTER the PAYOFF beat.
+  All curiosity gaps must stay open until the final 30 seconds.
+  Any segment that resolves tension before the PAYOFF must be:
+    a) Removed entirely, OR
+    b) Reordered to after the PAYOFF beat.
+  This is the single biggest lever for watch-time. Enforce it without
+  exception — even if it means reordering significant portions of the
+  source.
+
 PATTERN INTERRUPTS every 7–10 seconds:
   A viewer's attention resets every 7–10 seconds without stimulation.
   Force a change every 7–10s using ANY of:
