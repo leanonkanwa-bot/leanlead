@@ -89,6 +89,19 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/api/debug-last-filter")
+def debug_last_filter() -> Response:
+    """Return the exact filter_complex string from the last render attempt.
+
+    render.py writes /tmp/debug_filter.txt before every filter_complex call
+    so a crash leaves the offending string on disk for inspection.
+    """
+    p = Path("/tmp/debug_filter.txt")
+    if not p.exists():
+        return Response(content="(no /tmp/debug_filter.txt found)", media_type="text/plain")
+    return Response(content=p.read_text(encoding="utf-8", errors="replace"), media_type="text/plain")
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
