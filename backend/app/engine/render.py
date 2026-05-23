@@ -511,6 +511,14 @@ def _png_to_timed_clip(png: Path, dst: Path, duration: float, fps: int) -> None:
     timeline. No enable= expression is needed: the clip simply doesn't
     exist outside its window, so the overlay falls through to the base
     video automatically (eof_action=pass).
+
+    fps is intentionally hard-capped at 1 regardless of the caller value.
+    These clips contain a static PNG (no motion), so 1fps is visually
+    identical to 30fps — the overlay filter holds the last frame between
+    integer-second boundaries. At 30fps a 3-second clip is 90 RGBA frames
+    (~750 MB of decoded memory for a 1080×1920 source); at 1fps it is
+    3 frames (~25 MB). With 4–8 clips open simultaneously that difference
+    is the margin between a successful render and a SIGKILL.
     """
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
@@ -519,7 +527,7 @@ def _png_to_timed_clip(png: Path, dst: Path, duration: float, fps: int) -> None:
         "-t", f"{duration:.3f}",
         "-pix_fmt", "rgba",
         "-c:v", "png",
-        "-r", str(fps),
+        "-r", "1",          # always 1fps — static graphic, no motion
         str(dst),
     ])
 
@@ -960,12 +968,20 @@ def render(
 
     cmd1 += [
         "-frames:v", str(total_frames),
-        "-c:v", "libx264", "-preset", "medium", "-crf", "16",
-        "-threads", "2",
-        "-x264-params", "rc-lookahead=32:bframes=3",
+        # Pass-1 intermediate — gets re-encoded in pass 2 (subtitle burn),
+        # so visual quality here only needs to be "good enough" to survive
+        # one generation loss. Use the most memory-conservative x264 settings:
+        #   rc-lookahead=0  — no frame lookahead buffer (~100 MB saved at 1080p)
+        #   bframes=0       — no B-frame reorder buffer
+        #   ref=1           — single reference frame
+        #   no-mbtree=1     — disable macroblock tree (uses lookahead internally)
+        # These settings trade a small quality delta for a large memory saving,
+        # which is the right trade-off for a throwaway intermediate file.
+        "-c:v", "libx264", "-preset", "faster", "-crf", "18",
+        "-threads", "1",
+        "-x264-params", "rc-lookahead=0:bframes=0:ref=1:no-mbtree=1",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k",
-        "-movflags", "+faststart",
         str(_nocap_path),
     ]
     _run(cmd1)
