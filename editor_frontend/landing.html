@@ -1128,13 +1128,37 @@
     });
 
     function startAutoRotate() {
-      autoRotateTimer = setInterval(() => goToSlide(currentSlide + 1), 5000);
+      autoRotateTimer = setInterval(() => goToSlide(currentSlide + 1), 4000);
     }
     function resetAutoRotate() {
       clearInterval(autoRotateTimer);
       startAutoRotate();
     }
     startAutoRotate();
+
+    // ── Waitlist live count ─────────────────────────────────────────────
+    (async () => {
+      try {
+        const res = await fetch('/api/waitlist/count');
+        if (res.ok) {
+          const { count } = await res.json();
+          if (count > 0) {
+            // Update the "Créateurs actifs" animated counter target
+            const creatorStat = document.querySelector('.stat-num[data-target="500"]');
+            if (creatorStat) {
+              creatorStat.dataset.target = Math.max(count, 500);
+              creatorStat.textContent = Math.max(count, 500) + '+';
+            }
+            // Update hero text mentioning 500+
+            document.querySelectorAll('p').forEach(p => {
+              if (p.textContent.includes('500+')) {
+                p.textContent = p.textContent.replace('500+', Math.max(count, 500) + '+');
+              }
+            });
+          }
+        }
+      } catch {}
+    })();
 
     // ── FAQ accordion ───────────────────────────────────────────────────
     document.querySelectorAll('.faq-question').forEach(btn => {

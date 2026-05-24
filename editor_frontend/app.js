@@ -765,6 +765,16 @@ form.addEventListener("submit", (e) => {
   })();
   profileIdInput.value = localStorage.getItem("profile_id") || "";
 
+  // Request browser notification permission on first edit (BUILD 8)
+  if (localStorage.getItem("notif_permission_asked") !== "1") {
+    localStorage.setItem("notif_permission_asked", "1");
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().then(perm => {
+        localStorage.setItem("notif_enabled", perm === "granted" ? "true" : "false");
+      });
+    }
+  }
+
   resultCard?.classList.add("hidden");
   statusCard?.classList.remove("hidden");
   statusCard?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -944,6 +954,23 @@ async function showResult(jobId, result) {
 
   // Confetti!
   setTimeout(spawnConfetti, 300);
+
+  // Browser notification (BUILD 8)
+  setTimeout(() => {
+    try {
+      if (
+        "Notification" in window &&
+        Notification.permission === "granted" &&
+        localStorage.getItem("notif_enabled") !== "false"
+      ) {
+        new Notification("✅ Votre vidéo est prête !", {
+          body: "Votre vidéo éditée est disponible — cliquez pour la télécharger.",
+          icon: "/static/favicon.ico",
+          tag: "video-ready",
+        });
+      }
+    } catch {}
+  }, 600);
 
   if (player)      player.src       = `/api/download/${jobId}`;
   if (downloadLink) downloadLink.href = `/api/download/${jobId}`;
