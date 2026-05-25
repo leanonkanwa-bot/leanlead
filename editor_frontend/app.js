@@ -36,22 +36,31 @@ $("dashEditBtn")?.addEventListener("click", () => switchSection("editorArea"));
   try {
     let raw = localStorage.getItem("coach_profile");
 
-    if (!raw) {
-      const profileId = localStorage.getItem("profile_id");
-      if (profileId) {
-        try {
-          const res = await fetch(`/api/profile/${profileId}`);
-          if (res.ok) {
-            const restored = await res.json();
-            localStorage.setItem("coach_profile", JSON.stringify(restored));
-            raw = JSON.stringify(restored);
-          }
-        } catch {}
-      }
+    // Always re-sync from server when profile_id is present (keeps data fresh)
+    const profileId = localStorage.getItem("profile_id");
+    if (profileId) {
+      try {
+        const res = await fetch(`/api/profile/${profileId}`);
+        if (res.ok) {
+          const restored = await res.json();
+          localStorage.setItem("coach_profile", JSON.stringify(restored));
+          raw = JSON.stringify(restored);
+        }
+      } catch {}
     }
 
     if (!raw) { switchSection("editorArea"); return; }
     const p = JSON.parse(raw);
+
+    // Show "Bienvenue {name}" greeting in nav
+    const greetingEl = $("navGreeting");
+    if (greetingEl) {
+      const name = p.name || p.brandName || "";
+      if (name) {
+        greetingEl.textContent = `Bienvenue ${name} 👋`;
+        greetingEl.style.display = "";
+      }
+    }
 
     const nameEl = $("dashName");
     if (nameEl) nameEl.textContent = p.name || p.brandName || "toi";

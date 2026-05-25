@@ -251,22 +251,27 @@ def build_ass(
         if emphasis_only and not has_emphasis:
             continue
 
-        # Mixed case: emphasis words → Title Case (salmon), others → sentence case
+        # Per-word inline ASS tags: emphasis words get salmon colour + larger size,
+        # all other words stay in Default style at normal size.
+        cap_size_emph = CAP_SIZE_SHORT_EMPH if short_form else CAP_SIZE_LONG_EMPH
         display_parts: list[str] = []
         for i, w in enumerate(clean_words):
             if w.lower() in emphasis_set:
-                display_parts.append(w.title())
+                # Inline override: salmon colour + emphasis size, then reset
+                display_parts.append(
+                    f"{{\\c{EMPHASIS_COLOR_ASS}\\fs{cap_size_emph}}}{w.title()}{{\\r}}"
+                )
             elif i == 0:
                 display_parts.append(w.capitalize())
             else:
                 display_parts.append(w.lower())
         display = " ".join(display_parts)
 
-        style_name = "Emphasis" if has_emphasis else "Default"
+        # Always use Default style; per-word overrides handle emphasis inline
         start = max(0.0, group[0].start - CAPTION_LEAD_S)
         end   = group[-1].end
         lines.append(
-            f"Dialogue: 0,{_ts(start)},{_ts(end)},{style_name},,0,0,0,,{display}"
+            f"Dialogue: 0,{_ts(start)},{_ts(end)},Default,,0,0,0,,{display}"
         )
 
     out_path.write_text("\n".join(lines), encoding="utf-8")

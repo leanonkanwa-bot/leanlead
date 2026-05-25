@@ -188,17 +188,25 @@ CUT FREQUENCY — non-negotiable targets:
   Never let 7 seconds pass without SOMETHING changing — cut, zoom,
   graphic, or hyperframe.
 
-SEGMENT SCORING — use this to prioritize what to keep vs. cut:
-  High tension / conflict moment   → score 10  (always keep)
-  Counterintuitive claim           → score 9   (always keep)
-  Specific stat / number / name    → score 8   (keep, use as emphasis word)
-  Story / narrative beat           → score 7   (keep if fits pacing)
-  Answer / payoff moment           → score 5   (keep, but compress)
-  Connective / transition          → score 3   (compress aggressively)
-  Filler / repetition / warm-up    → score 1   (cut entirely)
-Score each transcript segment before building keep_segments.
+SENTENCE SCORING — score EVERY sentence before building keep_segments:
+  Counterintuitive claim (contradicts a widely held belief)  → score 10  (always keep; this is your hook pool)
+  Specific stat / number / name / concrete claim             → score 8   (always keep; mark as emphasis_word)
+  Story / narrative / scene / lived moment                   → score 7   (keep if serves pacing)
+  Contrast / "but" / "however" / flip / reframe              → score 5   (keep; compress if needed)
+  Answer / payoff / resolution                               → score 5   (keep; but NEVER before last 20% of edit)
+  Connective / transition / setup / context                  → score 3   (compress aggressively)
+  Filler / repetition / warm-up / hedge                      → score 1   (cut entirely)
+
+PAYOFF PLACEMENT RULE — ABSOLUTE:
+  Tension resolution (the answer to any open loop) MUST appear in
+  the last 20% of the output edit duration.
+  Example: 60s video → payoff not before t=48s.
+  If the transcript's payoff appears early, DELAY it by reordering
+  keep_segments — insert story or principle segments between
+  the setup and the payoff to enforce the 20% rule.
+
 Drop score ≤ 3 segments entirely unless they are the hook or payoff.
-Compress score-5 segments to their single punchiest sentence.
+Compress score-5 payoff segments to one sentence; place in final 20%.
 
 CURIOSITY LOOP TIMER — every 15–20 seconds:
   Every 15–20 seconds of the output edit, a NEW curiosity loop must open.
