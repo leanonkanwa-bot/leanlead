@@ -19,8 +19,9 @@ function switchSection(targetId) {
     tab.classList.toggle("active", tab.dataset.target === targetId);
   });
   if (targetId === "analyticsSection") loadAnalytics();
-  if (targetId === "dashboardSection") { updateDashboardStats(); loadVideoLibrary(); updateStreak(); updateAchievements(); }
+  if (targetId === "dashboardSection") { updateDashboardStats(); loadVideoLibrary(); updateStreak(); updateAchievements(); initReferral(); }
   if (targetId === "profileSection") loadProfileSection();
+  if (targetId === "editorArea") updateOnboardingProgress();
 }
 
 // Nav tab clicks
@@ -68,6 +69,7 @@ $("dashEditBtn")?.addEventListener("click", () => switchSection("editorArea"));
     updateDashboardStats();
     updateStreak();
     updateAchievements();
+    updateOnboardingProgress();
 
     const onboarded = localStorage.getItem("onboarded") === "true";
     if (onboarded) {
@@ -981,8 +983,10 @@ async function showResult(jobId, result) {
     } catch {}
   }, 600);
 
-  if (player)      player.src       = `/api/download/${jobId}`;
-  if (downloadLink) downloadLink.href = `/api/download/${jobId}`;
+  if (player)            player.src = `/api/download/${jobId}`;
+  if ($("downloadTiktok"))  $("downloadTiktok").href  = `/api/download/${jobId}`;
+  if ($("downloadYoutube")) $("downloadYoutube").href = `/api/download/${jobId}?fmt=landscape`;
+  if ($("downloadThumb"))   $("downloadThumb").href   = `/api/thumbnail/${jobId}`;
 
   const pkg = result?.packaging || {};
   if (pkgTitle) pkgTitle.textContent = pkg.title || result?.titres_ctr?.[0] || "—";
@@ -1136,10 +1140,51 @@ function showPreview(jobId, preview) {
   const tl = $("previewTimeline");
   if (tl) {
     const segs = preview.edit_plan || [];
-    tl.innerHTML = segs.slice(0, 20).map(s =>
-      `<div class="tl-row"><span class="tl-num">${s.order}</span><span class="tl-role">${s.role || "—"}</span><span class="tl-time">${s.original_time || ""} → ${s.edit_dur || ""}</span></div>`
-    ).join("") || "<p style='color:var(--muted);font-size:.8rem'>Aucun segment</p>";
+    tl.innerHTML = segs.slice(0, 20).map(s => {
+      const raw = typeof s.score === "number" ? s.score : 0;
+      // scores 1–10 from planner → display 0–100
+      const dispScore = raw <= 10 ? raw * 10 : raw;
+      const scoreColor = dispScore >= 80 ? "#22c55e" : dispScore >= 55 ? "var(--salmon)" : "#ff5c7a";
+      const tooltip = (s.retention_note || "").replace(/"/g, "&quot;");
+      const badge = `<span class="score-badge" style="background:${scoreColor}22;color:${scoreColor};border:1px solid ${scoreColor}44" ${tooltip ? `data-tooltip="${tooltip}"` : ""}>${dispScore}</span>`;
+      const isHook = s.role === "hook";
+      return `<div class="tl-row${isHook ? " tl-row-hook" : ""}">
+        ${isHook ? `<span class="tl-crown">👑</span>` : ""}
+        <span class="tl-num" style="${isHook ? "" : "margin-left:" + (0) + "px"}">${isHook ? "" : s.order}</span>
+        <span class="tl-role">${s.role || "—"}</span>
+        ${badge}
+        <span class="tl-time">${s.original_time || ""} → ${s.edit_dur || ""}</span>
+      </div>`;
+    }).join("") || "<p style='color:var(--muted);font-size:.8rem'>Aucun segment</p>";
   }
+
+  // ── Retention Prediction (Feature 5) ────────────────────────────────────────
+  const retBar  = $("retPredBar");
+  const retPct  = $("retPredPct");
+  const retWrap = $("retentionPrediction");
+  if (retBar && retPct && retWrap && preview.edit_plan) {
+    const segs = preview.edit_plan;
+    const hookSeg  = segs.find(s => s.role === "hook");
+    const hookRaw  = typeof hookSeg?.score === "number" ? hookSeg.score : 5;
+    const hookScaled = hookRaw <= 10 ? hookRaw * 10 : hookRaw;
+    const duration = preview.total_duration_edited || 60;
+    const loopCount = segs.filter(s => ["hook", "problem", "story"].includes(s.role)).length;
+    let base = 48;
+    base += Math.min(22, hookScaled * 0.22);    // hook quality → up to +22
+    base += Math.min(10, segs.length * 0.7);    // cut density → up to +10
+    base += Math.min(8, loopCount * 1.6);       // loop mechanics → up to +8
+    base -= Math.max(0, (duration - 90) * 0.12);// duration penalty
+    const predicted = Math.min(95, Math.max(35, Math.round(base)));
+    const color = predicted >= 80 ? "#22c55e" : predicted >= 65 ? "var(--salmon)" : "#ff5c7a";
+    setTimeout(() => {
+      retBar.style.width = predicted + "%";
+      retBar.style.background = color;
+    }, 200);
+    retPct.textContent = predicted + "%";
+    retPct.style.color = color;
+    retWrap.style.display = "";
+  }
+
   if ($("previewJson")) $("previewJson").textContent = JSON.stringify(preview, null, 2);
 }
 
@@ -1172,3 +1217,200 @@ $("replanBtn")?.addEventListener("click", async () => {
 });
 
 } // end editor guard
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FEATURE 3 — SMART CAPTION STYLES
+// ══════════════════════════════════════════════════════════════════════════════
+(function initCaptionPresets() {
+  // Restore saved preset
+  try {
+    const raw = localStorage.getItem("coach_profile");
+    if (raw) {
+      const p = JSON.parse(raw);
+      if (p.caption_preset) {
+        document.querySelectorAll("#captionPresetSelector .caption-preset-btn").forEach(b => {
+          b.classList.toggle("active", b.dataset.preset === p.caption_preset);
+        });
+        const active = document.querySelector(`#captionPresetSelector [data-preset="${p.caption_preset}"]`);
+        const styleInput = document.querySelector('input[name="caption_style"]');
+        if (active && styleInput) styleInput.value = active.dataset.style || "impact";
+      }
+    }
+  } catch {}
+})();
+
+document.querySelectorAll("#captionPresetSelector .caption-preset-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("#captionPresetSelector .caption-preset-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const preset = btn.dataset.preset;
+    const styleVal = btn.dataset.style || "impact";
+    const captionStyleInput = document.querySelector('input[name="caption_style"]');
+    if (captionStyleInput) captionStyleInput.value = styleVal;
+    try {
+      const raw = localStorage.getItem("coach_profile");
+      const p = raw ? JSON.parse(raw) : {};
+      p.caption_preset = preset;
+      localStorage.setItem("coach_profile", JSON.stringify(p));
+    } catch {}
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FEATURE 4 — HOOK GENERATOR
+// ══════════════════════════════════════════════════════════════════════════════
+function useHook(text) {
+  const instr = document.querySelector('textarea[name="instructions"]');
+  if (instr) {
+    instr.value = instr.value
+      ? instr.value.trimEnd() + "\n\nHook de départ: " + text
+      : "Hook de départ: " + text;
+    instr.scrollIntoView({ behavior: "smooth", block: "center" });
+    instr.focus();
+  }
+}
+
+$("hookGenBtn")?.addEventListener("click", async () => {
+  const topic = $("hookGenTopic")?.value.trim();
+  if (!topic) return;
+  const btn    = $("hookGenBtn");
+  const label  = $("hookGenBtnLabel");
+  const results = $("hookGenResults");
+  if (label) label.textContent = "Génération en cours…";
+  if (btn)   btn.disabled = true;
+  if (results) { results.style.display = "none"; results.innerHTML = ""; }
+  try {
+    const res = await fetch("/api/generate-hooks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic }),
+    });
+    if (!res.ok) throw new Error(`Erreur serveur: ${res.status}`);
+    const { hooks } = await res.json();
+    if (results && hooks?.length) {
+      results.innerHTML = hooks.map(h => {
+        const sc = typeof h.score === "number" ? h.score : 70;
+        const col = sc >= 80 ? "#22c55e" : sc >= 60 ? "#FF7751" : "#ff5c7a";
+        const safeText = h.text.replace(/'/g, "&#39;").replace(/"/g, "&quot;");
+        return `<div class="hook-option">
+          <span class="hook-score-pill" style="background:${col}22;color:${col};border:1px solid ${col}44">${sc}</span>
+          <div class="hook-option-body">
+            <div class="hook-option-text">"${h.text}"</div>
+            <div class="hook-option-why">${h.why || ""}</div>
+          </div>
+          <button class="hook-use-btn" onclick="useHook('${safeText}')">Utiliser →</button>
+        </div>`;
+      }).join("");
+      results.style.display = "flex";
+      results.style.flexDirection = "column";
+    } else {
+      if (results) {
+        results.innerHTML = `<p style="color:var(--muted);font-size:.8rem">Aucun hook généré. Réessayez avec un sujet plus précis.</p>`;
+        results.style.display = "block";
+      }
+    }
+  } catch (err) {
+    if (results) {
+      results.innerHTML = `<p style="color:var(--err);font-size:.8rem">Erreur: ${err.message}</p>`;
+      results.style.display = "block";
+    }
+  }
+  if (label) label.textContent = "✨ Générer 5 hooks";
+  if (btn)   btn.disabled = false;
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FEATURE 6 — REFERRAL SYSTEM
+// ══════════════════════════════════════════════════════════════════════════════
+function initReferral() {
+  const profileId = localStorage.getItem("profile_id");
+  const input = $("referralLinkInput");
+  if (input) {
+    const base = window.location.hostname === "localhost"
+      ? window.location.origin
+      : "https://leanlead-production.up.railway.app";
+    input.value = profileId ? `${base}?ref=${profileId}` : "";
+  }
+  if (profileId) {
+    fetch(`/api/referral/${profileId}/stats`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data) return;
+        const count = data.count || 0;
+        const countEl = $("referralCount");
+        const earnedEl = $("referralEarned");
+        if (countEl) countEl.textContent = `${count} invité${count !== 1 ? "s" : ""}`;
+        if (earnedEl && count > 0)
+          earnedEl.textContent = `🎉 ${count} mois gratuit${count > 1 ? "s" : ""} gagnés`;
+      })
+      .catch(() => {});
+  }
+}
+
+$("copyReferralBtn")?.addEventListener("click", () => {
+  const input = $("referralLinkInput");
+  if (!input?.value) return;
+  const btn = $("copyReferralBtn");
+  navigator.clipboard.writeText(input.value)
+    .then(() => {
+      if (btn) { btn.textContent = "Copié ✓"; setTimeout(() => { btn.textContent = "Copier"; }, 2000); }
+    })
+    .catch(() => {
+      input.select();
+      try { document.execCommand("copy"); } catch {}
+    });
+});
+
+// Track referral visit from ?ref= parameter
+(function checkReferralParam() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    const myId = localStorage.getItem("profile_id");
+    if (ref && ref !== myId) {
+      localStorage.setItem("referred_by", ref);
+      fetch(`/api/referral/${ref}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      }).catch(() => {});
+    }
+  } catch {}
+})();
+
+// ══════════════════════════════════════════════════════════════════════════════
+// FEATURE 8 — ONBOARDING PROGRESS
+// ══════════════════════════════════════════════════════════════════════════════
+function updateOnboardingProgress() {
+  const card = $("onboardingCard");
+  if (!card) return;
+  try {
+    const videos    = JSON.parse(localStorage.getItem("edited_videos") || "[]");
+    const hasVideo  = videos.length >= 1;
+    const has5      = videos.length >= 5;
+    const raw       = localStorage.getItem("coach_profile");
+    const p         = raw ? JSON.parse(raw) : null;
+    const hasBrand  = !!(p?.primaryColor && p?.brandName);
+    const hasProf   = !!(p?.name && p?.icp && (p?.pillars || []).filter(Boolean).length >= 2);
+
+    // Hide card when all 5 steps complete
+    const allDone = hasVideo && has5 && hasBrand && hasProf;
+    if (allDone) { card.style.display = "none"; return; }
+    card.style.display = "";
+
+    const setStep = (id, done, isNext) => {
+      const el = $(id);
+      if (!el) return;
+      el.classList.toggle("step-done",   done);
+      el.classList.toggle("step-active", !done && isNext);
+      const icon = el.querySelector(".ob-icon");
+      if (icon) icon.textContent = done ? "✓" : isNext ? "→" : "";
+    };
+
+    setStep("step-account",     !!p,              !p);
+    setStep("step-first-video", hasVideo,          !!p && !hasVideo);
+    setStep("step-brand",       hasBrand,          hasVideo && !hasBrand);
+    setStep("step-5videos",     has5,              hasBrand && !has5);
+    setStep("step-profile",     hasProf,           has5 && !hasProf);
+  } catch {}
+}

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import secrets
 import shutil
+import subprocess
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -17,6 +19,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     Request,
     UploadFile,
 )
@@ -518,11 +521,240 @@ async def get_profile(profile_id: str) -> dict:
 
 
 @app.get("/api/download/{job_id}")
-def download(job_id: str, request: Request, _: None = Depends(_check_auth)):
+def download(
+    job_id: str,
+    request: Request,
+    fmt: str = Query("vertical"),
+    _: None = Depends(_check_auth),
+):
     out = settings.outputs_dir / f"{job_id}.mp4"
     if not out.exists():
         raise HTTPException(404, "Output not ready")
+
+    if fmt == "landscape":
+        landscape = settings.outputs_dir / f"{job_id}_landscape.mp4"
+        if not landscape.exists():
+            try:
+                from app.engine.transcribe import FFMPEG_PATH
+                subprocess.run([
+                    FFMPEG_PATH, "-y", "-i", str(out),
+                    "-vf",
+                    "scale=1920:1080:force_original_aspect_ratio=decrease,"
+                    "pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=black",
+                    "-c:v", "libx264", "-crf", "20", "-preset", "fast",
+                    "-c:a", "copy",
+                    str(landscape),
+                ], check=True, capture_output=True)
+            except Exception as e:
+                raise HTTPException(500, f"Landscape conversion failed: {e}")
+        return FileResponse(landscape, media_type="video/mp4",
+                            filename=f"youtube-{job_id}.mp4")
+
     return FileResponse(out, media_type="video/mp4", filename=f"edited-{job_id}.mp4")
+
+
+@app.get("/api/thumbnail/{job_id}")
+def thumbnail(job_id: str, request: Request, _: None = Depends(_check_auth)):
+    """Extract first frame as 1080×1080 square thumbnail."""
+    out = settings.outputs_dir / f"{job_id}.mp4"
+    if not out.exists():
+        raise HTTPException(404, "Output not ready")
+    thumb = settings.outputs_dir / f"{job_id}_thumb.jpg"
+    if not thumb.exists():
+        try:
+            from app.engine.transcribe import FFMPEG_PATH
+            subprocess.run([
+                FFMPEG_PATH, "-y", "-i", str(out),
+                "-vf",
+                "scale=1080:1080:force_original_aspect_ratio=decrease,"
+                "pad=1080:1080:(ow-iw)/2:(oh-ih)/2:color=black",
+                "-frames:v", "1", "-q:v", "2",
+                str(thumb),
+            ], check=True, capture_output=True)
+        except Exception as e:
+            raise HTTPException(500, f"Thumbnail extraction failed: {e}")
+    return FileResponse(thumb, media_type="image/jpeg",
+                        filename=f"thumbnail-{job_id}.jpg")
+
+
+# ── Feature 4: Hook Generator ─────────────────────────────────────────────────
+
+@app.post("/api/generate-hooks")
+async def generate_hooks(payload: dict = Body(...)) -> dict:
+    """Ask Claude to generate 5 scored hook options for a topic."""
+    topic = (payload.get("topic") or "").strip()
+    if not topic:
+        raise HTTPException(400, "topic required")
+    if not settings.anthropic_api_key:
+        raise HTTPException(500, "ANTHROPIC_API_KEY not set")
+
+    try:
+        import anthropic as _ant
+        client = _ant.Anthropic(api_key=settings.anthropic_api_key)
+        resp = client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=1500,
+            system=(
+                "You are a viral short-form content strategist. "
+                "Generate high-retention hooks. Always respond with valid JSON only — "
+                "a JSON array of hook objects, nothing else."
+            ),
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Generate 5 different hook options for this topic: \"{topic}\"\n\n"
+                    "Rules:\n"
+                    "- Each hook ≤ 10 seconds spoken (≤ 20 words)\n"
+                    "- Mix types: counterintuitive claim, specific stat, story opening, "
+                    "contrast/flip, curiosity question\n"
+                    "- Score 0–100 based on: curiosity gap + specificity + "
+                    "counterintuitive element\n"
+                    "- Write hooks in the SAME LANGUAGE as the topic\n"
+                    "- The hook must NOT resolve the tension it creates\n\n"
+                    "Return ONLY a JSON array:\n"
+                    '[{"text":"...", "score":85, "why":"one sentence explaining why this '
+                    'works"}, ...]'
+                ),
+            }],
+        )
+        raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+        # Extract JSON array
+        import re as _re
+        m = _re.search(r"\[.*\]", raw, _re.DOTALL)
+        hooks = json.loads(m.group(0)) if m else []
+        return {"hooks": hooks[:5]}
+    except Exception as e:
+        raise HTTPException(500, f"Hook generation failed: {e}")
+
+
+# ── Feature 6: Referral System ────────────────────────────────────────────────
+
+_REFERRALS_FILE = Path(__file__).resolve().parents[2] / "storage" / "referrals.json"
+
+
+def _load_referrals() -> dict:
+    try:
+        return json.loads(_REFERRALS_FILE.read_text())
+    except Exception:
+        return {}
+
+
+def _save_referrals(data: dict) -> None:
+    _REFERRALS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _REFERRALS_FILE.write_text(json.dumps(data, indent=2, ensure_ascii=False))
+
+
+@app.post("/api/referral/{ref_id}")
+def track_referral(ref_id: str, request: Request) -> dict:
+    """Record a referral visit for ref_id."""
+    data = _load_referrals()
+    entry = data.get(ref_id, {"count": 0, "visitors": []})
+    ip = request.client.host if request.client else "unknown"
+    # Deduplicate by IP
+    if ip not in entry.get("visitors", []):
+        entry["count"] = entry.get("count", 0) + 1
+        visitors = entry.get("visitors", [])
+        visitors.append(ip)
+        entry["visitors"] = visitors[-200:]  # keep last 200
+        entry["last_referral"] = datetime.utcnow().isoformat()
+        data[ref_id] = entry
+        _save_referrals(data)
+    return {"ref_id": ref_id, "count": entry["count"]}
+
+
+@app.get("/api/referral/{profile_id}/stats")
+def get_referral_stats(profile_id: str) -> dict:
+    """Return referral count for a profile."""
+    data = _load_referrals()
+    entry = data.get(profile_id, {"count": 0})
+    return {"profile_id": profile_id, "count": entry.get("count", 0)}
+
+
+# ── Feature 7: Weekly Email Digest ───────────────────────────────────────────
+
+def _send_weekly_digests() -> None:
+    """Iterate profiles and send weekly digest email to each coach."""
+    import os
+    try:
+        import resend as _resend
+    except ImportError:
+        return
+    api_key = os.environ.get("RESEND_API_KEY", "")
+    if not api_key:
+        return
+    _resend.api_key = api_key
+    try:
+        for profile_path in _PROFILES_DIR.glob("*.json"):
+            try:
+                profile = json.loads(profile_path.read_text())
+                email = profile.get("email", "")
+                if not email:
+                    continue
+                name = profile.get("name") or profile.get("brandName") or "Coach"
+                html = f"""<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#080808;font-family:'Helvetica Neue',Arial,sans-serif">
+  <div style="background:#080808;color:#F5F5F6;padding:40px 28px;max-width:520px;margin:0 auto">
+    <div style="margin-bottom:24px">
+      <span style="background:#FF7751;color:#080808;font-size:12px;font-weight:700;
+                   padding:5px 10px;border-radius:5px">LEANRETENTION</span>
+    </div>
+    <h1 style="font-size:22px;font-weight:800;margin:0 0 8px">
+      Votre résumé de la semaine, {name} 📊
+    </h1>
+    <p style="color:rgba(245,245,246,.6);font-size:15px;line-height:1.6;margin:0 0 24px">
+      Continuez sur cette lancée — chaque vidéo optimisée améliore votre rétention.
+    </p>
+    <div style="background:rgba(255,255,255,.04);border-radius:10px;padding:18px 20px;
+                margin-bottom:20px;border:1px solid rgba(255,255,255,.08)">
+      <p style="color:#FF7751;font-size:12px;font-weight:700;text-transform:uppercase;
+                letter-spacing:.06em;margin:0 0 10px">Conseil IA cette semaine</p>
+      <p style="font-size:14px;line-height:1.6;margin:0">
+        Ouvrez au moins <strong>2 boucles de curiosité</strong> dans les 30 premières secondes.
+        Les vidéos avec 3+ loops retiennent 40% de spectateurs supplémentaires à la marque.
+      </p>
+    </div>
+    <a href="https://leanlead-production.up.railway.app/app"
+       style="display:inline-block;background:#FF7751;color:#fff;padding:12px 24px;
+              border-radius:8px;text-decoration:none;font-weight:700;font-size:14px">
+      Éditer une nouvelle vidéo →
+    </a>
+    <div style="margin-top:36px;padding-top:18px;border-top:1px solid rgba(255,255,255,.07)">
+      <p style="color:rgba(245,245,246,.3);font-size:11px;margin:0">
+        LeanRetention · <a href="#" style="color:#FF7751;text-decoration:none">Se désabonner</a>
+      </p>
+    </div>
+  </div>
+</body></html>"""
+                _resend.Emails.send({
+                    "from": "digest@resend.dev",
+                    "to": [email],
+                    "subject": f"📊 Votre résumé LeanRetention — semaine du {datetime.utcnow().strftime('%d/%m')}",
+                    "html": html,
+                })
+            except Exception as e:
+                print(f"[digest] Failed for profile {profile_path.stem}: {e}")
+    except Exception as e:
+        print(f"[digest] Error iterating profiles: {e}")
+
+
+def _digest_scheduler() -> None:
+    """Check every hour if it's Monday 9AM UTC → send digest."""
+    try:
+        now = datetime.utcnow()
+        if now.weekday() == 0 and now.hour == 9 and now.minute < 60:
+            _send_weekly_digests()
+    except Exception as e:
+        print(f"[digest] Scheduler error: {e}")
+    t = threading.Timer(3600, _digest_scheduler)
+    t.daemon = True
+    t.start()
+
+
+# Start digest scheduler in background (first check after 30s)
+_digest_t = threading.Timer(30, _digest_scheduler)
+_digest_t.daemon = True
+_digest_t.start()
 
 
 editor_dir = Path(__file__).resolve().parents[2] / "editor_frontend"
