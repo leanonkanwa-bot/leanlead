@@ -316,6 +316,13 @@ async def submit_edit(
     store.update(job.id, source_path=str(dest), params=run_params)
 
     background.add_task(run_job, job.id, dest, **run_params)
+
+    # Feature 15: record activity for social proof ticker
+    try:
+        _append_activity("vient d'éditer une vidéo")
+    except Exception:
+        pass
+
     return JSONResponse({"job_id": job.id, "status": job.status})
 
 
@@ -668,6 +675,236 @@ def get_referral_stats(profile_id: str) -> dict:
     data = _load_referrals()
     entry = data.get(profile_id, {"count": 0})
     return {"profile_id": profile_id, "count": entry.get("count", 0)}
+
+
+# ── Feature 9: AI Video Coach ─────────────────────────────────────────────────
+
+@app.post("/api/coach-chat")
+async def coach_chat(payload: dict = Body(...)) -> dict:
+    """Claude analyses the user's video history and answers coaching questions."""
+    question = (payload.get("question") or "").strip()
+    if not question:
+        raise HTTPException(400, "question required")
+    if not settings.anthropic_api_key:
+        raise HTTPException(500, "ANTHROPIC_API_KEY not set")
+
+    video_history = payload.get("video_history") or []
+    profile = payload.get("profile") or {}
+
+    history_txt = ""
+    if video_history:
+        lines = []
+        for v in video_history[:20]:
+            title = v.get("title", "Untitled")
+            score = v.get("retention_score", "?")
+            fmt = v.get("format", "auto")
+            date = v.get("date", "")[:10]
+            lines.append(f"  - {date} | {title} | format={fmt} | retention={score}%")
+        history_txt = "Historique vidéos récentes:\n" + "\n".join(lines)
+
+    try:
+        import anthropic as _ant
+        client = _ant.Anthropic(api_key=settings.anthropic_api_key)
+        resp = client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=800,
+            system=(
+                "Tu es un coach vidéo expert en short-form content (TikTok, Reels, Shorts). "
+                "Tu analyses les données de performance de l'utilisateur et donnes des conseils "
+                "concrets, actionnables, basés sur les données. "
+                "Réponds en français, de manière directe et structurée. "
+                "Maximum 4 points clés, chacun avec une action concrète."
+            ),
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Profil: {json.dumps(profile, ensure_ascii=False)}\n\n"
+                    f"{history_txt}\n\n"
+                    f"Question: {question}"
+                ),
+            }],
+        )
+        answer = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+        return {"answer": answer.strip()}
+    except Exception as e:
+        raise HTTPException(500, f"Coach chat failed: {e}")
+
+
+# ── Feature 11: Competitor Analysis ──────────────────────────────────────────
+
+@app.post("/api/analyze-competitor")
+async def analyze_competitor(payload: dict = Body(...)) -> dict:
+    """Ask Claude to analyse a competitor video URL for content structure."""
+    url = (payload.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "url required")
+    if not settings.anthropic_api_key:
+        raise HTTPException(500, "ANTHROPIC_API_KEY not set")
+
+    try:
+        import anthropic as _ant
+        client = _ant.Anthropic(api_key=settings.anthropic_api_key)
+        resp = client.messages.create(
+            model=settings.anthropic_model,
+            max_tokens=1000,
+            system=(
+                "Tu es un expert en analyse de contenu viral (TikTok, YouTube Shorts, Reels). "
+                "Tu analyses des vidéos à partir de leur URL et identifies les patterns "
+                "de rétention. Réponds en français avec une analyse structurée."
+            ),
+            messages=[{
+                "role": "user",
+                "content": (
+                    f"Analyse cette vidéo concurrente: {url}\n\n"
+                    "Fournis une analyse détaillée en JSON avec ces champs:\n"
+                    '{"hook_type": "type de hook (counterintuitive/stat/story/question/contrast)", '
+                    '"hook_text": "texte approximatif du hook (si deductible de l\'URL/titre)", '
+                    '"estimated_loop": "mécanique de boucle supposée", '
+                    '"caption_style": "style de captions supposé", '
+                    '"structure": "description de la structure narrative", '
+                    '"retention_factors": ["facteur1", "facteur2", "facteur3"], '
+                    '"weakness": "point faible identifié", '
+                    '"steal_this": "élément précis à adapter pour nos vidéos"}'
+                ),
+            }],
+        )
+        raw = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+        import re as _re
+        m = _re.search(r"\{.*\}", raw, _re.DOTALL)
+        analysis = json.loads(m.group(0)) if m else {"raw": raw}
+        return {"analysis": analysis}
+    except Exception as e:
+        raise HTTPException(500, f"Competitor analysis failed: {e}")
+
+
+# ── Feature 14: Caption Editor ────────────────────────────────────────────────
+
+def _parse_ass_captions(ass_path: Path) -> list[dict]:
+    """Parse an ASS subtitle file and return list of {start, end, text} dicts."""
+    import re as _re
+    captions = []
+    for line in ass_path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith("Dialogue:"):
+            continue
+        # Dialogue: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
+        parts = line.split(",", 9)
+        if len(parts) < 10:
+            continue
+        start_s = parts[1].strip()
+        end_s   = parts[2].strip()
+        text    = parts[9].strip()
+        # Strip ASS override tags like {\c...}
+        text_clean = _re.sub(r"\{[^}]*\}", "", text).strip()
+        if text_clean:
+            captions.append({"start": start_s, "end": end_s, "text": text_clean})
+    return captions
+
+
+def _ass_ts_to_sec(ts: str) -> float:
+    """Convert ASS timestamp H:MM:SS.cs to seconds float."""
+    try:
+        h, m, rest = ts.split(":")
+        s, cs = rest.split(".")
+        return int(h) * 3600 + int(m) * 60 + int(s) + int(cs) / 100
+    except Exception:
+        return 0.0
+
+
+@app.get("/api/jobs/{job_id}/captions")
+def get_job_captions(job_id: str, request: Request, _: None = Depends(_check_auth)) -> dict:
+    """Return parsed captions for a completed job."""
+    ass_path = settings.work_dir / job_id / "captions.ass"
+    if not ass_path.exists():
+        return {"captions": []}
+    captions = _parse_ass_captions(ass_path)
+    return {"captions": captions}
+
+
+@app.post("/api/edit-captions/{job_id}")
+async def edit_captions(
+    job_id: str,
+    payload: dict = Body(...),
+    request: Request = None,
+    _: None = Depends(_check_auth),
+) -> dict:
+    """Accept edited captions and rewrite the ASS file.
+
+    Payload: {"captions": [{"start":"0:00:00.50","end":"0:00:01.20","text":"New text"}, ...]}
+    The ASS header is preserved; only Dialogue lines are replaced.
+    """
+    captions = payload.get("captions") or []
+    if not captions:
+        raise HTTPException(400, "captions required")
+
+    ass_path = settings.work_dir / job_id / "captions.ass"
+    if not ass_path.exists():
+        raise HTTPException(404, f"No captions file for job {job_id}")
+
+    # Read original to preserve header
+    original = ass_path.read_text(encoding="utf-8")
+    header_lines = []
+    for line in original.splitlines():
+        if line.startswith("Dialogue:"):
+            break
+        header_lines.append(line)
+
+    # Build new Dialogue lines
+    new_lines = header_lines[:]
+    for cap in captions:
+        start = cap.get("start", "0:00:00.00")
+        end   = cap.get("end",   "0:00:00.00")
+        text  = cap.get("text",  "").replace("\n", " ")
+        new_lines.append(f"Dialogue: 0,{start},{end},Default,,0,0,0,,{text}")
+
+    ass_path.write_text("\n".join(new_lines), encoding="utf-8")
+    return {"status": "ok", "lines": len(captions)}
+
+
+# ── Feature 15: Activity Feed ─────────────────────────────────────────────────
+
+_ACTIVITY_FILE = Path(__file__).resolve().parents[2] / "storage" / "activity.json"
+_FIRST_NAMES = [
+    "Marie", "Lucas", "Camille", "Thomas", "Emma", "Léo", "Sarah", "Antoine",
+    "Clara", "Julien", "Manon", "Nicolas", "Inès", "Alexandre", "Chloé",
+    "Maxime", "Laura", "Romain", "Alice", "Pierre",
+]
+_ACTIONS = [
+    "vient d'éditer une vidéo",
+    "a généré 5 hooks IA",
+    "a optimisé ses captions",
+    "a téléchargé sa vidéo TikTok",
+    "a analysé un concurrent",
+    "a planifié du contenu",
+    "vient de rejoindre LeanRetention",
+]
+
+
+def _load_activity() -> list:
+    try:
+        return json.loads(_ACTIVITY_FILE.read_text())
+    except Exception:
+        return []
+
+
+def _append_activity(action: str) -> None:
+    """Append an anonymized activity entry."""
+    import random as _rnd
+    entries = _load_activity()
+    entries.insert(0, {
+        "name": _rnd.choice(_FIRST_NAMES),
+        "action": action,
+        "ts": datetime.utcnow().isoformat(),
+    })
+    _ACTIVITY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    _ACTIVITY_FILE.write_text(
+        json.dumps(entries[:200], ensure_ascii=False, indent=2)
+    )
+
+
+@app.get("/api/activity")
+def get_activity() -> dict:
+    """Return last 10 anonymized activity entries for social proof ticker."""
+    return {"activity": _load_activity()[:10]}
 
 
 # ── Feature 7: Weekly Email Digest ───────────────────────────────────────────
