@@ -1,0 +1,1 @@
+Drop custom TTF font files here. They will be installed to /usr/local/share/fonts/leanlead/ in the Docker container. SF Compact Bold: place SFCompact-Bold.ttf here.

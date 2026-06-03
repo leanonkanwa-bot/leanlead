@@ -93,6 +93,10 @@ class EditPlan:
     def music_energy(self) -> list[dict[str, Any]]:
         return self.raw.get("music_energy", [])
 
+    @property
+    def word_colors(self) -> dict[str, str]:
+        return self.raw.get("word_colors", {})
+
 
 def _decide_format(duration_s: float, hint: FormatHint) -> str:
     if hint in ("short", "long"):

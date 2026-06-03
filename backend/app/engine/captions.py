@@ -22,7 +22,7 @@ ALLOWED_FONTS = {
     "Poppins Bold", "Poppins ExtraBold", "Poppins SemiBold",
     "Inter Bold", "Montserrat Bold", "Montserrat Black",
     "Roboto Bold", "Bebas Neue", "DM Sans Bold", "Space Grotesk Bold",
-    "DejaVu Sans Bold",
+    "DejaVu Sans Bold", "SF Compact Bold",
 }
 
 ALLOWED_COLORS = {
@@ -77,6 +77,7 @@ _FONT_MAP: dict[str, str] = {
     "DM Sans Bold":       "DejaVu Sans Bold",
     "Space Grotesk Bold": "DejaVu Sans Bold",
     "Bebas Neue":         "DejaVu Sans Bold",
+    "SF Compact Bold":    "DejaVu Sans Bold",
 }
 
 
@@ -208,6 +209,7 @@ def build_ass(
     style: str = "impact",
     broll_windows: Iterable[tuple[float, float]] = (),
     emphasis_only: bool = False,
+    word_colors: dict[str, str] | None = None,
 ) -> Path:
     """Render captions to an ASS file.
 
@@ -234,6 +236,8 @@ def build_ass(
 
     lines = [_ass_header(short_form, font, color_hex, position, style)]
 
+    word_color_map = {k.strip().lower(): v for k, v in (word_colors or {}).items()}
+
     groups = _group_words(word_list)
     for group in groups:
         # Skip groups entirely inside b-roll windows
@@ -256,8 +260,13 @@ def build_ass(
         cap_size_emph = CAP_SIZE_SHORT_EMPH if short_form else CAP_SIZE_LONG_EMPH
         display_parts: list[str] = []
         for i, w in enumerate(clean_words):
-            if w.lower() in emphasis_set:
-                # Inline override: salmon colour + emphasis size, then reset
+            w_lower = w.lower()
+            custom_color = word_color_map.get(w_lower)
+            if custom_color:
+                color_ass = _hex_to_ass_bgr(custom_color)
+                label = w.capitalize() if i == 0 else w.lower()
+                display_parts.append(f"{{\\c{color_ass}}}{label}{{\\r}}")
+            elif w_lower in emphasis_set:
                 display_parts.append(
                     f"{{\\c{EMPHASIS_COLOR_ASS}\\fs{cap_size_emph}}}{w.title()}{{\\r}}"
                 )

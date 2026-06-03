@@ -412,6 +412,25 @@ def _remap_time(t: float, kept_intervals: list[tuple[float, float]]) -> float:
     return out
 
 
+def _find_word_timestamp(
+    transcript: dict[str, Any],
+    anchor_word: str,
+) -> float | None:
+    """Find the start timestamp of the first occurrence of anchor_word."""
+    needle = anchor_word.strip().lower().strip(".,!?;:\"'")
+    for seg in transcript.get("segments", []):
+        for w in seg.get("words", []):
+            wt = str(w.get("text", "")).strip().lower().strip(".,!?;:\"'")
+            if wt == needle:
+                return float(w["start"])
+    return None
+
+
+def _escape_for_vf(expr: str) -> str:
+    """Escape commas in an expression for safe use in a -vf filter chain option value."""
+    return expr.replace(",", "\\,")
+
+
 def _build_zoom_expression(
     zoom_plan: list[dict[str, Any]],
     total_duration: float,
@@ -816,6 +835,7 @@ def render(
     remapped_words: list[WordTiming] = []
     remapped_silences: list[dict[str, Any]] = []
     remapped_vsm: list[dict[str, Any]] = []
+    cut_timestamps: list[float] = []  # output-timeline timestamps of cut points
 
     for i, seg in enumerate(keep):
         s_raw = float(seg["start"])
@@ -883,6 +903,8 @@ def render(
                     "duration": vm_dur,
                 })
 
+        if parts:  # not the first segment — record this cut point
+            cut_timestamps.append(cum)
         cum += (e - s)
 
     if not parts:
@@ -906,6 +928,12 @@ def render(
             br_dur = float(br.get("duration", 0))
         except (TypeError, ValueError):
             continue
+        # UPGRADE 1: anchor_word overrides at with the exact word timestamp
+        anchor = str(br.get("anchor_word") or "").strip()
+        if anchor:
+            anchor_ts = _find_word_timestamp(transcript, anchor)
+            if anchor_ts is not None:
+                br_at = anchor_ts
         br_dur = max(BROLL_MIN_S, min(BROLL_MAX_S, br_dur))
         # Find the keep_segment that contains br_at and remap.
         run = 0.0
@@ -940,17 +968,18 @@ def render(
                 break
             run += max(0.0, ee - ss)
 
-    # FIX 3 + FIX 7 — Silence/dead-space compression for short-form.
-    # Detect pauses > 0.4s between spoken words and compress them to 0.3s.
-    # Must run AFTER remapped_broll and remapped_hyperframes are built so
-    # all timeline data is remapped together consistently.
-    if short_form and remapped_words:
-        long_pauses = _find_long_pauses(remapped_words, min_gap_s=0.4)
+    # UPGRADE 6 — BREATHLESS PACING: tighter silence thresholds.
+    # Short-form: any pause > 0.3s → compress to 0.25s (breathless sensation).
+    # Long-form: any pause > 0.6s → compress to 0.4s (cinematic breathing room).
+    _sil_min = 0.30 if short_form else 0.60
+    _sil_max = 0.25 if short_form else 0.40
+    if remapped_words:
+        long_pauses = _find_long_pauses(remapped_words, min_gap_s=_sil_min)
         if long_pauses:
             compressed_path = work_dir / "concat_compressed.mp4"
             kept_intervals = _compress_pauses(
                 concat_path, compressed_path, work_dir,
-                long_pauses, max_silence_s=0.3,
+                long_pauses, max_silence_s=_sil_max,
             )
             if compressed_path.exists():
                 concat_path = compressed_path
@@ -980,8 +1009,80 @@ def render(
                     {**sil, "at": _remap_time(float(sil.get("at", 0)), kept_intervals)}
                     for sil in remapped_silences
                 ]
+                cut_timestamps = [
+                    _remap_time(ct, kept_intervals) for ct in cut_timestamps
+                ]
 
     total_duration = _probe_duration(concat_path)
+
+    # UPGRADE 7 — VISUAL RESET AT EVERY CUT: alternate zoom level at each edit point.
+    for ci, ct in enumerate(cut_timestamps):
+        if ct <= 0.5 or ct >= total_duration - 0.5:
+            continue
+        z_alt = 1.04 if ci % 2 == 0 else 1.10
+        remapped_zoom.append({
+            "start": ct - 0.05,
+            "end": ct + 0.25,
+            "from": 1.08,
+            "to": z_alt,
+            "kind": "punch_in",
+        })
+        remapped_zoom.append({
+            "start": ct + 0.25,
+            "end": ct + 1.0,
+            "from": z_alt,
+            "to": 1.08,
+            "kind": "drift",
+        })
+
+    # UPGRADE 2 — AUTO-PUNCH at hyperframe timestamps for felt impact.
+    _covered_times = {float(zp.get("start", 0)) for zp in remapped_zoom}
+    for hf in remapped_hyperframes:
+        hf_at = float(hf.get("at", 0))
+        if hf_at < 0.5 or hf_at > total_duration - 0.5:
+            continue
+        if not any(
+            abs(float(zp.get("start", 0)) - hf_at) < 0.5
+            for zp in remapped_zoom
+        ):
+            remapped_zoom.append({
+                "start": hf_at,
+                "end": hf_at + 0.05,
+                "from": 1.08,
+                "to": 1.15,
+                "kind": "punch_in",
+            })
+            remapped_zoom.append({
+                "start": hf_at + 0.05,
+                "end": hf_at + 1.2,
+                "from": 1.15,
+                "to": 1.08,
+                "kind": "drift",
+            })
+
+    # UPGRADE 4 — 3-SECOND VISUAL RHYTHM: auto-insert micro-punches in long gaps.
+    _all_event_times = sorted(
+        [0.0]
+        + [float(zp.get("start", 0)) for zp in remapped_zoom]
+        + [float(hf.get("at", 0)) for hf in remapped_hyperframes]
+        + [total_duration]
+    )
+    for _ei in range(len(_all_event_times) - 1):
+        _gap_s = _all_event_times[_ei]
+        _gap_e = _all_event_times[_ei + 1]
+        if _gap_e - _gap_s > 3.0:
+            _mid = (_gap_s + _gap_e) / 2
+            if 0.5 < _mid < total_duration - 0.5:
+                remapped_zoom.append({
+                    "start": _mid,
+                    "end": _mid + 0.2,
+                    "from": 1.08,
+                    "to": 1.12,
+                    "kind": "drift",
+                })
+
+    # Sort the final zoom plan chronologically.
+    remapped_zoom.sort(key=lambda z: float(z.get("start", 0)))
 
     ass_path = work_dir / "captions.ass"
     build_ass(
@@ -994,6 +1095,7 @@ def render(
         position=caption_position,
         style=caption_style,
         broll_windows=remapped_broll,
+        word_colors=plan.word_colors,
     )
 
     face_cx_pct = 50.0
@@ -1106,12 +1208,30 @@ def render(
     _tmp_dir = Path(_tempfile.gettempdir())
     _base_path = _tmp_dir / f"base_{output_path.stem}.mp4"
 
-    _zoom_str = (
-        f"zoompan=z=1.08"
-        f":x=iw/2-(iw/zoom/2)"
-        f":y=ih/2-(ih/zoom/2)"
-        f":d=1:s={target_w}x{target_h}:fps={fps}"
-    )
+    # UPGRADE 2 — DYNAMIC ZOOM EXPRESSION from the full zoom plan.
+    # Cap at 30 entries to keep expression length manageable.
+    _zoom_for_expr = remapped_zoom[:30] if len(remapped_zoom) > 30 else remapped_zoom
+    if _zoom_for_expr:
+        _z_expr, _xy_expr = _build_zoom_expression(
+            _zoom_for_expr, total_duration, fps, face_cx_pct, face_cy_pct
+        )
+        _zx_str, _zy_str = _xy_expr.split(";")
+        _z_safe = _escape_for_vf(_z_expr)
+        _zx_safe = _escape_for_vf(_zx_str)
+        _zy_safe = _escape_for_vf(_zy_str)
+        _zoom_str = (
+            f"zoompan=z='{_z_safe}'"
+            f":x='{_zx_safe}'"
+            f":y='{_zy_safe}'"
+            f":d=1:s={target_w}x{target_h}:fps={fps}"
+        )
+    else:
+        _zoom_str = (
+            f"zoompan=z=1.08"
+            f":x=iw/2-(iw/zoom/2)"
+            f":y=ih/2-(ih/zoom/2)"
+            f":d=1:s={target_w}x{target_h}:fps={fps}"
+        )
     _vf_p1 = [p for p in [color_grade, scale_filter, _zoom_str] if p]
     _cmd_p1: list[str] = [
         FFMPEG_PATH, "-y", "-loglevel", "error",

@@ -249,6 +249,13 @@ CUT SPEED BY SECTION:
   PRINCIPE / PAYOFF                → slow cuts (4–8s per segment,
                                       let the weight land)
 
+3-SECOND VISUAL RHYTHM — ABSOLUTE RULE:
+  Every 2–3 seconds there MUST be a visual change.
+  Visual changes: cut, b-roll cut, zoom punch, caption emphasis word, hyperframe.
+  The renderer will auto-insert a micro zoom punch at gaps > 3s.
+  Your job: ensure your zoom_plan + hyperframes cover every 3s window.
+  A video with no visual change for 4+ seconds loses 70% of viewers.
+
 SPEED RAMPS — flag moments for the renderer:
   speed_up moments: mundane connectives, quick examples, transitions
     between ideas that carry no emotional weight.
@@ -642,6 +649,7 @@ only when the visual DRAMATICALLY reinforces the spoken idea — never
 for variety or decoration.
 
 Placement (must match the spoken context precisely):
+  Each b-roll MUST specify an `anchor_word` — the exact spoken word (verbatim from transcript) where the cut happens. The renderer will find that word's exact timestamp and cut in on that frame.
   Clip 1 → during STORY/CONTRAST  (show the concrete scene or wrong way)
   Clip 2 → during PAYOFF          (make the key idea land visually)
 
@@ -888,7 +896,8 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
   "broll_suggestions": [
     { "at": <s>, "duration": <s>,
       "concept": "<what the b-roll shows>",
-      "reason": "contrast|story|payoff" }
+      "reason": "contrast|story|payoff",
+      "anchor_word": "<verbatim word from transcript at cut point>" }
     /* MAX 2 entries. Zero is acceptable. Never 3+. */
   ],
 
@@ -956,6 +965,16 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
   ],
 
   "caption_emphasis_words": ["<word>", "<word>", ...],
+
+  /* ── word_colors: per-word color overrides for captions ──────────────
+     Key = exact spoken word (lowercase), Value = hex color.
+     TIME/NUMBER words → "#FFE500" (yellow)
+     EMOTION words (hate,love,fear) → "#FF3B30" (red)
+     Limit to 5-10 words max. Do NOT duplicate caption_emphasis_words.
+  */
+  "word_colors": {
+    "<word>": "#RRGGBB"
+  },
 
   "key_lines": [
     "<the 3 sentences the viewer remembers 24 hours later>",

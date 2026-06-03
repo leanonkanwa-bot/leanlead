@@ -5,6 +5,10 @@ RUN apt-get update && apt-get install -y \
     fonts-open-sans \
     && rm -rf /var/lib/apt/lists/*
 
+# Custom fonts (SF Compact Bold, etc.) — drop TTF files into fonts/ before building.
+COPY fonts/ /usr/local/share/fonts/leanlead/
+RUN fc-cache -f -v 2>/dev/null || true
+
 WORKDIR /app/backend
 
 COPY backend/requirements.txt .
