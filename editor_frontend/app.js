@@ -710,10 +710,6 @@ const resultCard  = $("resultCard");
 const previewCard = $("previewCard");
 const player      = $("player");
 const downloadLink = $("downloadLink");
-const pkgTitle    = $("pkgTitle");
-const pkgThumb    = $("pkgThumb");
-const pkgEnd      = $("pkgEnd");
-const planJson    = $("planJson");
 
 // ── Auth check ────────────────────────────────────────────────────────────────
 (async () => {
@@ -979,7 +975,7 @@ function spawnConfetti() {
 }
 
 async function showResult(jobId, result) {
-  if (submitBtn) { submitBtn.disabled = false; submitBtn.querySelector(".btn-label").textContent = "Éditer une autre"; submitBtn.classList.remove("loading"); }
+  if (submitBtn) { submitBtn.disabled = false; submitBtn.querySelector(".btn-label").textContent = "Éditer ma vidéo"; submitBtn.classList.remove("loading"); }
   previewCard?.classList.add("hidden");
   resultCard?.classList.remove("hidden");
   resultCard?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1004,22 +1000,16 @@ async function showResult(jobId, result) {
     } catch {}
   }, 600);
 
-  if (player)            player.src = `/api/download/${jobId}`;
-  if ($("downloadTiktok"))  $("downloadTiktok").href  = `/api/download/${jobId}`;
-  if ($("downloadYoutube")) $("downloadYoutube").href = `/api/download/${jobId}?fmt=landscape`;
-  if ($("downloadThumb"))   $("downloadThumb").href   = `/api/thumbnail/${jobId}`;
+  if (player) player.src = `/api/download/${jobId}`;
+  if (downloadLink) downloadLink.href = `/api/download/${jobId}`;
 
   const pkg = result?.packaging || {};
-  if (pkgTitle) pkgTitle.textContent = pkg.title || result?.titres_ctr?.[0] || "—";
-  if (pkgThumb) pkgThumb.textContent = result?.thumbnail_mot || pkg.thumbnail_word || "—";
-  if (pkgEnd)   pkgEnd.textContent   = pkg.end_caption || "—";
-
   const titres = result?.titres_ctr || [];
   if (titres.length && $("ctrTitles")) {
     $("ctrTitles").innerHTML = titres.map((t, i) => `<div class="ctr-title"><span class="ctr-num">${i + 1}</span>${t}</div>`).join("");
-    $("ctrBlock")?.classList.remove("hidden");
+    const ctrBlock = $("ctrBlock");
+    if (ctrBlock) ctrBlock.style.display = "";
   }
-  if (planJson) planJson.textContent = JSON.stringify(result?.plan ?? {}, null, 2);
 
   // ── Save to localStorage with retention_score ────────────────────────────
   try {
@@ -1130,23 +1120,22 @@ $("publishNowBtn")?.addEventListener("click", async () => {
   btn.disabled = false; btn.textContent = `Publier sur ${_selectedPlatforms.size} plateforme${_selectedPlatforms.size > 1 ? "s" : ""} →`;
 });
 
-// ── Instructions toggle ───────────────────────────────────────────────────────
-const instrToggle = $("instrToggle");
-const instrBody   = $("instrBody");
-const instrArrow  = $("instrArrow");
-instrToggle?.addEventListener("click", () => {
-  const open = instrBody?.classList.toggle("open");
-  if (instrArrow) instrArrow.textContent = open ? "↑" : "↓";
-  instrToggle.setAttribute("aria-expanded", String(open));
+
+// ── Details expand toggle ─────────────────────────────────────────────────────
+$("detailsToggle")?.addEventListener("click", () => {
+  const body = $("detailsBody");
+  const btn  = $("detailsToggle");
+  if (!body) return;
+  const open = body.classList.toggle("open");
+  if (btn) btn.textContent = open ? "Masquer les détails ↑" : "Voir les détails ↓";
 });
-instrToggle?.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); instrToggle.click(); } });
 
 // ── Preview panel (ready_for_review) ─────────────────────────────────────────
 let _reviewJobId = null;
 
 function showPreview(jobId, preview) {
   _reviewJobId = jobId;
-  if (submitBtn) { submitBtn.disabled = false; submitBtn.querySelector(".btn-label").textContent = "Éditer une autre"; submitBtn.classList.remove("loading"); }
+  if (submitBtn) { submitBtn.disabled = false; submitBtn.querySelector(".btn-label").textContent = "Éditer ma vidéo"; submitBtn.classList.remove("loading"); }
   statusCard?.classList.add("hidden");
   if (!previewCard || !preview) return;
   previewCard.classList.remove("hidden");

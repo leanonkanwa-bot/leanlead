@@ -265,24 +265,26 @@
       }
 
       /* ── RESULT ─────────────────────────────────────────────── */
-      .result .row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
-      .result h2 { font-size: 1.05rem; font-weight: 700; }
-      .btn-download {
-        background: var(--salmon); color: #fff; border: none;
-        box-shadow: 0 0 20px rgba(255,119,81,.4);
-        padding: .6rem 1.25rem; border-radius: 8px;
-        font-family: var(--font); font-size: .875rem; font-weight: 600;
-        cursor: pointer; text-decoration: none;
+      video { width: 100%; border-radius: 10px; background: #000; margin-bottom: 1rem; }
+      .btn-download-main {
+        display: block; width: 100%; padding: 1rem;
+        background: var(--salmon); color: #fff; border: none; border-radius: 10px;
+        font-family: var(--font); font-size: 1rem; font-weight: 700; text-align: center;
+        cursor: pointer; text-decoration: none; margin-bottom: .6rem;
+        box-shadow: 0 0 30px rgba(255,119,81,.4), 0 4px 16px rgba(255,119,81,.25);
         transition: opacity .15s, box-shadow .2s;
       }
-      .btn-download:hover { opacity: .9; box-shadow: 0 0 30px rgba(255,119,81,.5); }
-      video { width: 100%; border-radius: 10px; background: #000; margin-bottom: 1.25rem; }
-      .packaging { display: grid; gap: .75rem; }
-      .packaging > div { background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 10px; padding: .85rem 1rem; }
+      .btn-download-main:hover { opacity: .9; box-shadow: 0 0 50px rgba(255,119,81,.5); }
+      .details-toggle {
+        background: transparent; border: none; color: var(--muted);
+        font-size: .82rem; cursor: pointer; font-family: var(--font);
+        padding: .4rem 0; display: block; width: 100%; text-align: center;
+        transition: color .15s;
+      }
+      .details-toggle:hover { color: var(--text); }
+      .details-body { display: none; padding-top: 1rem; border-top: 1px solid var(--border); margin-top: .6rem; }
+      .details-body.open { display: block; }
       .tag-label { font-size: .68rem; font-weight: 700; color: var(--salmon); letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: .3rem; }
-      .packaging p { font-size: .875rem; }
-      .thumb-word { font-size: 1.8rem; font-weight: 800; letter-spacing: -.02em; }
-      .ctr-block { margin-top: .75rem; }
       #ctrTitles { display: flex; flex-direction: column; gap: .4rem; margin-top: .5rem; }
       .ctr-title { font-size: .875rem; padding: .6rem .85rem; background: rgba(255,255,255,.03); border: 1px solid var(--border); border-radius: 8px; display: flex; gap: .5rem; align-items: flex-start; }
       .ctr-num { color: var(--salmon); font-weight: 700; flex-shrink: 0; }
@@ -1434,25 +1436,12 @@
             </div>
           </div>
 
-          <!-- Instructions (collapsible) -->
-          <div class="brief-toggle" id="instrToggle" role="button" tabindex="0" aria-expanded="false">
-            <span>Instructions <em style="font-weight:400;color:var(--muted);text-transform:none">(optionnel)</em></span>
-            <span class="arrow" id="instrArrow">↓</span>
-          </div>
-          <div class="brief-body" id="instrBody">
-            <div class="field" style="padding-top:.75rem">
-              <textarea
-                name="instructions"
-                rows="3"
-                placeholder="ex. Le hook doit commencer par le moment clé. Tout couper après 3 minutes."
-              ></textarea>
-            </div>
-          </div>
-
-          <!-- Notification email -->
-          <div class="field" style="margin-top:1rem">
-            <span>Email pour recevoir les notifications</span>
-            <input type="email" name="notification_email" id="notifEmail" placeholder="votre@email.com" />
+          <div class="field">
+            <textarea
+              name="instructions"
+              rows="2"
+              placeholder="Instructions optionnelles — ex. Commencer par le moment clé, couper après 3 min."
+            ></textarea>
           </div>
 
           <button type="submit" class="btn-submit" id="submit">
@@ -1545,114 +1534,45 @@
 
       <!-- RESULT -->
       <section class="card result hidden" id="resultCard">
-        <div class="row" style="margin-bottom:.75rem">
-          <h2>Montage prêt ✓</h2>
-        </div>
-        <!-- Multi-format download (Feature 2) -->
-        <div class="download-buttons-grid">
-          <a id="downloadTiktok" class="btn-download-fmt" download>
-            <span class="fmt-icon">📱</span>
-            <span class="fmt-name">TikTok / Reels</span>
-            <span class="fmt-sub">1080×1920</span>
-          </a>
-          <a id="downloadYoutube" class="btn-download-fmt" download>
-            <span class="fmt-icon">▶️</span>
-            <span class="fmt-name">YouTube</span>
-            <span class="fmt-sub">1920×1080</span>
-          </a>
-          <a id="downloadThumb" class="btn-download-fmt fmt-outline" download>
-            <span class="fmt-icon">🖼</span>
-            <span class="fmt-name">Miniature</span>
-            <span class="fmt-sub">1080×1080</span>
-          </a>
-        </div>
         <video id="player" controls playsinline></video>
-        <div class="packaging">
-          <div>
-            <span class="tag-label">Titre suggéré</span>
-            <p id="pkgTitle"></p>
-          </div>
-          <div>
-            <span class="tag-label">Mot miniature</span>
-            <p id="pkgThumb" class="thumb-word"></p>
-          </div>
-          <div>
-            <span class="tag-label">Caption de fin</span>
-            <p id="pkgEnd"></p>
-          </div>
-        </div>
-        <div id="ctrBlock" class="ctr-block hidden">
-          <span class="tag-label">5 titres A/B à tester</span>
-          <div id="ctrTitles"></div>
-        </div>
-        <!-- Caption Editor (Feature 14) -->
-        <div class="caption-editor" id="captionEditorWrap" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.55rem">
-            <span style="font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">✏ Éditeur de captions</span>
-            <button id="reburnBtn" class="btn-render" style="font-size:.72rem;padding:.35rem .75rem">Re-brûler les captions</button>
-          </div>
-          <div class="caption-list" id="captionList"></div>
-          <p id="reburnMsg" style="font-size:.75rem;color:var(--salmon);margin-top:.4rem;display:none">Captions mises à jour ✓</p>
-        </div>
+        <a id="downloadLink" class="btn-download-main" download>Télécharger →</a>
+        <button id="detailsToggle" class="details-toggle">Voir les détails ↓</button>
+        <div id="detailsBody" class="details-body">
 
-        <!-- Feature 17: Auto-Chapters -->
-        <div class="chapters-section" id="chaptersSection" style="display:none">
-          <h4 style="margin:0 0 .4rem;font-size:.85rem">📑 Chapitres YouTube</h4>
-          <pre class="chapters-pre" id="chaptersOutput"></pre>
-          <button class="btn-copy-sm" id="copyChaptersBtn">📋 Copier les chapitres</button>
-        </div>
+          <!-- Title suggestions -->
+          <div id="ctrBlock" style="display:none;margin-bottom:1.25rem">
+            <span class="tag-label">Titres suggérés</span>
+            <div id="ctrTitles"></div>
+          </div>
 
-        <!-- Feature 18: Description Generator -->
-        <div class="desc-gen-section">
-          <h4 style="margin:0 0 .5rem;font-size:.85rem">✍️ Descriptions plateformes</h4>
-          <button class="desc-gen-btn" id="descGenBtn"><span id="descGenBtnLabel">✨ Générer les descriptions</span></button>
-          <div id="descGenOutput" style="display:none">
-            <div class="desc-tabs">
-              <button class="desc-tab active" data-plat="youtube">YouTube</button>
-              <button class="desc-tab" data-plat="tiktok">TikTok</button>
-              <button class="desc-tab" data-plat="instagram">Instagram</button>
-              <button class="desc-tab" data-plat="linkedin">LinkedIn</button>
+          <!-- Caption Editor (Feature 14) -->
+          <div class="caption-editor" id="captionEditorWrap" style="display:none">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.55rem">
+              <span style="font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">✏ Éditeur de captions</span>
+              <button id="reburnBtn" class="btn-render" style="font-size:.72rem;padding:.35rem .75rem">Re-brûler les captions</button>
             </div>
-            <div class="desc-platform active" id="desc-youtube"><div class="desc-output" id="desc-youtube-text"></div><button class="btn-copy-sm" data-copy="desc-youtube-text">📋 Copier</button></div>
-            <div class="desc-platform" id="desc-tiktok"><div class="desc-output" id="desc-tiktok-text"></div><button class="btn-copy-sm" data-copy="desc-tiktok-text">📋 Copier</button></div>
-            <div class="desc-platform" id="desc-instagram"><div class="desc-output" id="desc-instagram-text"></div><button class="btn-copy-sm" data-copy="desc-instagram-text">📋 Copier</button></div>
-            <div class="desc-platform" id="desc-linkedin"><div class="desc-output" id="desc-linkedin-text"></div><button class="btn-copy-sm" data-copy="desc-linkedin-text">📋 Copier</button></div>
+            <div class="caption-list" id="captionList"></div>
+            <p id="reburnMsg" style="font-size:.75rem;color:var(--salmon);margin-top:.4rem;display:none">Captions mises à jour ✓</p>
           </div>
-        </div>
 
-        <details>
-          <summary>Plan de montage (JSON brut)</summary>
-          <pre id="planJson"></pre>
-        </details>
-
-        <!-- Publish section -->
-        <div class="publish-section" id="publishSection">
-          <h3>Publier</h3>
-          <div class="platform-grid" id="platformGrid">
-            <button type="button" class="platform-btn" data-platform="youtube">
-              <span class="platform-dot" id="dot-youtube"></span> YouTube
-            </button>
-            <button type="button" class="platform-btn" data-platform="tiktok">
-              <span class="platform-dot" id="dot-tiktok"></span> TikTok
-            </button>
-            <button type="button" class="platform-btn" data-platform="instagram">
-              <span class="platform-dot" id="dot-instagram"></span> Instagram
-            </button>
-            <button type="button" class="platform-btn" data-platform="linkedin">
-              <span class="platform-dot" id="dot-linkedin"></span> LinkedIn
-            </button>
-          </div>
-          <div id="publishMetaPreview" style="display:none;margin-bottom:1rem">
-            <div class="field"><span>Titre / Caption</span>
-              <input type="text" id="publishTitle" placeholder="Généré automatiquement…" />
+          <!-- Platform descriptions (Feature 18) -->
+          <div class="desc-gen-section" style="margin-top:1rem">
+            <h4 style="margin:0 0 .5rem;font-size:.85rem">✍️ Descriptions plateformes</h4>
+            <button class="desc-gen-btn" id="descGenBtn"><span id="descGenBtnLabel">✨ Générer les descriptions</span></button>
+            <div id="descGenOutput" style="display:none">
+              <div class="desc-tabs">
+                <button class="desc-tab active" data-plat="youtube">YouTube</button>
+                <button class="desc-tab" data-plat="tiktok">TikTok</button>
+                <button class="desc-tab" data-plat="instagram">Instagram</button>
+                <button class="desc-tab" data-plat="linkedin">LinkedIn</button>
+              </div>
+              <div class="desc-platform active" id="desc-youtube"><div class="desc-output" id="desc-youtube-text"></div><button class="btn-copy-sm" data-copy="desc-youtube-text">📋 Copier</button></div>
+              <div class="desc-platform" id="desc-tiktok"><div class="desc-output" id="desc-tiktok-text"></div><button class="btn-copy-sm" data-copy="desc-tiktok-text">📋 Copier</button></div>
+              <div class="desc-platform" id="desc-instagram"><div class="desc-output" id="desc-instagram-text"></div><button class="btn-copy-sm" data-copy="desc-instagram-text">📋 Copier</button></div>
+              <div class="desc-platform" id="desc-linkedin"><div class="desc-output" id="desc-linkedin-text"></div><button class="btn-copy-sm" data-copy="desc-linkedin-text">📋 Copier</button></div>
             </div>
           </div>
-          <div style="display:flex;gap:.6rem;align-items:center">
-            <button type="button" id="publishNowBtn" class="btn-render" style="flex:1" disabled>
-              Publier sur les plateformes sélectionnées →
-            </button>
-          </div>
-          <p id="publishStatus" style="font-size:.8rem;color:var(--muted);margin-top:.5rem"></p>
+
         </div>
       </section>
 
