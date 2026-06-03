@@ -1003,6 +1003,18 @@ async function showResult(jobId, result) {
   if (player) player.src = `/api/download/${jobId}`;
   if (downloadLink) downloadLink.href = `/api/download/${jobId}`;
 
+  // Show hook_rewrite as suggested title metadata (not a video caption).
+  const suggestedTitleEl = $("suggestedTitleResult");
+  if (suggestedTitleEl) {
+    const suggestedTitle = result?.hook_overlay?.rewritten_hook || "";
+    if (suggestedTitle) {
+      suggestedTitleEl.textContent = `Titre suggéré : ${suggestedTitle}`;
+      suggestedTitleEl.style.display = "";
+    } else {
+      suggestedTitleEl.style.display = "none";
+    }
+  }
+
   const pkg = result?.packaging || {};
   const titres = result?.titres_ctr || [];
   if (titres.length && $("ctrTitles")) {
