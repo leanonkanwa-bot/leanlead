@@ -36,20 +36,20 @@ ALLOWED_COLORS = {
 ALLOWED_POSITIONS = {"center", "bottom", "side-left", "side-right"}
 ALLOWED_STYLES    = {"impact", "kinetic"}
 
-# 5% of PlayResY — bold and readable at full screen.
-CAP_SIZE_SHORT      = 96   # 5% of 1920
-CAP_SIZE_LONG       = 54   # 5% of 1080
-# Emphasis words: 1.3× larger (Title Case, salmon #FF7751)
-CAP_SIZE_SHORT_EMPH = 125  # ~6.5% of 1920
-CAP_SIZE_LONG_EMPH  = 70   # ~6.5% of 1080
+# 4.5% of frame height — readable at full screen, Kiyosaki standard.
+CAP_SIZE_SHORT      = 86   # 4.5% of 1920
+CAP_SIZE_LONG       = 49   # 4.5% of 1080
+# Emphasis words: 5.5% frame height (Title Case, salmon #FF7751)
+CAP_SIZE_SHORT_EMPH = 106  # 5.5% of 1920
+CAP_SIZE_LONG_EMPH  = 59   # 5.5% of 1080
 
 # Salmon accent colour for emphasis words (matches brand)
 EMPHASIS_COLOR_ASS = "&H005177FF"  # BGR for #FF7751
 
 PUNCT_RE = re.compile(r"[.,!?;:\"'()\[\]…–—]")
 
-# 1-frame lead so captions feel synced (brain reads ~33ms ahead of audio).
-CAPTION_LEAD_S: float = 1.0 / 30.0  # 33 ms
+# 50ms delay: caption appears slightly after the word starts — feels most natural.
+CAPTION_DELAY_S: float = 0.05
 
 # Group words separated by less than this gap into one caption line.
 WORD_GROUP_GAP_S: float = 0.25   # 250 ms — natural breath pause threshold
@@ -116,8 +116,8 @@ def _ass_header(
     cap_size      = CAP_SIZE_SHORT      if short_form else CAP_SIZE_LONG
     cap_size_emph = CAP_SIZE_SHORT_EMPH if short_form else CAP_SIZE_LONG_EMPH
 
-    # MarginV = 15% of PlayResY from bottom → captions sit in bottom 20% zone
-    margin_v = int(play_res_y * 0.15)
+    # MarginV = 20% of PlayResY from bottom → captions sit in bottom 20% zone
+    margin_v = int(play_res_y * 0.20)
 
     if style == "kinetic":
         # Kinetic bar: dark semi-transparent background behind text
@@ -267,8 +267,8 @@ def build_ass(
                 display_parts.append(w.lower())
         display = " ".join(display_parts)
 
-        # Always use Default style; per-word overrides handle emphasis inline
-        start = max(0.0, group[0].start - CAPTION_LEAD_S)
+        # Caption appears 50ms after the word starts — never before the speaker.
+        start = max(0.0, group[0].start + CAPTION_DELAY_S)
         end   = group[-1].end
         lines.append(
             f"Dialogue: 0,{_ts(start)},{_ts(end)},Default,,0,0,0,,{display}"
