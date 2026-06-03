@@ -782,10 +782,10 @@ def render(
     work_dir: Path,
     output_path: Path,
     *,
-    caption_font: str = "Poppins Bold",
+    caption_font: str = "Inter Bold",
     caption_color: str = "white",
     caption_position: str = "center",
-    caption_style: str = "impact",
+    caption_style: str = "kinetic",
     brand_color: str | None = None,
     aesthetic: str = "dark-pro",
     subject_position: dict | None = None,
@@ -919,8 +919,8 @@ def render(
     # confuses the viewer. Clamp the agent's suggestion into that window;
     # if the agent gave us 0s/0.1s of duration the clamp pulls it up to
     # the readable floor.
-    BROLL_MIN_S = 2.5
-    BROLL_MAX_S = 4.0
+    BROLL_MIN_S = 2.0
+    BROLL_MAX_S = 3.5
     remapped_broll: list[tuple[float, float]] = []
     for br in plan.broll_suggestions:
         try:
@@ -968,11 +968,11 @@ def render(
                 break
             run += max(0.0, ee - ss)
 
-    # UPGRADE 6 — BREATHLESS PACING: tighter silence thresholds.
-    # Short-form: any pause > 0.3s → compress to 0.25s (breathless sensation).
+    # BREATHLESS PACING: tightest possible silence thresholds.
+    # Short-form: any pause > 0.25s → compress to 0.20s (competitor standard).
     # Long-form: any pause > 0.6s → compress to 0.4s (cinematic breathing room).
-    _sil_min = 0.30 if short_form else 0.60
-    _sil_max = 0.25 if short_form else 0.40
+    _sil_min = 0.25 if short_form else 0.60
+    _sil_max = 0.20 if short_form else 0.40
     if remapped_words:
         long_pauses = _find_long_pauses(remapped_words, min_gap_s=_sil_min)
         if long_pauses:
@@ -1015,22 +1015,24 @@ def render(
 
     total_duration = _probe_duration(concat_path)
 
-    # UPGRADE 7 — VISUAL RESET AT EVERY CUT: alternate zoom level at each edit point.
+    # MULTI-CAMERA SIMULATION: 4-step zoom cycle on every cut creates the
+    # illusion of different camera angles — wide / medium-CU / medium / CU.
+    _MC_ZOOM_CYCLE = [1.00, 1.12, 1.06, 1.18]
     for ci, ct in enumerate(cut_timestamps):
         if ct <= 0.5 or ct >= total_duration - 0.5:
             continue
-        z_alt = 1.04 if ci % 2 == 0 else 1.10
+        z_target = _MC_ZOOM_CYCLE[ci % 4]
         remapped_zoom.append({
             "start": ct - 0.05,
-            "end": ct + 0.25,
+            "end": ct + 0.15,
             "from": 1.08,
-            "to": z_alt,
+            "to": z_target,
             "kind": "punch_in",
         })
         remapped_zoom.append({
-            "start": ct + 0.25,
+            "start": ct + 0.15,
             "end": ct + 1.0,
-            "from": z_alt,
+            "from": z_target,
             "to": 1.08,
             "kind": "drift",
         })
@@ -1060,7 +1062,26 @@ def render(
                 "kind": "drift",
             })
 
-    # UPGRADE 4 — 3-SECOND VISUAL RHYTHM: auto-insert micro-punches in long gaps.
+    # TECHNIQUE 4 — 15% DIGITAL PUNCH-IN EVERY 3 SECONDS.
+    # Insert full 1.08→1.15 punch at every 3s interval across the entire video.
+    # Skip positions already covered by another zoom event (±1.2s window).
+    _punch_t = 3.0
+    while _punch_t < total_duration - 0.5:
+        if not any(abs(float(zp.get("start", 0)) - _punch_t) < 1.2 for zp in remapped_zoom):
+            remapped_zoom.append({
+                "start": _punch_t,
+                "end": _punch_t + 0.15,
+                "from": 1.08, "to": 1.15, "kind": "punch_in",
+            })
+            remapped_zoom.append({
+                "start": _punch_t + 0.15,
+                "end": _punch_t + 1.65,
+                "from": 1.15, "to": 1.08, "kind": "drift",
+            })
+        _punch_t += 3.0
+
+    # VISUAL RHYTHM — 1.8s rule: fill any gap > 1.8s with no visual event.
+    # Rebuild the event list after all punches above have been added.
     _all_event_times = sorted(
         [0.0]
         + [float(zp.get("start", 0)) for zp in remapped_zoom]
@@ -1070,15 +1091,18 @@ def render(
     for _ei in range(len(_all_event_times) - 1):
         _gap_s = _all_event_times[_ei]
         _gap_e = _all_event_times[_ei + 1]
-        if _gap_e - _gap_s > 3.0:
+        if _gap_e - _gap_s > 1.8:
             _mid = (_gap_s + _gap_e) / 2
             if 0.5 < _mid < total_duration - 0.5:
                 remapped_zoom.append({
                     "start": _mid,
-                    "end": _mid + 0.2,
-                    "from": 1.08,
-                    "to": 1.12,
-                    "kind": "drift",
+                    "end": _mid + 0.15,
+                    "from": 1.08, "to": 1.12, "kind": "punch_in",
+                })
+                remapped_zoom.append({
+                    "start": _mid + 0.15,
+                    "end": _mid + 0.5,
+                    "from": 1.12, "to": 1.08, "kind": "drift",
                 })
 
     # Sort the final zoom plan chronologically.
@@ -1096,6 +1120,7 @@ def render(
         style=caption_style,
         broll_windows=remapped_broll,
         word_colors=plan.word_colors,
+        word_categories=plan.word_categories,
     )
 
     face_cx_pct = 50.0
