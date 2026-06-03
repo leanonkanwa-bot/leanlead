@@ -36,12 +36,12 @@ ALLOWED_COLORS = {
 ALLOWED_POSITIONS = {"center", "bottom", "side-left", "side-right"}
 ALLOWED_STYLES    = {"impact", "kinetic"}
 
-# 4.5% of PlayResY — readable, not overwhelming.
-CAP_SIZE_SHORT      = 86   # 4.5% of 1920
-CAP_SIZE_LONG       = 49   # 4.5% of 1080
-# Emphasis words: 1.3× larger
-CAP_SIZE_SHORT_EMPH = 112  # ~5.8% of 1920
-CAP_SIZE_LONG_EMPH  = 64   # ~5.9% of 1080
+# 5% of PlayResY — bold and readable at full screen.
+CAP_SIZE_SHORT      = 96   # 5% of 1920
+CAP_SIZE_LONG       = 54   # 5% of 1080
+# Emphasis words: 1.3× larger (Title Case, salmon #FF7751)
+CAP_SIZE_SHORT_EMPH = 125  # ~6.5% of 1920
+CAP_SIZE_LONG_EMPH  = 70   # ~6.5% of 1080
 
 # Salmon accent colour for emphasis words (matches brand)
 EMPHASIS_COLOR_ASS = "&H005177FF"  # BGR for #FF7751
