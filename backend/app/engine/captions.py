@@ -1,13 +1,14 @@
 """Build .ass subtitle files.
 
 Caption system — professional short-form edutainment standard:
-  - kinetic mode: 1 word per frame, each pops on its exact syllable timestamp
-  - impact mode: 2–3 words per frame (grouped on pauses ≥ 0.25s)
+  - kinetic mode: 1 word per frame, pops on its exact syllable timestamp
+  - impact mode: up to 4 words per frame (grouped on pauses ≥ 0.25s)
   - Every spoken word appears — no gaps in the caption track
-  - Emphasis words: larger (1.3×) + salmon colour (#FF7751) — always Title Case
-  - Normal words: sentence case, white, soft 1px drop shadow (no outline)
-  - Position: center 45% from top (kinetic, mobile eye focus zone)
-              bottom 20% of frame (impact, MarginV = 20% of PlayResY)
+  - Emphasis words: larger (1.25×) + salmon colour (#FF7751) — always Title Case
+  - Normal words: white, soft 1px drop shadow (no outline)
+  - Position: bottom 25% of frame, alignment=2 (bottom-center)
+              MarginV=150px for 9:16 (1080×1920), 80px for 16:9 (1920×1080)
+  - Entry animation: scale 80%→100%, opacity 0%→100% over ~6 frames (200ms)
   - Shadow only (no outline) — softer, more legible on mixed backgrounds.
   - Font: Inter Bold (installed) or DejaVu Sans Bold fallback
   - Color hierarchy: time/location=sky-blue, action=white, emotion=light-red, hook=salmon, normal=white
@@ -39,12 +40,10 @@ ALLOWED_COLORS = {
 ALLOWED_POSITIONS = {"center", "bottom", "side-left", "side-right"}
 ALLOWED_STYLES    = {"impact", "kinetic"}
 
-# 5% of frame height — readable at full screen, TikTok/Reels standard.
-CAP_SIZE_SHORT      = 96   # 5.0% of 1920
-CAP_SIZE_LONG       = 54   # 5.0% of 1080
-# Emphasis / colored words: 6.5% frame height (Title Case, salmon #FF7751)
-CAP_SIZE_SHORT_EMPH = 125  # 6.5% of 1920
-CAP_SIZE_LONG_EMPH  = 70   # 6.5% of 1080
+# Reference font sizes at 1080p — scaled proportionally to PlayResY in _ass_header().
+# Normal captions: 58px · Emphasis captions: 72px (per professional caption spec).
+CAP_SIZE_REF      = 58
+CAP_SIZE_REF_EMPH = 72
 
 # Salmon accent colour for emphasis words (matches brand)
 EMPHASIS_COLOR_ASS = "&H005177FF"  # BGR for #FF7751
@@ -67,7 +66,7 @@ CAPTION_DELAY_S: float = 0.0
 
 # Group words separated by less than this gap into one caption line.
 WORD_GROUP_GAP_S: float = 0.25   # 250 ms — natural breath pause threshold
-MAX_WORDS_PER_GROUP: int = 3
+MAX_WORDS_PER_GROUP: int = 4     # max 4 words per line per professional spec
 
 
 @dataclass
@@ -128,41 +127,25 @@ def _ass_header(
 
     play_res_y = 1920 if short_form else 1080
     play_res_x = 1080 if short_form else 1920
-    cap_size      = CAP_SIZE_SHORT      if short_form else CAP_SIZE_LONG
-    cap_size_emph = CAP_SIZE_SHORT_EMPH if short_form else CAP_SIZE_LONG_EMPH
 
-    # Kinetic captions: center of frame (45% from top), mobile eye focus zone.
-    # Impact captions: bottom 20% of frame (traditional safe zone).
-    # ASS alignment: 8 = top-center (MarginV from top), 2 = bottom-center (MarginV from bottom).
-    if position == "center" or style == "kinetic":
-        alignment = 8
-        margin_v = int(play_res_y * 0.42)  # text top at 42% → center at ~45%
-    else:
-        alignment = 2
-        margin_v = int(play_res_y * 0.20)
+    # Font sizes: 58px normal / 72px emphasis at 1080p, scaled to PlayResY.
+    cap_size      = round(CAP_SIZE_REF      * play_res_y / 1080)
+    cap_size_emph = round(CAP_SIZE_REF_EMPH * play_res_y / 1080)
 
-    if style == "kinetic":
-        # Kinetic: each word pops independently. Soft 1px drop shadow, no outline.
-        # Shadow + no outline = legible on any background without the heavy stroke look.
-        default_line = (
-            f"Style: Default,{font_name},{cap_size},{primary},{primary},"
-            f"&H00000000,&H40000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
-        )
-        emphasis_line = (
-            f"Style: Emphasis,{font_name},{cap_size_emph},{EMPHASIS_COLOR_ASS},{EMPHASIS_COLOR_ASS},"
-            f"&H00000000,&H40000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
-        )
-    else:
-        # Impact: soft 1px drop shadow, no outline — matches kinetic readability standard.
-        default_line = (
-            f"Style: Default,{font_name},{cap_size},{primary},{primary},"
-            f"&H00000000,&H40000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
-        )
-        # Emphasis: salmon colour, 1.3× size, same soft shadow
-        emphasis_line = (
-            f"Style: Emphasis,{font_name},{cap_size_emph},{EMPHASIS_COLOR_ASS},{EMPHASIS_COLOR_ASS},"
-            f"&H00000000,&H40000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
-        )
+    # Always bottom-center (alignment=2) — never covers the face.
+    # MarginV is measured from the bottom edge of the frame.
+    alignment = 2
+    margin_v  = 150 if short_form else 80
+
+    # Both styles use the same positioning; style only affects grouping / animations.
+    default_line = (
+        f"Style: Default,{font_name},{cap_size},{primary},{primary},"
+        f"&H00000000,&H40000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
+    )
+    emphasis_line = (
+        f"Style: Emphasis,{font_name},{cap_size_emph},{EMPHASIS_COLOR_ASS},{EMPHASIS_COLOR_ASS},"
+        f"&H00000000,&H40000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
+    )
 
     return (
         "[Script Info]\n"
@@ -247,12 +230,9 @@ def build_ass(
 
     color_hex = ALLOWED_COLORS.get(color.lower(), color if color.startswith("#") else "FFFFFF")
     if position not in ALLOWED_POSITIONS:
-        position = "center"
+        position = "bottom"
     if style not in ALLOWED_STYLES:
         style = "kinetic"
-    # kinetic forces center positioning — mobile eye focus zone, avoids UI buttons.
-    if style == "kinetic" and position not in {"center"}:
-        position = "center"
 
     emphasis_set = {_strip_punct(w).lower() for w in (emphasis_words or set())}
     broll_list   = list(broll_windows)
@@ -273,7 +253,16 @@ def build_ass(
     else:
         groups = _group_words(word_list)
 
-    cap_size_emph = CAP_SIZE_SHORT_EMPH if short_form else CAP_SIZE_LONG_EMPH
+    play_res_y    = 1920 if short_form else 1080
+    cap_size_emph = round(CAP_SIZE_REF_EMPH * play_res_y / 1080)
+
+    # Entry animation tags — prepended to every Dialogue line text.
+    # Kinetic: scale 80%→100% + opacity 0%→100% over 200ms (~6 frames at 30fps).
+    # Impact:  subtle scale 97%→100% + fade over 400ms (12 frames).
+    if style == "kinetic":
+        _anim = r"{\fad(200,80)\fscx80\fscy80\t(0,200,\fscx100\fscy100)}"
+    else:
+        _anim = r"{\fad(400,300)\fscx97\fscy97\t(0,400,\fscx100\fscy100)}"
 
     for group in groups:
         # Skip groups entirely inside b-roll windows
@@ -324,9 +313,9 @@ def build_ass(
                 display_parts.append(w.capitalize())
             else:
                 display_parts.append(w.lower())
-        display = " ".join(display_parts)
+        display = _anim + " ".join(display_parts)
 
-        # Caption appears 50ms after the word starts — never before the speaker.
+        # Caption appears exactly when the word is spoken — no delay.
         start = max(0.0, group[0].start + CAPTION_DELAY_S)
         end   = group[-1].end
         lines.append(
