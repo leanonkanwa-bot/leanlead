@@ -37,9 +37,10 @@ from app.engine.graphics import (
 )
 
 
-SHORT_PAD_S = 0.05   # 50ms — tight, energetic
-LONG_PAD_S = 0.15    # 150ms — cinematic breathing room
-AUDIO_FADE_S = 0.03  # 30ms — anti-pop fade at every segment boundary
+SHORT_PAD_S    = 0.15   # 150ms — word-safe start/end buffer (was 50ms)
+LONG_PAD_S     = 0.25   # 250ms — cinematic breathing room (was 150ms)
+AUDIO_FADE_S   = 0.05   # 50ms — anti-pop fade at every segment boundary
+AUDIO_HANDLE_S = 0.08   # 80ms audio handle kept before/after each cut edge
 
 
 def _run(cmd: list[str]) -> None:
@@ -175,7 +176,10 @@ def _cut_proxy_segment(
     bytes. Cuts snap to the nearest keyframe (≤ 2 s error), which the final
     zoompan re-encode corrects. Audio is re-encoded to apply the 30 ms fades.
     """
-    duration = max(0.1, end - start)
+    # FIX 1: 80ms audio handle prevents mid-syllable cuts; trim back with fade.
+    actual_start = max(0.0, start - AUDIO_HANDLE_S)
+    actual_end   = end + AUDIO_HANDLE_S
+    duration     = max(0.1, actual_end - actual_start)
     fade_out_start = max(0.0, duration - AUDIO_FADE_S)
     af = (
         f"afade=t=in:st=0:d={AUDIO_FADE_S},"
@@ -184,7 +188,7 @@ def _cut_proxy_segment(
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-threads", "1",
-        "-ss", f"{start:.3f}", "-i", str(proxy),
+        "-ss", f"{actual_start:.3f}", "-i", str(proxy),
         "-t", f"{duration:.3f}",
         "-af", af,
         "-c:v", "copy",                     # zero decode/encode memory
@@ -210,24 +214,25 @@ def _snap_to_word_boundary(
     words: list[tuple[float, float]],
     edge: str,
 ) -> float:
-    """Snap a cut time to a SENTENCE boundary (Hard Rule 1 + FIX 2: no mid-sentence cuts).
+    """Snap a cut time to a word boundary with ≥0.15s gap (FIX 3).
 
-    Prefers boundaries where the gap between consecutive words is ≥ 0.3s
-    (a natural sentence/clause pause). Falls back to any word boundary only
-    if no sentence boundary is found within SEARCH_WINDOW_S.
+    Priority 1: find a boundary preceded/followed by ≥0.15s of silence
+                (a true inter-word gap, not a brief coarticulation pause).
+    Priority 2: fallback to the nearest word edge only when no gap boundary
+                is found within SEARCH_WINDOW_S.
 
-    edge='start' → start of the first word AFTER a sentence pause, at or near t.
-    edge='end'   → end of the last word BEFORE a sentence pause, at or near t.
+    edge='start' → word.start AFTER t where gap before word ≥ WORD_GAP_S.
+    edge='end'   → word.end   BEFORE t where gap after word ≥ WORD_GAP_S.
     """
     if not words:
         return t
 
-    SENTENCE_GAP_S = 0.3    # gap that marks a sentence/clause boundary
-    SEARCH_WINDOW_S = 1.5   # how far to search for a sentence boundary
+    WORD_GAP_S    = 0.15   # FIX 3: min gap to qualify as a clean cut point
+    SEARCH_WINDOW_S = 1.5
 
     if edge == "start":
-        sent_best: float | None = None
-        sent_dist = float("inf")
+        gap_best:  float | None = None
+        gap_dist  = float("inf")
         word_best: float | None = None
         word_dist = float("inf")
 
@@ -237,23 +242,17 @@ def _snap_to_word_boundary(
             dist = ws - t
             if dist > SEARCH_WINDOW_S:
                 break
-            # Check if a sentence pause precedes this word
-            is_sentence_start = (
-                i == 0
-                or (ws - words[i - 1][1]) >= SENTENCE_GAP_S
-            )
-            if is_sentence_start and dist < sent_dist:
-                sent_best, sent_dist = ws, dist
+            gap_before = ws - words[i - 1][1] if i > 0 else WORD_GAP_S
+            if gap_before >= WORD_GAP_S and dist < gap_dist:
+                gap_best, gap_dist = ws, dist
             if dist < word_dist:
                 word_best, word_dist = ws, dist
 
-        if sent_best is not None:
-            return sent_best
-        return word_best if word_best is not None else t
+        return gap_best if gap_best is not None else (word_best if word_best is not None else t)
 
     else:  # end
-        sent_best = None
-        sent_dist = float("inf")
+        gap_best  = None
+        gap_dist  = float("inf")
         word_best = None
         word_dist = float("inf")
 
@@ -263,19 +262,13 @@ def _snap_to_word_boundary(
             dist = t - we
             if dist > SEARCH_WINDOW_S:
                 continue
-            # Check if a sentence pause follows this word
-            is_sentence_end = (
-                i + 1 >= len(words)
-                or (words[i + 1][0] - we) >= SENTENCE_GAP_S
-            )
-            if is_sentence_end and dist < sent_dist:
-                sent_best, sent_dist = we, dist
+            gap_after = words[i + 1][0] - we if i + 1 < len(words) else WORD_GAP_S
+            if gap_after >= WORD_GAP_S and dist < gap_dist:
+                gap_best, gap_dist = we, dist
             if dist < word_dist:
                 word_best, word_dist = we, dist
 
-        if sent_best is not None:
-            return sent_best
-        return word_best if word_best is not None else t
+        return gap_best if gap_best is not None else (word_best if word_best is not None else t)
 
 
 def _cut_segment(
@@ -287,8 +280,11 @@ def _cut_segment(
     target_h: int,
     fps: int,
 ) -> None:
-    """Per-segment extract with 30ms audio fades baked in (Hard Rule 6)."""
-    duration = max(0.1, end - start)
+    """Per-segment extract with audio handles + fades baked in."""
+    # FIX 1: 80ms audio handle prevents mid-syllable cuts at segment boundaries.
+    actual_start = max(0.0, start - AUDIO_HANDLE_S)
+    actual_end   = end + AUDIO_HANDLE_S
+    duration     = max(0.1, actual_end - actual_start)
     fade_out_start = max(0.0, duration - AUDIO_FADE_S)
     af = (
         f"afade=t=in:st=0:d={AUDIO_FADE_S},"
@@ -306,7 +302,7 @@ def _cut_segment(
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-threads", "1",        # global: limits decoder threads too, not just encoder
-        "-ss", f"{start:.3f}", "-i", str(src),
+        "-ss", f"{actual_start:.3f}", "-i", str(src),
         "-t", f"{duration:.3f}",
         "-vf", vf,
         "-af", af,
@@ -329,6 +325,77 @@ def _concat(parts: list[Path], dst: Path) -> None:
         str(dst),
     ])
     list_path.unlink(missing_ok=True)
+
+
+def _concat_audio_xfade(parts: list[Path], dst: Path) -> None:
+    """Concatenate segments with 50ms exponential audio crossfade at every cut.
+
+    FIX 2: acrossfade smooths audio transitions completely — no clicks or pops
+    at cut points. Video is stream-copied (no re-encode); only audio is touched.
+    Falls back to plain _concat() if fewer than 2 parts.
+    """
+    if len(parts) < 2:
+        _concat(parts, dst)
+        return
+
+    # Build a filter graph: chain acrossfade filters between every adjacent pair.
+    # acrossfade takes [a][b] and outputs one stream; each subsequent crossfade
+    # re-uses the output of the previous one.
+    inputs: list[str] = []
+    for p in parts:
+        inputs += ["-i", str(p)]
+
+    n = len(parts)
+    filter_parts: list[str] = []
+
+    # Label outputs: [a0][a1]...[an-1]
+    prev = "[0:a]"
+    for i in range(1, n):
+        out_label = f"[xf{i}]" if i < n - 1 else "[aout]"
+        filter_parts.append(
+            f"{prev}[{i}:a]acrossfade=d=0.05:c1=exp:c2=exp{out_label}"
+        )
+        prev = out_label
+
+    filter_complex = ";".join(filter_parts)
+
+    # Video: simple concat (stream-copy); audio: crossfaded chain.
+    # Build video concat separately.
+    list_path = dst.with_suffix(".xfade_list.txt")
+    list_path.write_text("\n".join(f"file '{p.as_posix()}'" for p in parts))
+    video_concat = dst.with_suffix(".xfade_video.mp4")
+    _run([
+        FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-f", "concat", "-safe", "0", "-i", str(list_path),
+        "-c:v", "copy", "-an",
+        str(video_concat),
+    ])
+    list_path.unlink(missing_ok=True)
+
+    # Audio: crossfaded output.
+    audio_out = dst.with_suffix(".xfade_audio.aac")
+    _run(
+        [FFMPEG_PATH, "-y", "-loglevel", "error"]
+        + inputs
+        + [
+            "-filter_complex", filter_complex,
+            "-map", "[aout]",
+            "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+            str(audio_out),
+        ]
+    )
+
+    # Mux video + crossfaded audio.
+    _run([
+        FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-i", str(video_concat),
+        "-i", str(audio_out),
+        "-c:v", "copy", "-c:a", "copy",
+        "-shortest",
+        str(dst),
+    ])
+    video_concat.unlink(missing_ok=True)
+    audio_out.unlink(missing_ok=True)
 
 
 def _find_long_pauses(
@@ -913,7 +980,7 @@ def render(
         raise RuntimeError("No keep_segments produced any clip.")
 
     concat_path = work_dir / "concat.mp4"
-    _concat(parts, concat_path)
+    _concat_audio_xfade(parts, concat_path)  # FIX 2: 50ms audio crossfade at every cut
 
     # Remap b-roll windows to the cut timeline so captions pause there.
     # BUG FIX — B-ROLL TIMING:
@@ -970,11 +1037,11 @@ def render(
                 break
             run += max(0.0, ee - ss)
 
-    # BREATHLESS PACING: tightest possible silence thresholds.
-    # Short-form: any pause > 0.25s → compress to 0.20s (competitor standard).
-    # Long-form: any pause > 0.6s → compress to 0.4s (cinematic breathing room).
-    _sil_min = 0.25 if short_form else 0.60
-    _sil_max = 0.20 if short_form else 0.40
+    # FIX 4: Larger silence thresholds — keep natural breathing pauses intact.
+    # Short-form: only remove pauses > 0.5s (was 0.25s); compress to 0.30s.
+    # Long-form:  only remove pauses > 0.8s (was 0.6s);  compress to 0.50s.
+    _sil_min = 0.50 if short_form else 0.80
+    _sil_max = 0.30 if short_form else 0.50
     if remapped_words:
         long_pauses = _find_long_pauses(remapped_words, min_gap_s=_sil_min)
         if long_pauses:
