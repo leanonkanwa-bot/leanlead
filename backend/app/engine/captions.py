@@ -25,8 +25,10 @@ from typing import Iterable
 ALLOWED_FONTS = {
     "Poppins Bold", "Poppins ExtraBold", "Poppins SemiBold",
     "Inter Bold", "Montserrat Bold", "Montserrat Black",
-    "Roboto Bold", "Bebas Neue", "DM Sans Bold", "Space Grotesk Bold",
-    "DejaVu Sans Bold", "SF Compact Bold",
+    "Roboto Bold", "Bebas Neue", "DM Sans Bold", "DM Sans",
+    "Space Grotesk Bold", "DejaVu Sans Bold", "SF Compact Bold",
+    "Quicksand Bold", "Quicksand SemiBold", "Quicksand Medium",
+    "Anton",
 }
 
 ALLOWED_COLORS = {
@@ -64,7 +66,7 @@ PUNCT_RE = re.compile(r"[.,!?;:\"'()\[\]…–—]")
 # Whisper word timestamps are systematically 50–150ms earlier than when words
 # are actually spoken (known faster-whisper alignment bias). This constant
 # shifts all captions forward so they match actual lip movement.
-WHISPER_TIMESTAMP_CORRECTION: float = 0.08   # 80ms forward shift on every word
+WHISPER_TIMESTAMP_CORRECTION: float = 0.05   # 50ms forward shift (reduced after remapping fix)
 
 # Additional per-group delay on top of the Whisper correction (usually 0).
 CAPTION_DELAY_S: float = 0.0
@@ -85,17 +87,18 @@ class WordTiming:
 # Railway ships Debian; Poppins/Montserrat/Inter are not installed by default.
 # Map all UI font names to a font that is actually present on the server.
 _FONT_MAP: dict[str, str] = {
+    # Fonts installed in Dockerfile pass through unchanged (their face names match).
+    # Fonts NOT installed are remapped to the DejaVu fallback.
     "Poppins Bold":       "DejaVu Sans Bold",
     "Poppins ExtraBold":  "DejaVu Sans Bold",
     "Poppins SemiBold":   "DejaVu Sans Bold",
-    # "Inter Bold" intentionally omitted — now installed via apt/download in Dockerfile
-    "Montserrat Bold":    "DejaVu Sans Bold",
-    "Montserrat Black":   "DejaVu Sans Bold",
+    "Montserrat Black":   "Montserrat Bold",   # Black weight not installed → Bold
     "Roboto Bold":        "DejaVu Sans Bold",
-    "DM Sans Bold":       "DejaVu Sans Bold",
+    "DM Sans Bold":       "DM Sans",           # face registered as "DM Sans"
     "Space Grotesk Bold": "DejaVu Sans Bold",
-    "Bebas Neue":         "DejaVu Sans Bold",
     "SF Compact Bold":    "DejaVu Sans Bold",
+    # Installed fonts — no remapping needed (listed in ALLOWED_FONTS):
+    # Inter Bold, Montserrat Bold, Bebas Neue, Anton, Quicksand Bold/SemiBold/Medium
 }
 
 
