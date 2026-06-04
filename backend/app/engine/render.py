@@ -1217,19 +1217,14 @@ def render(
     src_w = concat_info.get("width",  0) or target_w
     src_h = concat_info.get("height", 0) or target_h
 
-    if src_w == target_w and src_h == target_h:
-        scale_filter: str | None = None          # already correct — skip re-scale
-    elif src_w >= src_h:
-        # Landscape / square → portrait: fill frame, no letterbox
-        scale_filter = (
-            f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
-            f"crop={target_w}:{target_h}"
-        )
-    else:
-        # Portrait source: fix the constrained axis, auto-compute the other
-        scale_filter = (
-            f"scale=-2:{target_h}" if short_form else f"scale={target_w}:-2"
-        )
+    # PROBLEM 1 FIX: always apply explicit crop-to-fill regardless of concat
+    # dimensions. This guarantees no letterbox / pillarbox bars even when the
+    # concat is already nominally the right size (avoids subtle off-by-one edge
+    # cases that produce the video-in-video effect).
+    scale_filter = (
+        f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
+        f"crop={target_w}:{target_h}"
+    )
 
     system_font = _find_system_font()
 
@@ -1298,6 +1293,8 @@ def render(
             f":x='{_zx_safe}'"
             f":y='{_zy_safe}'"
             f":d=1:s={target_w}x{target_h}:fps={fps}"
+            # PROBLEM 2 FIX: reset PTS after zoompan to prevent audio/video drift.
+            f",setpts=N/FRAME_RATE/TB"
         )
     else:
         _zoom_str = (
@@ -1305,6 +1302,7 @@ def render(
             f":x=iw/2-(iw/zoom/2)"
             f":y=ih/2-(ih/zoom/2)"
             f":d=1:s={target_w}x{target_h}:fps={fps}"
+            f",setpts=N/FRAME_RATE/TB"
         )
     _vf_p1 = [p for p in [color_grade, scale_filter, _zoom_str] if p]
     _cmd_p1: list[str] = [
@@ -1329,9 +1327,14 @@ def render(
     _cmd_p1 += ["-map", "0:a"]
     _cmd_p1 += [
         "-frames:v", str(total_frames),
-        "-c:v", "libx264", "-preset", "slow", "-crf", str(output_crf),
+        # PROBLEM 2 FIX: -vsync cfr + -async 1 lock audio/video to same clock.
+        "-vsync", "cfr",
+        "-async", "1",
+        # PROBLEM 3 FIX: lossless intermediate — only ONE lossy encode happens
+        # in the final caption-burn pass. CRF 0 = lossless H.264.
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
         "-threads", "4",
-        "-x264-params", "rc-lookahead=48:bframes=3",
+        "-x264-params", "rc-lookahead=0:bframes=0",
         "-pix_fmt", "yuv420p",
         "-c:a", "aac", "-b:a", "192k",
         str(_base_path),
@@ -1385,7 +1388,10 @@ def render(
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(_nocap_path),
         "-vf", f"subtitles={_ass_str}",
-        "-c:v", "libx264", "-preset", "slow", "-crf", str(output_crf),
+        # PROBLEM 3 FIX: final quality encode — CRF 16 + 20M cap for high
+        # fidelity output. This is the ONLY lossy encode in the pipeline.
+        "-c:v", "libx264", "-preset", "medium", "-crf", str(output_crf),
+        "-b:v", "20M",
         "-threads", "4",
         "-x264-params", "rc-lookahead=48:bframes=3",
         "-pix_fmt", "yuv420p",
