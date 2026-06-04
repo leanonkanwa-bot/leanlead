@@ -181,7 +181,7 @@ def transcribe(video_path: Path) -> Transcript:
             best_of=10,                     # pick best of N random samples
             temperature=[0.0],              # deterministic — no hallucination variance
             condition_on_previous_text=True,  # use context for proper nouns / numbers
-            no_speech_threshold=0.3,        # filter non-speech segments
+            no_speech_threshold=0.4,        # filter non-speech segments
             compression_ratio_threshold=2.0,  # drop garbage repetition transcriptions
             vad_filter=False,               # silero-VAD adds ~60MB onnxruntime overhead
             language=None,                  # auto-detect: French, English, Spanish, Arabic
