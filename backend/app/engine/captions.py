@@ -61,7 +61,12 @@ CATEGORY_COLOR_ASS: dict[str, str] = {
 
 PUNCT_RE = re.compile(r"[.,!?;:\"'()\[\]…–—]")
 
-# 0ms delay: caption appears exactly when the word is spoken — perfect sync.
+# Whisper word timestamps are systematically 50–150ms earlier than when words
+# are actually spoken (known faster-whisper alignment bias). This constant
+# shifts all captions forward so they match actual lip movement.
+WHISPER_TIMESTAMP_CORRECTION: float = 0.08   # 80ms forward shift on every word
+
+# Additional per-group delay on top of the Whisper correction (usually 0).
 CAPTION_DELAY_S: float = 0.0
 
 # Group words separated by less than this gap into one caption line.
@@ -315,9 +320,9 @@ def build_ass(
                 display_parts.append(w.lower())
         display = _anim + " ".join(display_parts)
 
-        # Caption appears exactly when the word is spoken — no delay.
-        start = max(0.0, group[0].start + CAPTION_DELAY_S)
-        end   = group[-1].end
+        # Apply Whisper correction + any explicit delay.
+        start = max(0.0, group[0].start + WHISPER_TIMESTAMP_CORRECTION + CAPTION_DELAY_S)
+        end   = group[-1].end + WHISPER_TIMESTAMP_CORRECTION
         lines.append(
             f"Dialogue: 0,{_ts(start)},{_ts(end)},Default,,0,0,0,,{display}"
         )

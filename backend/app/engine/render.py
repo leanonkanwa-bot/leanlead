@@ -37,8 +37,8 @@ from app.engine.graphics import (
 )
 
 
-SHORT_PAD_S    = 0.15   # 150ms — word-safe start/end buffer (was 50ms)
-LONG_PAD_S     = 0.25   # 250ms — cinematic breathing room (was 150ms)
+SHORT_PAD_S    = 0.12   # 120ms — word-safe start/end buffer
+LONG_PAD_S     = 0.20   # 200ms — cinematic breathing room
 AUDIO_FADE_S   = 0.05   # 50ms — anti-pop fade at every segment boundary
 AUDIO_HANDLE_S = 0.08   # 80ms audio handle kept before/after each cut edge
 
@@ -844,6 +844,42 @@ def _color_grade_filter(content_type: str) -> str:
     return profiles.get(content_type.lower(), "eq=contrast=1.1:saturation=1.05")
 
 
+def _verify_caption_sync(
+    words: list["WordTiming"],
+    edited_duration: float,
+) -> list["WordTiming"]:
+    """Drop caption words outside the edited video's duration and log anomalies.
+
+    Called just before build_ass() to prevent captions from appearing at
+    times that don't exist in the final video — which looks like frozen or
+    ghost captions at the end of the video.
+    """
+    import logging as _lg
+    _log = _lg.getLogger(__name__)
+    issues: list[str] = []
+    valid: list["WordTiming"] = []
+    for w in words:
+        if w.start < 0:
+            issues.append(f"'{w.text}' negative start={w.start:.3f}s")
+            continue
+        if w.start > edited_duration:
+            issues.append(
+                f"'{w.text}' start={w.start:.3f}s > video duration={edited_duration:.3f}s"
+            )
+            continue
+        if w.end > edited_duration + 0.5:
+            issues.append(
+                f"'{w.text}' end={w.end:.3f}s exceeds video duration={edited_duration:.3f}s"
+            )
+            # Clamp rather than drop — the word starts inside the video.
+            valid.append(WordTiming(text=w.text, start=w.start, end=min(w.end, edited_duration)))
+            continue
+        valid.append(w)
+    if issues:
+        _log.warning("caption sync anomalies (%d words): %s", len(issues), issues[:10])
+    return valid
+
+
 def render(
     src: Path,
     transcript: dict[str, Any],
@@ -927,25 +963,32 @@ def render(
             _cut_segment(cut_src, s, e, part, target_w, target_h, fps)
         parts.append(part)
 
+        # PROBLEM 1 FIX: use the actual cut boundaries (with audio handles) as
+        # the reference for all timeline remapping so captions, zooms, and
+        # silences are placed at the correct positions in the concatenated video.
+        actual_s = max(0.0, s - AUDIO_HANDLE_S)
+        actual_e = e + AUDIO_HANDLE_S
+        seg_offset = cum  # concat-timeline start of this segment
+
         for zp in plan.zoom_plan:
             zs = float(zp.get("start", 0))
             ze = float(zp.get("end", zs))
             if zs >= s and ze <= e:
                 remapped_zoom.append({
                     **zp,
-                    "start": cum + (zs - s),
-                    "end": cum + (ze - s),
+                    "start": seg_offset + (zs - actual_s),
+                    "end": seg_offset + (ze - actual_s),
                 })
 
         for tseg in transcript.get("segments", []):
             for w in tseg.get("words", []):
                 ws = float(w["start"])
                 we = float(w["end"])
-                if ws >= s and we <= e:
+                if ws >= s and we <= e:  # only content words (not handle region)
                     remapped_words.append(WordTiming(
                         text=w["text"].strip(),
-                        start=cum + (ws - s),
-                        end=cum + (we - s),
+                        start=seg_offset + (ws - actual_s),
+                        end=seg_offset + (we - actual_s),
                     ))
 
         for sil in (plan.silences or []):
@@ -956,7 +999,7 @@ def render(
             if s <= sil_at <= e:
                 remapped_silences.append({
                     **sil,
-                    "at": cum + (sil_at - s),
+                    "at": seg_offset + (sil_at - actual_s),
                 })
 
         for vm in (plan.visual_style_moments or []):
@@ -968,13 +1011,13 @@ def render(
             if s <= vm_at <= e:
                 remapped_vsm.append({
                     **vm,
-                    "at": cum + (vm_at - s),
+                    "at": seg_offset + (vm_at - actual_s),
                     "duration": vm_dur,
                 })
 
         if parts:  # not the first segment — record this cut point
             cut_timestamps.append(cum)
-        cum += (e - s)
+        cum += (actual_e - actual_s)  # advance by the actual part file duration
 
     if not parts:
         raise RuntimeError("No keep_segments produced any clip.")
@@ -1173,6 +1216,10 @@ def render(
 
     # Sort the final zoom plan chronologically.
     remapped_zoom.sort(key=lambda z: float(z.get("start", 0)))
+
+    # VERIFICATION: drop caption words outside the edited video duration and log
+    # any sync anomalies so mismatches are visible in server logs.
+    remapped_words = _verify_caption_sync(remapped_words, total_duration)
 
     ass_path = work_dir / "captions.ass"
     build_ass(

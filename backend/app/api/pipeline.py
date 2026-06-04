@@ -25,6 +25,31 @@ from app.engine.template_engine import apply_template, get_template
 from app.engine.transcribe import transcribe, unload_model
 
 
+def verify_caption_sync(remapped_words: list, edited_duration: float) -> list:
+    """Filter caption words to only those that fall within the edited video.
+
+    This is a utility wrapper around render._verify_caption_sync() exposed
+    here for testing and external use. The render pipeline calls the private
+    version directly before build_ass().
+    """
+    import logging
+    log = logging.getLogger(__name__)
+    issues = []
+    valid = []
+    for w in remapped_words:
+        start = getattr(w, "start", w.get("start", 0) if isinstance(w, dict) else 0)
+        if start < 0:
+            issues.append(f"'{getattr(w, 'text', '')}' negative start={start:.3f}s")
+            continue
+        if start > edited_duration:
+            issues.append(f"'{getattr(w, 'text', '')}' start={start:.3f}s > duration={edited_duration:.3f}s")
+            continue
+        valid.append(w)
+    if issues:
+        log.warning("caption sync issues (%d): %s", len(issues), issues[:10])
+    return valid
+
+
 def run_job(
     job_id: str,
     src: Path,
