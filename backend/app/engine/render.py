@@ -777,36 +777,6 @@ def _color_grade_filter(content_type: str) -> str:
     return profiles.get(content_type.lower(), "eq=contrast=1.1:saturation=1.05")
 
 
-def _apply_depth_of_field(src: Path, dst: Path, target_w: int, target_h: int) -> None:
-    """Background blur (depth-of-field simulation) for portrait talking-head content.
-
-    Splits the frame into a blurred background copy and a scaled-down sharp
-    foreground copy, then composites the sharp layer centered on the blur.
-    Only called for coaching/education content_type.
-    """
-    fg_w = int(target_w * 0.65) & ~1   # ensure even for yuv420p
-    fg_h = int(target_h * 0.65) & ~1
-    _run([
-        FFMPEG_PATH, "-y", "-loglevel", "error",
-        "-threads", "1",
-        "-i", str(src),
-        "-filter_complex",
-        (
-            "split[bg][fg];"
-            "[bg]boxblur=lr=8:lp=2[blurred];"
-            f"[fg]scale={fg_w}:{fg_h}[sharp];"
-            "[blurred][sharp]overlay=(W-w)/2:(H-h)/2[out]"
-        ),
-        "-map", "[out]",
-        "-map", "0:a",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
-        "-threads", "1",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
-        str(dst),
-    ])
-
-
 def render(
     src: Path,
     transcript: dict[str, Any],
@@ -1049,17 +1019,6 @@ def render(
     remapped_hyperframes = remapped_hyperframes[:2]
 
     total_duration = _probe_duration(concat_path)
-
-    # FIX 3: Background blur (depth-of-field) for coaching/education content.
-    # Simulates a shallow depth-of-field: blurred background + sharp subject overlay.
-    if content_type.lower() in {"coaching", "education"}:
-        _dof_path = work_dir / "concat_dof.mp4"
-        try:
-            _apply_depth_of_field(concat_path, _dof_path, target_w, target_h)
-            if _dof_path.exists():
-                concat_path = _dof_path
-        except Exception:
-            pass  # DoF is aesthetic-only; skip gracefully if it fails
 
     # SMOOTH PUSH-IN per segment: cinematic slow zoom 1.0→1.06 over the full
     # duration of each segment. Replaces the jarring multi-camera zoom-cut cycle.
