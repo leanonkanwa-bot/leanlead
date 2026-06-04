@@ -911,6 +911,40 @@ The video ends when the viewer has been permanently changed.
 Not informed. Not entertained. Changed.
 """
 
+VISUAL_PACING = """\
+VISUAL PACING — cinematic rhythm by section
+
+FAST SECTIONS (HOOK / AMPLIFY / CONSEQUENCE):
+  Target cut: 1.5–2 s per segment — maximum urgency.
+  No b-roll during hook or amplify — keep the speaker fully present to
+  build trust. Every word must land on the viewer's face.
+  Caption style: kinetic, 1 word per frame. No slow pans.
+  Zoom: tight framing (1.08×+) so the viewer feels the energy.
+
+SLOW SECTIONS (REALIZATION / PRINCIPLE):
+  Target cut: 3–5 s per segment — give the idea room to breathe.
+  Slow push-in (1.0→1.06 over the segment). The viewer leans in.
+  Do NOT cut away mid-sentence during PRINCIPLE — the silence after
+  the last word IS the emphasis. Hold the frame for 0.5–1s.
+  Caption style: kinetic at normal rate — no speed ramp here.
+
+EMOTIONAL PEAK MOMENTS (PAYOFF / EMOTIONAL_END):
+  Hold 1s extra on the final frame — do not cut immediately after the
+  last word. The viewer needs a beat to process.
+  Insert 0.5s near-silence (silence entry in `silences`) before the
+  peak line so the line drops into absolute quiet.
+  Caption holds 0.5s after the last word before the line disappears —
+  extend the Dialogue line end time by 0.5s past the last word end.
+  No b-roll. No graphics. Speaker face only. Maximum zoom held constant.
+
+SECTION TRANSITIONS:
+  Topic change → punch_in zoom (kind: "punch_in") + "whoosh" sfx at the
+  cut point. The snap + audio hit land simultaneously.
+  Chapter start (HISTOIRE, PRINCIPE, PAYOFF) → "riser" sfx 0.5s before.
+  Hard cut only between sections — never dissolve. Dissolves signal
+  weakness; hard cuts signal confidence and momentum.
+"""
+
 
 # ---------------------------------------------------------------------------
 # Output contract — the JSON the agent must emit. Renderer reads this.
@@ -1265,6 +1299,7 @@ def system_prompt(
         BROLL_RULES,
         SOUND_DESIGN,
         RETENTION_MECHANICS,
+        VISUAL_PACING,
         CORE_LAW,
         OUTPUT_CONTRACT,
     ])
