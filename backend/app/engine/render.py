@@ -1111,6 +1111,7 @@ def render(
             _cut_proxy_segment(cut_src, s, e, part)
         else:
             _cut_segment(cut_src, s, e, part, target_w, target_h, fps)
+        print(f"[CUT] Segment {i}: {s:.3f}s → {e:.3f}s (duration: {e-s:.3f}s)  part={part.name}")
         parts.append(part)
 
         # PROBLEM 1 FIX: use the actual cut boundaries (with audio handles) as
@@ -1182,6 +1183,33 @@ def render(
 
     concat_path = work_dir / "concat.mp4"
     _concat(parts, concat_path)
+    print(f"[AUDIO] Concat complete: {concat_path}")
+    _audio_expected = sum(float(s["end"]) - float(s["start"]) for s in keep
+                         if float(s["end"]) > float(s["start"]))
+    print(f"[AUDIO] Expected duration (plan boundaries): {_audio_expected:.3f}s")
+
+    # Probe both audio and video streams on concat output
+    import subprocess as _sp, json as _js
+    def _probe_streams(path: Path) -> None:
+        try:
+            _r = _sp.run(
+                [FFPROBE_PATH, "-v", "quiet", "-print_format", "json",
+                 "-show_streams", str(path)],
+                capture_output=True, text=True, timeout=15,
+            )
+            _data = _js.loads(_r.stdout) if _r.stdout.strip() else {}
+            for _st in _data.get("streams", []):
+                print(
+                    f"[PROBE] {path.name}  codec_type={_st.get('codec_type')} "
+                    f"codec={_st.get('codec_name')}  duration={_st.get('duration','?')}s  "
+                    f"size={_st.get('width','')}"
+                    + (f"x{_st.get('height','')}" if _st.get('codec_type') == 'video' else "")
+                    + f"  r_frame_rate={_st.get('r_frame_rate','')}"
+                )
+        except Exception as _pe:
+            print(f"[PROBE] {path.name} probe failed: {_pe}")
+
+    _probe_streams(concat_path)
 
     # FIX 5 — Verify concat duration matches expected plan-boundary sum.
     import logging as _logging_early
@@ -1407,8 +1435,17 @@ def render(
     # any sync anomalies so mismatches are visible in server logs.
     remapped_words = _verify_caption_sync(remapped_words, total_duration)
 
-    # PROBLEM 2 DEBUG: log first 3 remapped words so caption sync is verifiable
-    # in production logs. Format: [('word', start_s, end_s), ...]
+    print(f"[CAPTIONS] Total remapped words: {len(remapped_words)}")
+    print(f"[CAPTIONS] Total edited duration (cap_offset): {cap_offset:.3f}s")
+    print(f"[CAPTIONS] Actual video duration (total_duration): {total_duration:.3f}s")
+    if remapped_words:
+        print(f"[CAPTIONS] First word: '{remapped_words[0].text}' at {remapped_words[0].start:.3f}s")
+        print(f"[CAPTIONS] Last word: '{remapped_words[-1].text}' at {remapped_words[-1].start:.3f}s")
+        _words_after = [w for w in remapped_words if w.start > total_duration]
+        print(f"[CAPTIONS] Words after video duration (should be 0): {len(_words_after)}")
+    else:
+        print("[CAPTIONS] WARNING: no remapped words — captions will be empty!")
+
     _log.info(
         "caption sync: %d remapped words; first 3: %s",
         len(remapped_words),
@@ -1429,6 +1466,8 @@ def render(
         word_colors=plan.word_colors,
         word_categories=plan.word_categories,
     )
+    print(f"[CAPTIONS] ASS file written: {ass_path}")
+    print(f"[CAPTIONS] ASS file size: {ass_path.stat().st_size} bytes")
 
     face_cx_pct = 50.0
     face_cy_pct = 50.0
@@ -1692,6 +1731,8 @@ def render(
         "-movflags", "+faststart",
         str(output_path),
     ])
+    print(f"[FINAL] Output: {output_path}")
+    _probe_streams(output_path)
     _nocap_path.unlink(missing_ok=True)
     for _p in _overlay_intermediates:
         _p.unlink(missing_ok=True)
