@@ -1187,15 +1187,18 @@ def render(
             for w in tseg.get("words", []):
                 ws = float(w["start"])
                 we = float(w["end"])
-                if ws >= s and we <= e:  # only content words (not handle region)
-                    # Use segment.start (s), not actual_s, so the remapped timestamp
-                    # represents when the word was spoken relative to the edit timeline
-                    # start. WHISPER_TIMESTAMP_CORRECTION in captions.py applies the
-                    # remaining per-word shift to align captions with actual lip movement.
+                # Strict plan-boundary whitelist: only include words whose
+                # original timestamp starts within [s_raw, e_raw). Using the
+                # plan's stated boundaries (not snapped/padded/extended) ensures
+                # that words from removed or reordered segments NEVER appear in
+                # the edit timeline.  The remapping formula still uses the
+                # snapped `s` so captions align with the actual lip position in
+                # the cut video.
+                if s_raw <= ws < e_raw:
                     remapped_words.append(WordTiming(
                         text=w["text"].strip(),
                         start=seg_offset + (ws - s),
-                        end=seg_offset + (we - s),
+                        end=seg_offset + (min(we, e) - s),
                     ))
 
         for sil in (plan.silences or []):
