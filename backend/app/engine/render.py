@@ -1545,20 +1545,24 @@ def render(
         [(w.text, round(w.start, 3), round(w.end, 3)) for w in remapped_words[:3]],
     )
 
+    # PART 4 — caption_style_map: per-segment style hints from the planner.
+    # Maps source segment start time → caption style ("normal" | "emphasis" | "highlight").
+    caption_style_map = {
+        float(seg.get("start", 0)): seg.get("caption_style", "normal")
+        for seg in (plan.keep_segments or [])
+        if isinstance(seg, dict)
+    }
+
     ass_path = work_dir / "captions.ass"
     build_ass(
         remapped_words,
         ass_path,
-        short_form=short_form,
-        emphasis_words=set(plan.caption_emphasis_words),
-        font=caption_font,
-        color=caption_color,
-        position=caption_position,
-        style=caption_style,
-        broll_windows=remapped_broll,
-        word_colors=plan.word_colors,
-        word_categories=plan.word_categories,
-        brand_color=brand_color,
+        video_w=target_w,
+        video_h=target_h,
+        brand_color=brand_color or "#FF7751",
+        caption_font=caption_font,
+        caption_style_map=caption_style_map,
+        video_duration=total_duration,
     )
     print(f"[CAPTIONS] ASS file written: {ass_path}")
     print(f"[CAPTIONS] ASS file size: {ass_path.stat().st_size} bytes")

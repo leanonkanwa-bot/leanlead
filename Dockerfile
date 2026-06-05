@@ -17,16 +17,17 @@ RUN apt-get update && ( apt-get install -y fonts-inter 2>/dev/null || ( \
     rm -rf /tmp/inter /tmp/inter.zip ) ) && rm -rf /var/lib/apt/lists/*
 
 # Google Fonts: Montserrat, DM Sans, Bebas Neue, Anton — direct TTF from GitHub raw
+# Each download is independent with || true so a single CDN hiccup doesn't break the build.
 RUN mkdir -p /usr/local/share/fonts/leanlead && \
     curl -fsSL "https://github.com/google/fonts/raw/main/ofl/montserrat/static/Montserrat-Bold.ttf" \
-         -o /usr/local/share/fonts/leanlead/Montserrat-Bold.ttf && \
+         -o /usr/local/share/fonts/leanlead/Montserrat-Bold.ttf 2>/dev/null || true && \
     curl -fsSL "https://github.com/google/fonts/raw/main/ofl/bebasneue/BebasNeue-Regular.ttf" \
-         -o /usr/local/share/fonts/leanlead/BebasNeue-Regular.ttf && \
+         -o /usr/local/share/fonts/leanlead/BebasNeue-Regular.ttf 2>/dev/null || true && \
     curl -fsSL "https://github.com/google/fonts/raw/main/ofl/anton/Anton-Regular.ttf" \
-         -o /usr/local/share/fonts/leanlead/Anton-Regular.ttf && \
+         -o /usr/local/share/fonts/leanlead/Anton-Regular.ttf 2>/dev/null || true && \
     curl -fsSL "https://github.com/google/fonts/raw/main/ofl/dmsans/static/DMSans-Bold.ttf" \
-         -o /usr/local/share/fonts/leanlead/DMSans-Bold.ttf && \
-    fc-cache -f -v
+         -o /usr/local/share/fonts/leanlead/DMSans-Bold.ttf 2>/dev/null || true && \
+    fc-cache -f -v 2>/dev/null || true
 
 # Custom fonts (Quicksand, SF Compact Bold, etc.) — drop TTF/OTF files into fonts/ before building.
 COPY fonts/ /usr/local/share/fonts/leanlead/
