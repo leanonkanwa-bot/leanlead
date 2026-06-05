@@ -781,11 +781,34 @@ Each b-roll suggestion's `at` is the EXACT START of the sentence whose
 content the visual matches. Read the transcript word-by-word and pick
 b-roll moments that align with the spoken concept — not random intervals.
 
+GENDER RULE FOR B-ROLL — mandatory for every search_query:
+  Analyze who is speaking from the transcript context and voice style.
+  If the speaker appears MALE: all search_query values MUST include "man"
+  or "male" unless the content specifically references women.
+  If the speaker appears FEMALE: include "woman" or "female".
+  If gender is unclear: use gender-neutral terms ("person", "athlete", etc.).
+
+  Examples (male speaker):
+    Says "I ran 10 miles"      → search_query: "man running trail"
+    Says "I drove 2 hours"     → search_query: "man driving highway"
+    Says "I woke up at 5AM"    → search_query: "man morning routine alarm"
+    Says "my girlfriend did X" → search_query: "woman smiling happy"
+
+  Examples (female speaker):
+    Says "I worked out"        → search_query: "woman workout gym"
+    Says "I started my business" → search_query: "woman entrepreneur laptop"
+
+  NEVER use bare generic queries — they return random gender stock footage
+  that breaks the speaker-to-viewer first-person connection:
+    Bad:  "running trail"          Good: "man running trail"
+    Bad:  "driving highway"        Good: "man driving car highway"
+    Bad:  "morning routine"        Good: "man morning coffee routine"
+
 Required fields for every b-roll entry:
   `description`   — vivid visual scene description for the stock search
-                    "Two people running on a forest trail at sunrise"
-  `search_query`  — short Pexels search terms (3–5 words, no filler)
-                    "people running forest trail"
+                    "Man running on a forest trail at sunrise"
+  `search_query`  — short Pexels search terms (3–5 words, gender-matched)
+                    "man running forest trail"
   `type`          — one of: action | location | emotion | number | concept
 
 The renderer fetches a free Pexels stock clip using `search_query` and
