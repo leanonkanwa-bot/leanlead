@@ -906,16 +906,8 @@ def _build_pass1_filter_complex(
 
 
 def _color_grade_filter(content_type: str) -> str:
-    """Return an FFmpeg video filter string for the given content type.
-    Applied FIRST in the filter chain so all subsequent overlays inherit the grade.
-    """
-    profiles: dict[str, str] = {
-        "coaching":   "eq=contrast=1.2:brightness=0.05:saturation=1.15,colorbalance=rs=0.03:gs=0.01:bs=-0.02",
-        "education":  "eq=brightness=0.05:contrast=1.1,unsharp=5:5:1.0:5:5:0.0",
-        "motivation": "eq=contrast=1.2:gamma=0.95,colorbalance=rs=0.08:gs=0.03",
-        "story":      "eq=saturation=0.9:contrast=1.05,colorbalance=rs=0.03",
-    }
-    return profiles.get(content_type.lower(), "eq=contrast=1.1:saturation=1.05")
+    """Disabled — returns empty string so no color/grade filter is applied."""
+    return ""
 
 
 def _fetch_broll_clip(
@@ -1020,8 +1012,7 @@ def _fetch_broll_clip(
         vf = (
             f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase,"
             f"crop={target_w}:{target_h},fps={fps},"
-            f"trim=duration={duration:.2f},setpts=PTS-STARTPTS,"
-            f"eq=contrast=1.1:saturation=1.05"
+            f"trim=duration={duration:.2f},setpts=PTS-STARTPTS"
         )
         _run([
             FFMPEG_PATH, "-y", "-loglevel", "error",
@@ -1550,22 +1541,7 @@ def render(
     # Pass 1 uses a simple fps lock + PTS reset — no additional zoompan needed.
     _zoom_str = f"fps={fps},setpts=N/FRAME_RATE/TB"
 
-    # Cinematic immersion layer (applied only to main speaker footage here;
-    # b-roll overlays come in later passes and are unaffected):
-    #   1. Film grain — subtle analog texture (strength 4, temporal+uniform)
-    #   2. Camera shake — sub-pixel crop oscillation (±2px at 0.3/0.4 Hz)
-    #      scaled back to target dimensions so the output is unchanged in size
-    #   3. Vignette — forward vignette darkens edges, focusing the eye
-    _shake_w = target_w - 8
-    _shake_h = target_h - 8
-    _immersion = (
-        f"noise=alls=4:allf=t+u,"
-        f"crop={_shake_w}:{_shake_h}"
-        f":x=4+sin(2*PI*t*0.3)*2:y=4+cos(2*PI*t*0.4)*2,"
-        f"scale={target_w}:{target_h},"
-        f"vignette=angle=PI/4:mode=forward:eval=init:dither=1"
-    )
-    _vf_p1 = [p for p in [color_grade, scale_filter, _zoom_str, _immersion] if p]
+    _vf_p1 = [p for p in [color_grade, scale_filter, _zoom_str] if p]
     _cmd_p1: list[str] = [
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(concat_path),
