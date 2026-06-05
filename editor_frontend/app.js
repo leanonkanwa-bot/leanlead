@@ -853,6 +853,17 @@ async function chunkedUpload(file) {
   setStatus("queued", "Démarrage de l'édition IA…", 28);
   const fd = new FormData(form);
   fd.delete("video"); fd.set("upload_id", upload_id);
+
+  // Inject brand colors + font from coach_profile if not already set by form
+  try {
+    const _cp = JSON.parse(localStorage.getItem("coach_profile") || "{}");
+    const _fontMap = { Poppins: "Poppins Bold", Inter: "Inter Bold", Montserrat: "Montserrat Bold",
+      Bebas: "Bebas Neue", Anton: "Anton", "DM Sans": "DM Sans Bold", Quicksand: "Quicksand Bold" };
+    if (_cp.primaryColor && !fd.get("brand_color")) fd.set("brand_color", _cp.primaryColor);
+    if (_cp.font && (!fd.get("caption_font") || fd.get("caption_font") === "Poppins Bold"))
+      fd.set("caption_font", _fontMap[_cp.font] || _cp.font);
+  } catch (_e) {}
+
   const editRes = await apiFetch("/api/edit", { method: "POST", body: fd });
   if (editRes.status === 401) { loginCard?.classList.remove("hidden"); appCard?.classList.add("hidden"); statusCard?.classList.add("hidden"); submitBtn.disabled = false; submitBtn.querySelector(".btn-label").textContent = "Éditer ma vidéo"; submitBtn.classList.remove("loading"); return; }
   if (!editRes.ok) throw new Error(`Edit start failed: ${editRes.status} ${await editRes.text()}`);

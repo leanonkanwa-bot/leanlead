@@ -130,6 +130,7 @@ def _ass_header(
     color_hex: str,
     position: str,
     style: str = "impact",
+    brand_color: str | None = None,
 ) -> str:
     primary = _hex_to_ass_bgr(color_hex)
 
@@ -145,13 +146,16 @@ def _ass_header(
     alignment = 2
     margin_v  = round(play_res_y * 0.18)  # 346px for 9:16, 194px for 16:9
 
+    # Emphasis color: brand primary overrides the default salmon
+    _emph_ass = _hex_to_ass_bgr(brand_color) if brand_color else EMPHASIS_COLOR_ASS
+
     # Both styles use the same positioning; style only affects grouping / animations.
     default_line = (
         f"Style: Default,{font_name},{cap_size},{primary},{primary},"
         f"&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
     )
     emphasis_line = (
-        f"Style: Emphasis,{font_name},{cap_size_emph},{EMPHASIS_COLOR_ASS},{EMPHASIS_COLOR_ASS},"
+        f"Style: Emphasis,{font_name},{cap_size_emph},{_emph_ass},{_emph_ass},"
         f"&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
     )
 
@@ -167,8 +171,8 @@ def _ass_header(
         tl_large_mv  = round(play_res_y * 0.13)
         # Small line sits directly above the large line with ~12px clearance
         tl_small_mv  = tl_large_mv + tl_large_sz + round(play_res_y * 0.012)
-        # Gold/cream (#F5E6C8): R=F5 G=E6 B=C8 → ASS BGR = C8E6F5
-        tl_large_color = "&H00C8E6F5"
+        # TL_Large color: use brand primary if provided, else gold/cream (#F5E6C8)
+        tl_large_color = _hex_to_ass_bgr(brand_color) if brand_color else "&H00C8E6F5"
         # White at ~70% opacity: ASS alpha 0x4D ≈ 30% transparent → 70% visible
         tl_small_color = "&H4DFFFFFF"
         tl_large_line = (
@@ -251,6 +255,7 @@ def build_ass(
     emphasis_only: bool = False,
     word_colors: dict[str, str] | None = None,
     word_categories: dict[str, str] | None = None,
+    brand_color: str | None = None,
 ) -> Path:
     """Render captions to an ASS file.
 
@@ -273,11 +278,14 @@ def build_ass(
     if style not in ALLOWED_STYLES:
         style = "kinetic"
 
+    # Derive emphasis color from brand primary (or fall back to default salmon)
+    _emphasis_color_ass = _hex_to_ass_bgr(brand_color) if brand_color else EMPHASIS_COLOR_ASS
+
     emphasis_set = {_strip_punct(w).lower() for w in (emphasis_words or set())}
     broll_list   = list(broll_windows)
     word_list    = [w for w in words if _strip_punct(w.text)]
 
-    lines = [_ass_header(short_form, font, color_hex, position, style)]
+    lines = [_ass_header(short_form, font, color_hex, position, style, brand_color=brand_color)]
 
     word_color_map = {k.strip().lower(): v for k, v in (word_colors or {}).items()}
     # word_categories: key is the ORIGINAL word (case-preserved from the plan).
@@ -354,7 +362,7 @@ def build_ass(
                     parts.append(f"{{\\c{_hex_to_ass_bgr(cust)}}}{label}{{\\r}}")
                 elif wl in emphasis_set:
                     parts.append(
-                        f"{{\\c{EMPHASIS_COLOR_ASS}\\fs{tl_emph_sz}}}{label}{{\\r}}"
+                        f"{{\\c{_emphasis_color_ass}\\fs{tl_emph_sz}}}{label}{{\\r}}"
                     )
                 else:
                     parts.append(label)
@@ -423,7 +431,7 @@ def build_ass(
                 display_parts.append(f"{{\\c{color_ass}}}{label}{{\\r}}")
             elif w_lower in emphasis_set:
                 display_parts.append(
-                    f"{{\\c{EMPHASIS_COLOR_ASS}\\fs{cap_size_emph}}}{w.title()}{{\\r}}"
+                    f"{{\\c{_emphasis_color_ass}\\fs{cap_size_emph}}}{w.title()}{{\\r}}"
                 )
             elif style in ("kinetic", "popup"):
                 # Kinetic/popup normal words: ALL CAPS for impact at the center.
