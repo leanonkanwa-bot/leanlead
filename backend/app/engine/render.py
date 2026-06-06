@@ -1126,10 +1126,8 @@ def render(
     src_h_raw = video_info.get("height", 0)
     is_4k = max(src_w_raw, src_h_raw) >= 3840
 
-    if short_form:
-        target_w, target_h = (2160, 3840) if is_4k else (1080, 1920)
-    else:
-        target_w, target_h = (3840, 2160) if is_4k else (1920, 1080)
+    # Always vertical 9:16 — TikTok / Reels / Shorts output
+    target_w, target_h = (2160, 3840) if is_4k else (1080, 1920)
 
     # CRF 14 for 4K (high bitrate needed), 16 for 1080p. Preset slow for quality.
     output_crf = 14 if is_4k else 16
@@ -1663,7 +1661,9 @@ def render(
         f"fps={fps},setpts=N/FRAME_RATE/TB"
     )
 
-    _vf_p1 = [p for p in [color_grade, scale_filter, _zoom_str] if p]
+    # Cover stream chat / subscriber UI burned into top-right corner of captures
+    _stream_ui_cover = "drawbox=x=W-300:y=0:w=300:h=200:color=black:t=fill"
+    _vf_p1 = [p for p in [color_grade, scale_filter, _stream_ui_cover, _zoom_str] if p]
     _cmd_p1: list[str] = [
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(concat_path),
