@@ -31,7 +31,10 @@ class EditPlan:
 
     @property
     def keep_segments(self) -> list[dict[str, Any]]:
-        return self.raw.get("keep_segments", [])
+        return [
+            {**s, "beat": s.get("beat", "story")}
+            for s in self.raw.get("keep_segments", [])
+        ]
 
     @property
     def zoom_plan(self) -> list[dict[str, Any]]:
