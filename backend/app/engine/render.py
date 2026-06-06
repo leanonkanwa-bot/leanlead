@@ -767,6 +767,62 @@ def _find_system_font() -> str | None:
     return None
 
 
+_VALID_ZOOM_LEVELS = frozenset({100, 130, 150, 170})
+
+
+def _zoom_filter_for_level(zoom_level: int, target_w: int, target_h: int) -> str | None:
+    """Return an FFmpeg vf string for a jump zoom at the given level.
+
+    Returns None for level 100 (full frame, no crop needed).
+    For 130/150/170: scales up then center-crops back to target dimensions.
+    Uses lanczos for quality — these are still-frame crops, not animations.
+    """
+    if zoom_level <= 100:
+        return None
+    factor = zoom_level / 100.0
+    scaled_w = round(target_w * factor)
+    scaled_h = round(target_h * factor)
+    crop_x = (scaled_w - target_w) // 2
+    crop_y = (scaled_h - target_h) // 2
+    return (
+        f"scale={scaled_w}:{scaled_h}:flags=lanczos,"
+        f"crop={target_w}:{target_h}:{crop_x}:{crop_y}"
+    )
+
+
+def _apply_segment_zoom(
+    src: Path,
+    dst: Path,
+    zoom_level: int,
+    target_w: int,
+    target_h: int,
+    fps: int,
+) -> None:
+    """Bake a jump-zoom into a segment clip via instant scale+crop.
+
+    No animation — the whole segment is at a constant zoom level.
+    Produces an output at target_w × target_h regardless of input zoom.
+    """
+    zoom_f = _zoom_filter_for_level(zoom_level, target_w, target_h)
+    vf = (
+        f"{zoom_f},fps={fps},setpts=N/FRAME_RATE/TB"
+        if zoom_f
+        else f"fps={fps},setpts=N/FRAME_RATE/TB"
+    )
+    _run([
+        FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-i", str(src),
+        "-vf", vf,
+        "-vsync", "cfr",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
+        "-threads", "1",
+        "-x264-params", "rc-lookahead=0:bframes=0:ref=1:no-mbtree=1",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "copy",
+        str(dst),
+    ])
+
+
 def _render_hyperframe_png(
     color_str: str,
     dst: Path,
@@ -1181,8 +1237,18 @@ def render(
             _cut_proxy_segment(cut_src, s, e, part)
         else:
             _cut_segment(cut_src, s, e, part, target_w, target_h, fps)
-        print(f"[CUT] Segment {i}: {s:.3f}s → {e:.3f}s (duration: {e-s:.3f}s)  part={part.name}")
-        parts.append(part)
+
+        # Jordan Belfort jump zoom — apply per-segment at the level the planner chose.
+        zoom_level = int(seg.get("zoom_level", 130))
+        if zoom_level not in _VALID_ZOOM_LEVELS:
+            zoom_level = min(_VALID_ZOOM_LEVELS, key=lambda z: abs(z - zoom_level))
+        zoomed_part = work_dir / f"part_z_{i:04d}.mp4"
+        _apply_segment_zoom(part, zoomed_part, zoom_level, target_w, target_h, fps)
+        print(
+            f"[CUT] Segment {i}: {s:.3f}s → {e:.3f}s (duration: {e-s:.3f}s)"
+            f"  role={seg.get('role', '?')}  zoom={zoom_level}%  part={zoomed_part.name}"
+        )
+        parts.append(zoomed_part)
 
         # PROBLEM 1 FIX: use the actual cut boundaries (with audio handles) as
         # the reference for all timeline remapping so captions, zooms, and
@@ -1652,17 +1718,9 @@ def render(
     _tmp_dir = Path(_tempfile.gettempdir())
     _base_path = _tmp_dir / f"base_{output_path.stem}.mp4"
 
-    # Static 4% zoom: scale to 104% then center-crop back to target — gives a
-    # subtle "punched in" look without per-frame zoompan PTS drift.
-    _sz_w = round(target_w * 1.04)
-    _sz_h = round(target_h * 1.04)
-    _sz_x = (_sz_w - target_w) // 2
-    _sz_y = (_sz_h - target_h) // 2
-    _zoom_str = (
-        f"scale={_sz_w}:{_sz_h}:flags=lanczos,"
-        f"crop={target_w}:{target_h}:{_sz_x}:{_sz_y},"
-        f"fps={fps},setpts=N/FRAME_RATE/TB"
-    )
+    # Jump zoom is baked in per-segment (see _apply_segment_zoom above).
+    # Pass 1 only needs fps normalization and PTS reset.
+    _zoom_str = f"fps={fps},setpts=N/FRAME_RATE/TB"
 
     # Cover stream chat / subscriber UI in top-right corner — short-form only.
     # In long-form (16:9) the crop is different and the UI position varies.

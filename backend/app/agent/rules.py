@@ -1068,11 +1068,17 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
          cut_before_silence: true if breath pause ≥0.25s precedes
            this segment's first word (always cut at breath boundaries).
          retention_note: one sentence — why this earns the viewer's time.
+         zoom_level: jump-zoom level for this entire segment.
+           100 = wide reset (topic transitions, breathing room)
+           130 = standard (default — story, narrative, context sections)
+           150 = emphasis (key points, stats, emotions, realization)
+           170 = maximum impact (use ONCE only — most powerful line in video)
       */
       "role": "hook"|"problem"|"story"|"principle"|"payoff"|"transition",
       "score": <net score>,
       "cut_before_silence": true|false,
-      "retention_note": "<why this keeps the viewer watching>" }
+      "retention_note": "<why this keeps the viewer watching>",
+      "zoom_level": 100|130|150|170 }
   ],
   "drop_segments": [
     { "start": <s>, "end": <s>,
@@ -1167,6 +1173,17 @@ Rules the JSON must obey:
   - speed_ramps: rate 0.5–2.0; slow_down for PRINCIPE/PAYOFF delivery,
     speed_up for mundane connectives. Never ramp mid-sentence.
   - music_energy: one entry per named beat section.
+  - zoom_level rules (REQUIRED on every keep_segment):
+      Allowed values: 100, 130, 150, 170 only.
+      100  = wide reset — use at topic transitions only (maximum 2 per video).
+      130  = default — story, narrative, context segments.
+      150  = emphasis — key points, stats, emotions, realization beats.
+      170  = maximum — use EXACTLY ONCE on the single most powerful line.
+             Never use 170 more than once per video. Never.
+      Hook segment: always 130.
+      Payoff segment: 170 (this is typically the one use of 170).
+      After payoff — reset segment: 100.
+      Default when in doubt: 130.
   - Be ruthless. Tension > comfort. Specific > generic.
   - Output ONLY JSON. No prose around it.
 """
@@ -1327,6 +1344,19 @@ def system_prompt(
         OUTPUT_CONTRACT,
     ])
 
+    _zoom_level_rules = (
+        "ZOOM LEVELS — assign zoom_level to EVERY keep_segment (required field):\n"
+        "  100 = wide reset   — topic transitions only, max 2 per video\n"
+        "  130 = standard     — default; story, narrative, context segments\n"
+        "  150 = emphasis     — key points, stats, emotions, realization beats\n"
+        "  170 = maximum      — EXACTLY ONCE on the most powerful line (usually payoff)\n"
+        "Assignment rules:\n"
+        "  Hook → 130. Payoff → 170 (this is the one use of 170). Reset after payoff → 100.\n"
+        "  Never use 170 more than once. Never.\n"
+        "  ~4 zoom changes per minute. Never hold the same level more than 20–25 seconds.\n"
+        "  Default when uncertain: 130."
+    )
+
     if format_hint == "short":
         blocks.append(
             "TARGET FORMAT: short — apply the high-amplitude zoom arc, "
@@ -1339,7 +1369,8 @@ def system_prompt(
             "visual_style_moments: [] — output empty array, no exceptions. "
             "1 cut per 2–3 seconds. Ruthless filler removal. "
             "New curiosity loop every 15–20s. "
-            "9-beat spine: HOOK/AMPLIFY/CONTEXT/TENSION/STORY/REALIZATION/PRINCIPLE/PAYOFF/EMOTIONAL_END."
+            "9-beat spine: HOOK/AMPLIFY/CONTEXT/TENSION/STORY/REALIZATION/PRINCIPLE/PAYOFF/EMOTIONAL_END.\n\n"
+            + _zoom_level_rules
         )
     elif format_hint == "long":
         blocks.append(
@@ -1348,7 +1379,10 @@ def system_prompt(
             "category colors on key words, salmon emphasis. "
             "motion_graphics: [] — output empty array. visual_style_moments: [] — output empty array. "
             "1 cut per 4–6 seconds. Max 2 b-roll. "
-            "New curiosity loop every 15–20s."
+            "New curiosity loop every 15–20s.\n\n"
+            + _zoom_level_rules
         )
+    else:
+        blocks.append(_zoom_level_rules)
 
     return "\n\n".join(blocks)
