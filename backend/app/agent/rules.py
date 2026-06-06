@@ -1180,9 +1180,10 @@ Rules the JSON must obey:
       150  = emphasis — key points, stats, emotions, realization beats.
       170  = maximum — use EXACTLY ONCE on the single most powerful line.
              Never use 170 more than once per video. Never.
-      Hook segment: always 130.
-      Payoff segment: 170 (this is typically the one use of 170).
-      After payoff — reset segment: 100.
+      Beat-specific defaults:
+        HOOK → 150. AMPLIFY → 150. CONTEXT → 130.
+        TENSION → 150. STORY → 130. REALIZATION → 150. PRINCIPLE → 150.
+        PAYOFF → 170 (the one use of 170). EMOTIONAL_END → 100 (wide reset).
       Default when in doubt: 130.
   - Be ruthless. Tension > comfort. Specific > generic.
   - Output ONLY JSON. No prose around it.
@@ -1350,8 +1351,17 @@ def system_prompt(
         "  130 = standard     — default; story, narrative, context segments\n"
         "  150 = emphasis     — key points, stats, emotions, realization beats\n"
         "  170 = maximum      — EXACTLY ONCE on the most powerful line (usually payoff)\n"
-        "Assignment rules:\n"
-        "  Hook → 130. Payoff → 170 (this is the one use of 170). Reset after payoff → 100.\n"
+        "Beat-specific assignments:\n"
+        "  HOOK         → 150 (open strong — tight frame creates urgency)\n"
+        "  AMPLIFY      → 150 (sustain energy from the hook)\n"
+        "  CONTEXT      → 130 (give breathing room, let viewer settle)\n"
+        "  TENSION      → 150 (viewer must feel the discomfort)\n"
+        "  STORY        → 130 (narrative flow, standard frame)\n"
+        "  REALIZATION  → 150 (the turn — pull the viewer in)\n"
+        "  PRINCIPLE    → 150 (key idea deserves emphasis)\n"
+        "  PAYOFF       → 170 (the ONE use of 170 — most powerful moment)\n"
+        "  EMOTIONAL_END→ 100 (wide reset — let the final line land with space)\n"
+        "Global rules:\n"
         "  Never use 170 more than once. Never.\n"
         "  ~4 zoom changes per minute. Never hold the same level more than 20–25 seconds.\n"
         "  Default when uncertain: 130."

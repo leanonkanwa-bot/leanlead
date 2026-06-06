@@ -1231,6 +1231,7 @@ def render(
         cut_src = src
 
     parts: list[Path] = []
+    zoom_segments: list[int] = []
     cum = 0.0  # exact video output timeline — no audio-handle inflation
     remapped_zoom: list[dict[str, Any]] = []
     remapped_words: list[WordTiming] = []
@@ -1266,10 +1267,8 @@ def render(
             zoom_level = min(_VALID_ZOOM_LEVELS, key=lambda z: abs(z - zoom_level))
         zoomed_part = work_dir / f"part_z_{i:04d}.mp4"
         _apply_segment_zoom(part, zoomed_part, zoom_level, target_w, target_h, fps)
-        print(
-            f"[CUT] Segment {i}: {s:.3f}s → {e:.3f}s (duration: {e-s:.3f}s)"
-            f"  role={seg.get('role', '?')}  zoom={zoom_level}%  part={zoomed_part.name}"
-        )
+        print(f"[ZOOM] Segment {i}: beat={seg.get('beat')} zoom={zoom_level}% duration={e-s:.2f}s")
+        zoom_segments.append(i)
         parts.append(zoomed_part)
         _check_av_sync(zoomed_part, f"segment_{i}")  # FIX 5: probe after every cut
 
@@ -1333,6 +1332,7 @@ def render(
     if not parts:
         raise RuntimeError("No keep_segments produced any clip.")
 
+    print(f"[ZOOM] Total segments with zoom: {len(zoom_segments)}")
     concat_path = work_dir / "concat.mp4"
     _concat(parts, concat_path)
     print(f"[AUDIO] Concat complete: {concat_path}")
