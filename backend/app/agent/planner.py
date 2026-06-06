@@ -32,7 +32,13 @@ class EditPlan:
     @property
     def keep_segments(self) -> list[dict[str, Any]]:
         return [
-            {**s, "beat": s.get("beat", "story")}
+            {
+                **s,
+                "beat":          s.get("beat") or "story",
+                "zoom_level":    int(s.get("zoom_level") or 130),
+                "score":         int(s.get("score") or 0),
+                "caption_style": s.get("caption_style") or "normal",
+            }
             for s in self.raw.get("keep_segments", [])
         ]
 
