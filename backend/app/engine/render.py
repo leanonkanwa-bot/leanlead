@@ -337,28 +337,34 @@ def _cut_segment(
     target_h: int,
     fps: int,
 ) -> None:
-    """Per-segment extract with 80ms audio handles. Stream-copy audio to prevent
-    acrossfade drift and preserve exact A/V sync through the concat stage.
+    """Per-segment extract with 80ms audio handles.
 
-    BUG 2 FIX — AV SYNC: -avoid_negative_ts make_zero + -fflags +genpts fix
-    timestamp discontinuities that accumulate across cuts and cause drift between
-    the audio, video, and caption tracks in the concatenated output.
+    SYNC: -ss BEFORE -i (fast seek, frame-accurate). Duration via -t, not end
+    time. Audio re-encoded with -async 1 so its timestamps are normalized to
+    the same zero-based clock as the video — stream-copy would preserve the
+    source audio timestamps which may be offset from the video PTS.
     """
     actual_start = max(0.0, start - AUDIO_HANDLE_S)
     actual_end   = end + AUDIO_HANDLE_S
     duration     = max(0.1, actual_end - actual_start)
+    fade_out_st  = max(0.0, duration - AUDIO_FADE_S)
     vf = (
         f"scale={target_w}:{target_h}:force_original_aspect_ratio=increase"
         f":flags=lanczos,"
         f"crop={target_w}:{target_h},"
         f"fps={fps}"
     )
+    af = (
+        f"afade=t=in:st=0:d={AUDIO_FADE_S},"
+        f"afade=t=out:st={fade_out_st:.3f}:d={AUDIO_FADE_S}"
+    )
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-threads", "1",
         "-fflags", "+genpts",               # regenerate PTS — prevents drift
-        "-ss", f"{actual_start:.6f}", "-i", str(src),
-        "-t", f"{duration:.6f}",
+        "-ss", f"{actual_start:.6f}",       # -ss BEFORE -i = fast seek
+        "-i", str(src),
+        "-t", f"{duration:.6f}",            # duration, not end time
         "-avoid_negative_ts", "make_zero",  # zero-base all timestamps
         "-vf", vf,
         "-vsync", "cfr",
@@ -366,7 +372,9 @@ def _cut_segment(
         "-x264-params", "rc-lookahead=0:bframes=0:ref=1:no-mbtree=1:sync-lookahead=0",
         "-threads", "1",
         "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
+        "-af", af,
+        "-async", "1",                      # normalize audio timestamps to video clock
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
         str(dst),
     ])
 
@@ -376,6 +384,7 @@ def _concat(parts: list[Path], dst: Path) -> None:
     list_path.write_text("\n".join(f"file '{p.as_posix()}'" for p in parts))
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-fflags", "+genpts",               # normalize PTS at segment boundaries
         "-f", "concat", "-safe", "0", "-i", str(list_path),
         "-c", "copy",
         str(dst),
@@ -811,6 +820,7 @@ def _apply_segment_zoom(
     )
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-fflags", "+genpts",               # regenerate PTS — prevents drift
         "-i", str(src),
         "-vf", vf,
         "-vsync", "cfr",
@@ -818,7 +828,8 @@ def _apply_segment_zoom(
         "-threads", "1",
         "-x264-params", "rc-lookahead=0:bframes=0:ref=1:no-mbtree=1",
         "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
+        "-async", "1",                      # normalize audio timestamps to video clock
+        "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
         str(dst),
     ])
 
@@ -920,16 +931,10 @@ def _build_pass1_filter_complex(
     """
     fc: list[str] = []
 
-    # ── Video: grade + optional scale + constant zoompan ─────────────────
+    # ── Video: grade + optional scale ─────────────────────────────────────
     grade_parts: list[str] = [color_grade]
     if scale_filter:
         grade_parts.append(scale_filter)
-    grade_parts.append(
-        f"zoompan=z=1.08"
-        f":x=iw/2-(iw/zoom/2)"
-        f":y=ih/2-(ih/zoom/2)"
-        f":d=1:s={target_w}x{target_h}:fps={fps}"
-    )
     fc.append(f"[0:v]{','.join(grade_parts)}[vzoom]")
 
     # ── Timed clip overlays (hyperframes + motion graphics) ───────────────
@@ -1765,6 +1770,7 @@ def render(
         len(ok_graphics), len(remapped_silences),
     )
     _run(_cmd_p1)
+    _probe_av(_base_path)
 
     # ── B-roll overlay passes (full-screen Pexels stock video) ───────────
     # For each remapped b-roll window: fetch a stock clip from Pexels,
@@ -1824,15 +1830,17 @@ def render(
             "-filter_complex", _fc_br,
             "-map", "[vout]", "-map", "0:a",
             "-vsync", "cfr",
+            "-async", "1",                  # normalize audio timestamps to video clock
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
             "-threads", "4",
             "-pix_fmt", "yuv420p",
-            "-c:a", "copy",
+            "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
             str(_next_br_path),
         ])
         if _next_br_path.exists():
             _overlay_intermediates.append(_current_path)
             _current_path = _next_br_path
+            _probe_av(_current_path)
 
     print(f"[BROLL] Downloaded {_broll_clips_downloaded} clip(s) successfully")
 
@@ -1856,15 +1864,17 @@ def render(
             "-filter_complex", _fc_ov,
             "-map", "[out]", "-map", "0:a",
             "-vsync", "cfr",
+            "-async", "1",                  # normalize audio timestamps to video clock
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
             "-threads", "4",
             "-x264-params", "rc-lookahead=0:bframes=0",
             "-pix_fmt", "yuv420p",
-            "-c:a", "copy",
+            "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
             str(_next_path),
         ])
         _overlay_intermediates.append(_current_path)
         _current_path = _next_path
+        _probe_av(_current_path)
 
     _nocap_path = _current_path
 
@@ -1879,6 +1889,7 @@ def render(
         "-i", str(_nocap_path),
         "-vf", f"subtitles={_ass_str}",
         "-vsync", "cfr",
+        "-async", "1",                      # normalize audio timestamps to video clock
         # Final quality encode — CRF 16 + 20M cap. Only lossy encode in pipeline.
         "-c:v", "libx264", "-preset", "medium", "-crf", str(output_crf),
         "-b:v", "20M",
@@ -1893,6 +1904,7 @@ def render(
         str(output_path),
     ])
     print(f"[FINAL] Output: {output_path}")
+    _probe_av(output_path)
     _probe_streams(output_path)
     _nocap_path.unlink(missing_ok=True)
     for _p in _overlay_intermediates:
