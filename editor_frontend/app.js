@@ -113,7 +113,13 @@ function updateDashboardStats() {
     const count = videos.length;
     if ($("dashVideos")) $("dashVideos").textContent = count;
     if ($("dashTimeSaved")) $("dashTimeSaved").textContent = (count * 4) + "h";
-    if ($("dashViews")) $("dashViews").textContent = count > 0 ? (count * 10000).toLocaleString("fr-FR") : "—";
+    const now = new Date();
+    const thisMonthCount = videos.filter(v => {
+      if (!v.date) return false;
+      const d = new Date(v.date);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+    if ($("dashViews")) $("dashViews").textContent = thisMonthCount;
     const scores = videos.map(v => v.retention_score).filter(s => typeof s === "number");
     if ($("dashScoreMoyen")) {
       $("dashScoreMoyen").textContent = scores.length > 0
@@ -216,24 +222,21 @@ function loadVideoLibrary() {
     gridEl.style.display = "grid";
     gridEl.innerHTML = videos.slice(0, 12).map((v, i) => {
       const score = v.retention_score || Math.floor(Math.random() * 20) + 75;
-      const dateStr = v.date ? new Date(v.date).toLocaleDateString("fr-FR") : "—";
       const title = v.title || `Vidéo #${i + 1}`;
-      const scoreColor = score >= 85 ? "#22c55e" : score >= 70 ? "var(--salmon)" : "#ff5c7a";
-      const thumbHtml = v.thumbnail
-        ? `<img src="${v.thumbnail}" alt="${title}" />`
+      const scoreBg = score >= 85 ? "#22c55e" : score >= 70 ? "#f59e0b" : "#ef4444";
+      const thumbSrc = v.thumbnail_url || v.thumbnail || null;
+      const thumbHtml = thumbSrc
+        ? `<img src="${thumbSrc}" alt="${title}" style="width:100%;height:100%;object-fit:cover;display:block" />`
         : `<div class="video-lib-thumb-placeholder"><svg class="video-lib-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg></div>`;
       return `<div class="video-lib-card" title="${title}">
         <div class="video-lib-thumb">
           ${thumbHtml}
-          <span class="video-lib-retention" style="color:${scoreColor}">${score}%</span>
+          <span class="video-lib-retention" style="background:${scoreBg}">${score}%</span>
+          <div class="video-lib-title-overlay">${title}</div>
           <div class="video-lib-overlay">
             ${v.jobId ? `<a href="/api/download/${v.jobId}" class="action-btn" download>Télécharger</a>` : ""}
             <button class="action-btn" onclick="switchSection('editorArea')">Reediter</button>
           </div>
-        </div>
-        <div class="video-lib-info">
-          <div class="video-lib-title">${title}</div>
-          <div class="video-lib-meta">${dateStr} · ${v.format || "Auto"}</div>
         </div>
       </div>`;
     }).join("");
@@ -1035,26 +1038,13 @@ async function showResult(jobId, result) {
   if (player) player.src = downloadUrl;
   if (downloadLink) downloadLink.href = downloadUrl;
 
-  // Capture video thumbnail for library
+  // Store API thumbnail URL for library (generated on-demand by backend)
   try {
-    const thumbVideo = document.createElement("video");
-    thumbVideo.src = downloadUrl;
-    thumbVideo.crossOrigin = "anonymous";
-    thumbVideo.currentTime = 1;
-    thumbVideo.addEventListener("loadeddata", () => {
-      try {
-        const canvas = document.createElement("canvas");
-        canvas.width = 160; canvas.height = 90;
-        canvas.getContext("2d").drawImage(thumbVideo, 0, 0, 160, 90);
-        const thumbnail = canvas.toDataURL("image/jpeg", 0.7);
-        const videos = JSON.parse(localStorage.getItem("edited_videos") || "[]");
-        if (videos.length && videos[0].jobId === jobId) {
-          videos[0].thumbnail = thumbnail;
-          localStorage.setItem("edited_videos", JSON.stringify(videos.slice(0, 50)));
-        }
-      } catch {}
-    });
-    thumbVideo.load();
+    const videos = JSON.parse(localStorage.getItem("edited_videos") || "[]");
+    if (videos.length && videos[0].jobId === jobId) {
+      videos[0].thumbnail_url = `/api/thumbnail/${jobId}`;
+      localStorage.setItem("edited_videos", JSON.stringify(videos.slice(0, 50)));
+    }
   } catch {}
 
   // Show hook_rewrite as suggested title metadata (not a video caption).
