@@ -1237,6 +1237,7 @@ def render(
     remapped_words: list[WordTiming] = []
     remapped_silences: list[dict[str, Any]] = []
     remapped_vsm: list[dict[str, Any]] = []
+    remapped_moments: list[dict[str, Any]] = []
     cut_timestamps: list[float] = []  # output-timeline timestamps of cut points
 
     for i, seg in enumerate(keep):
@@ -1323,6 +1324,19 @@ def render(
                     **vm,
                     "at": seg_offset + (vm_at - s),
                     "duration": vm_dur,
+                })
+
+        for moment in (plan.caption_moments or []):
+            try:
+                m_at  = float(moment.get("start", 0))
+                m_end = float(moment.get("end", m_at + 3.0))
+            except (TypeError, ValueError):
+                continue
+            if s_raw <= m_at < e_raw:
+                remapped_moments.append({
+                    **moment,
+                    "start": seg_offset + (m_at - s),
+                    "end":   min(seg_offset + (m_end - s), seg_offset + (e - s)),
                 })
 
         if parts:  # record cut point in output timeline
@@ -1483,6 +1497,12 @@ def render(
                 remapped_silences = [
                     {**sil, "at": _remap_time(float(sil.get("at", 0)), kept_intervals)}
                     for sil in remapped_silences
+                ]
+                remapped_moments = [
+                    {**m,
+                     "start": _remap_time(float(m.get("start", 0)), kept_intervals),
+                     "end":   _remap_time(float(m.get("end", 0)),   kept_intervals)}
+                    for m in remapped_moments
                 ]
                 cut_timestamps = [
                     _remap_time(ct, kept_intervals) for ct in cut_timestamps
@@ -1662,7 +1682,7 @@ def render(
         caption_style_map=caption_style_map,
         video_duration=total_duration,
         mode="long" if not short_form else "short",
-        caption_moments=plan.caption_moments if not short_form else None,
+        caption_moments=remapped_moments if not short_form else None,
     )
     print(f"[CAPTIONS] ASS file written: {ass_path}")
     print(f"[CAPTIONS] ASS file size: {ass_path.stat().st_size} bytes")
