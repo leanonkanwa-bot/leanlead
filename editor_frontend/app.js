@@ -75,6 +75,7 @@ $("dashEditBtn")?.addEventListener("click", () => switchSection("editorArea"));
     if (navAvatar) {
       const initials = (p.name || p.brandName || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
       navAvatar.textContent = initials;
+      navAvatar.addEventListener("click", () => switchSection("profileSection"));
     }
     const greetingEl = $("navGreeting");
     if (greetingEl) {
@@ -1232,6 +1233,33 @@ function showPreview(jobId, preview) {
     }).join("") || "<p style='color:var(--muted);font-size:.8rem'>Aucun segment</p>";
   }
 
+  // ── Dropped segments ────────────────────────────────────────────────────────
+  const dropped = preview.drop_segments || preview.removed_segments || [];
+  let droppedContainer = $("droppedSegmentsWrap");
+  if (!droppedContainer) {
+    droppedContainer = document.createElement("div");
+    droppedContainer.id = "droppedSegmentsWrap";
+    droppedContainer.style.cssText = "margin-top:.75rem";
+    tl?.parentNode?.insertBefore(droppedContainer, tl.nextSibling);
+  }
+  if (dropped.length > 0) {
+    droppedContainer.innerHTML =
+      `<div style="margin-bottom:.35rem;font-size:.72rem;font-weight:600;color:var(--muted);letter-spacing:.04em;text-transform:uppercase">Segments supprimés (${dropped.length})</div>` +
+      dropped.slice(0, 15).map(s => {
+        const raw = typeof s.score === "number" ? s.score : 0;
+        const dispScore = raw <= 10 ? raw * 10 : raw;
+        const preview_text = s.preview || s.text || s.role || "—";
+        return `<div class="tl-row" style="opacity:.55;background:rgba(255,92,122,.06);border:1px solid rgba(255,92,122,.18)">
+          <span style="font-size:.6rem;font-weight:700;color:#ff5c7a;background:rgba(255,92,122,.18);padding:.1rem .35rem;border-radius:3px;margin-right:.35rem;flex-shrink:0">Supprimé</span>
+          <span class="tl-role" style="text-decoration:line-through;color:var(--muted)">${s.role || "—"}</span>
+          <span class="score-badge" style="background:#ff5c7a22;color:#ff5c7a;border:1px solid #ff5c7a44;margin-left:auto;flex-shrink:0">${dispScore}</span>
+          <span class="tl-time" style="color:var(--muted)">${s.original_time || ""}</span>
+        </div>`;
+      }).join("");
+  } else {
+    droppedContainer.innerHTML = "";
+  }
+
   // ── Retention Prediction (Feature 5) ────────────────────────────────────────
   const retBar  = $("retPredBar");
   const retPct  = $("retPredPct");
@@ -1259,7 +1287,6 @@ function showPreview(jobId, preview) {
     retWrap.style.display = "";
   }
 
-  if ($("previewJson")) $("previewJson").textContent = JSON.stringify(preview, null, 2);
 }
 
 $("renderBtn")?.addEventListener("click", async () => {
