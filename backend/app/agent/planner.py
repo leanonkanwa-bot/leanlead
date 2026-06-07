@@ -129,15 +129,37 @@ class EditPlan:
                     end = float(beat.get("end", start + 4.0))
                 except (TypeError, ValueError):
                     continue
-                text = lines[0]
-                cap_end = min(end, start + 4.0)
-                auto.append({
-                    "start": start,
-                    "end": cap_end,
-                    "text": text,
-                    "style": "concept",
-                    "emphasis_words": [],
-                })
+                if start < 15.0:
+                    # Hook phase: caption every line for maximum visual engagement
+                    beat_dur = max(1.0, end - start)
+                    n = len(lines)
+                    dur_per = beat_dur / n
+                    for li, ln in enumerate(lines):
+                        if not str(ln).strip():
+                            continue
+                        cap_s = start + li * dur_per
+                        cap_e = min(cap_s + min(dur_per - 0.05, 4.0), end)
+                        if cap_e <= cap_s:
+                            cap_e = cap_s + 2.0
+                        auto.append({
+                            "start": round(cap_s, 3),
+                            "end": round(cap_e, 3),
+                            "text": str(ln).strip(),
+                            "style": "hook" if li == 0 and start < 5.0 else "concept",
+                            "emphasis_words": [],
+                            "position": "center_bottom",
+                        })
+                else:
+                    text = lines[0]
+                    cap_end = min(end, start + 4.0)
+                    auto.append({
+                        "start": start,
+                        "end": cap_end,
+                        "text": text,
+                        "style": "concept",
+                        "emphasis_words": [],
+                        "position": "bottom_center",
+                    })
             if auto:
                 print(f"[CAPTIONS] Auto-generated {len(auto)} caption_moments from script_structure")
                 return auto

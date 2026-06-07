@@ -1195,9 +1195,16 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
     { "start": <s>, "end": <s>,
       "text": "<exact spoken words — verbatim from transcript>",
       "style": "hook"|"concept"|"stat"|"list_item"|"mantra"|"quote"|"marker",
-      "emphasis_words": ["<word>"] }
+      "emphasis_words": ["<word>", "<word>"],
+      "position": "center_bottom"|"center"|"bottom_left"|"bottom_right"|"bottom_center" }
     /* Long-form: REQUIRED. Target 1 per 8-12s. Max 3 per segment.
-       Short-form: omit entirely or use empty array []. */
+       Short-form: omit entirely or use empty array [].
+       position mapping:
+         hook/mantra  → "center_bottom"  (Alignment=2, centered at bottom)
+         stat/number  → "center"         (Alignment=5, center-screen)
+         concept/marker → "bottom_center" (Alignment=2, centered at bottom)
+         list_item landscape → "bottom_left" (Alignment=1, left-anchored)
+         list_item portrait  → "bottom_center" (Alignment=2) */
   ],
 
   "packaging": {
@@ -1473,6 +1480,25 @@ def system_prompt(
             "  emphasis_words: 1–2 most impactful words — brand color + 110% size.\n"
             "  text: exact verbatim spoken words — never invented, never paraphrased.\n"
             "  start/end: must fall within the corresponding keep_segment window.\n\n"
+            "HOOK CAPTIONING RULE (long-form):\n"
+            "  Caption EVERY phrase in the first 15 seconds of edited output — maximum visual\n"
+            "  engagement during the hook phase. Use style='hook' for the opening line,\n"
+            "  style='concept' for subsequent lines in the first 15s.\n"
+            "  After 15 seconds: revert to selective captioning (7 triggers only).\n\n"
+            "POWER WORD DETECTION — emphasis_words selection:\n"
+            "  Always emphasize (pick 1–2 per caption_moment):\n"
+            "    - Numbers and statistics: '10 miles', '$500k', '3 steps', '48 hours'\n"
+            "    - Superlatives: 'never', 'always', 'impossible', 'everyone', 'no one'\n"
+            "    - Core concept nouns: the main subject of the sentence\n"
+            "    - Contradiction pivots: 'but', 'except', 'however' — only when introducing a twist\n"
+            "    - Climax action verbs: 'ran', 'failed', 'realized', 'changed', 'quit', 'built'\n"
+            "  NEVER emphasize: 'the', 'a', 'and', 'I', 'you', 'was', 'is', 'it', common connectors.\n\n"
+            "POSITION FIELD — add to every caption_moment:\n"
+            "  hook/mantra: position='center_bottom' (Alignment=2, centered at bottom)\n"
+            "  stat/number: position='center' (Alignment=5, center-screen for maximum impact)\n"
+            "  concept/marker: position='bottom_center' (Alignment=2, centered at bottom)\n"
+            "  list_item (landscape): position='bottom_left' (Alignment=1, left-anchored)\n"
+            "  list_item (portrait): position='bottom_center' (Alignment=2)\n\n"
             + _zoom_level_rules
         )
     else:
