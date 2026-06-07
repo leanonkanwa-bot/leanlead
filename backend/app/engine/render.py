@@ -154,14 +154,14 @@ def _create_proxy(
         "-i", str(src),
         "-vf", vf,
         "-vsync", "cfr",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
         "-x264-params", (
             "rc-lookahead=0:bframes=0:ref=1:no-mbtree=1:"
             f"keyint=60:keyint_min=60"      # keyframe every 2 s
         ),
         "-threads", "1",
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-async", "1",                      # normalize audio timestamps
         str(dst),
     ])
@@ -853,7 +853,7 @@ def _apply_segment_zoom(
         "-x264-params", "rc-lookahead=0:bframes=0:ref=1:no-mbtree=1",
         "-pix_fmt", "yuv420p",
         "-async", "1",
-        "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+        "-c:a", "copy",
         str(_tmp_jz),
     ])
 
@@ -1155,7 +1155,7 @@ def _fetch_broll_clip(
                 f"setpts=PTS-STARTPTS"
             ),
             "-vsync", "cfr",
-            "-c:v", "libx264", "-crf", "18", "-preset", "fast",
+            "-c:v", "libx264", "-crf", "0", "-preset", "ultrafast",
             "-threads", "2", "-pix_fmt", "yuv420p",
             "-an",
             str(dst),
@@ -1894,6 +1894,7 @@ def render(
         "-vf", ",".join(_vf_p1),
         "-map", "0:v",
     ]
+    _p1_audio_filter = False
     if remapped_silences:
         _vol_nodes: list[str] = []
         for _sil in remapped_silences:
@@ -1907,21 +1908,24 @@ def render(
             )
         if _vol_nodes:
             _cmd_p1 += ["-af", ",".join(_vol_nodes)]
+            _p1_audio_filter = True
     _cmd_p1 += ["-map", "0:a"]
     _cmd_p1 += [
         "-frames:v", str(total_frames),
-        # PROBLEM 2 FIX: -vsync cfr + -async 1 lock audio/video to same clock.
         "-vsync", "cfr",
         "-async", "1",
-        # PROBLEM 3 FIX: lossless intermediate — only ONE lossy encode happens
-        # in the final caption-burn pass. CRF 0 = lossless H.264.
+        # Lossless intermediate video — only one lossy encode in the final pass.
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
         "-threads", "4",
         "-x264-params", "rc-lookahead=0:bframes=0",
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        str(_base_path),
     ]
+    # Re-encode audio only when a volume-duck filter is active; otherwise copy.
+    if _p1_audio_filter:
+        _cmd_p1 += ["-c:a", "aac", "-b:a", "192k"]
+    else:
+        _cmd_p1 += ["-c:a", "copy"]
+    _cmd_p1 += [str(_base_path)]
     _log.info(
         "render pass1: grade+scale+zoompan  graphics=%d  silences=%d",
         len(ok_graphics), len(remapped_silences),
@@ -1991,7 +1995,7 @@ def render(
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
             "-threads", "4",
             "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+            "-c:a", "copy",
             str(_next_br_path),
         ])
         if _next_br_path.exists():
@@ -2026,7 +2030,7 @@ def render(
             "-threads", "4",
             "-x264-params", "rc-lookahead=0:bframes=0",
             "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "128k", "-ar", "48000",
+            "-c:a", "copy",
             str(_next_path),
         ])
         _overlay_intermediates.append(_current_path)
@@ -2041,22 +2045,33 @@ def render(
     _ass_tmp = _tmp_dir / f"captions_{ass_path.parent.name}.ass"
     _shutil.copy2(ass_path, _ass_tmp)
     _ass_str = str(_ass_tmp).replace("\\", "/").replace(":", "\\:")
+    # Per-format output bitrate targets — prevent quality floor drops on
+    # complex scenes while keeping file size reasonable.
+    if is_4k:
+        _out_bv, _out_maxrate, _out_bufsize = "20M", "30M", "60M"
+    elif short_form:
+        _out_bv, _out_maxrate, _out_bufsize = "8M", "12M", "24M"
+    else:
+        _out_bv, _out_maxrate, _out_bufsize = "6M", "10M", "20M"
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(_nocap_path),
         "-vf", f"subtitles={_ass_str}",
         "-vsync", "cfr",
         "-async", "1",                      # normalize audio timestamps to video clock
-        # Final quality encode — CRF 16 + 20M cap. Only lossy encode in pipeline.
-        "-c:v", "libx264", "-preset", "medium", "-crf", str(output_crf),
-        "-b:v", "20M",
+        # Final quality encode — CRF 16, preset slow, per-format bitrate floor.
+        # Only lossy encode in the entire pipeline.
+        "-c:v", "libx264", "-preset", "slow", "-crf", str(output_crf),
+        "-b:v", _out_bv,
+        "-maxrate", _out_maxrate,
+        "-bufsize", _out_bufsize,
         "-threads", "4",
         "-x264-params", "rc-lookahead=48:bframes=3",
         "-pix_fmt", "yuv420p",
         # loudnorm: target -14 LUFS integrated, -1 dBTP true peak, LRA 7.
         # Ensures consistent perceived loudness across all devices and platforms.
         "-af", "loudnorm=I=-14:TP=-1:LRA=7",
-        "-c:a", "aac", "-b:a", "192k",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         "-movflags", "+faststart",
         str(output_path),
     ])
