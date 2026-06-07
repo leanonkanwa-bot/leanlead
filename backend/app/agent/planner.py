@@ -415,7 +415,11 @@ def plan_edit(
                     "  - keep_segments (scored, ordered by narrative function)\n"
                     "  - hook (highest score, serves the unified intention)\n"
                     "  - caption_emphasis_words (only words that serve the intention)\n"
-                    "  - broll (only when it ADDS to the intention, not decorates)\n"
+                    "  - broll (CONCRETE visuals only — physical actions, locations, objects, numbers):\n"
+                    "      Short-form: max 1 b-roll every 8s. 60s video = max 6 b-rolls.\n"
+                    "      Long-form: max 1 b-roll every 15s. Max 1 per keep_segment.\n"
+                    "      NEVER during beats: realization, payoff, emotional_end, hook.\n"
+                    "      NEVER during first 3s. Min 8s speaker face between b-rolls.\n"
                     "  - hyperframes (only at moments of maximum emotional impact)\n"
                     + (
                     "  - caption_moments (LONG-FORM ONLY — LESS IS MORE):\n"

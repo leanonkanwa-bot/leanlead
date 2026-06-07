@@ -1549,6 +1549,30 @@ def render(
                     _remap_time(ct, kept_intervals) for ct in cut_timestamps
                 ]
 
+    # Enforce minimum gap between b-roll clips to prevent over-cutting.
+    # Short-form: 8s minimum between clips. Long-form: 15s minimum.
+    # Also drop any b-roll in the first 3s (hook must show the speaker's face).
+    _MIN_BROLL_GAP_SHORT = 8.0
+    _MIN_BROLL_GAP_LONG  = 15.0
+    _min_broll_gap = _MIN_BROLL_GAP_SHORT if short_form else _MIN_BROLL_GAP_LONG
+    _filtered_broll: list[tuple[float, float]] = []
+    _filtered_queries: list[str] = []
+    _last_broll_end = 0.0
+    for (br_s, br_e), br_q in zip(remapped_broll, broll_queries):
+        if br_s < 3.0:
+            print(f"[BROLL] Rejected (hook zone): at={br_s:.2f}s query={br_q!r}")
+            continue
+        gap = br_s - _last_broll_end
+        if gap >= _min_broll_gap:
+            _filtered_broll.append((br_s, br_e))
+            _filtered_queries.append(br_q)
+            _last_broll_end = br_e
+            print(f"[BROLL] Accepted: at={br_s:.2f}s gap={gap:.2f}s query={br_q!r}")
+        else:
+            print(f"[BROLL] Rejected (too close): at={br_s:.2f}s gap={gap:.2f}s < {_min_broll_gap}s query={br_q!r}")
+    remapped_broll = _filtered_broll
+    broll_queries  = _filtered_queries
+
     # Cap hyperframes to max 2 — simple color flashes only at peak moments.
     remapped_hyperframes = remapped_hyperframes[:2]
     # BUG 1 FIX — SALMON SCREEN: remove any hyperframe that starts before 2.0s.
