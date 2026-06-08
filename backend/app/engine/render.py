@@ -1379,35 +1379,20 @@ def render(
                          if float(s["end"]) > float(s["start"]))
     print(f"[AUDIO] Expected duration (plan boundaries): {_audio_expected:.3f}s")
 
-    # BUG 3 FIX — DURATION MISMATCH: warn if concat is longer than plan.
+    # BUG 3 FIX — DURATION MISMATCH: log the delta for diagnostics only.
+    # The words are already correctly positioned via seg_offset (exact video clock),
+    # so scaling them again by actual/planned introduces drift rather than fixing it.
     _concat_actual = _probe_duration(concat_path)
     _concat_delta = _concat_actual - _audio_expected
     if abs(_concat_delta) > 1.0:
         print(
             f"[DURATION WARNING] concat.mp4={_concat_actual:.3f}s "
-            f"planned={_audio_expected:.3f}s delta={_concat_delta:+.3f}s — "
-            f"caption timestamps will be scaled to match actual duration"
+            f"planned={_audio_expected:.3f}s delta={_concat_delta:+.3f}s"
         )
-    # BUG 4 FIX — CAPTIONS SYNC: scale caption timestamps to actual video duration.
-    # If concat is 2s longer than planned, caption timestamps (which are based on
-    # plan boundaries) will arrive early. Scale all word timings proportionally.
-    if _audio_expected > 0 and abs(_concat_delta) > 0.1:
-        _scale = _concat_actual / _audio_expected
-        print(f"[CAPTIONS] Scaling timestamps by {_scale:.4f}× to match actual duration")
-        remapped_words = [
-            WordTiming(text=w.text, start=w.start * _scale, end=w.end * _scale)
-            for w in remapped_words
-        ]
-        remapped_moments = [
-            {**m, "start": float(m.get("start", 0)) * _scale,
-             "end": float(m.get("end", 0)) * _scale}
-            for m in remapped_moments
-        ]
-        remapped_silences = [
-            {**sil, "at": float(sil.get("at", 0)) * _scale}
-            for sil in remapped_silences
-        ]
-        cut_timestamps = [ct * _scale for ct in cut_timestamps]
+
+    # NOTE: caption timestamp scaling removed — words are mapped via seg_offset
+    # (exact video output clock), not plan boundaries.  Scaling by actual/planned
+    # was introducing drift and causing AV desync.
 
     # Remap b-roll windows to the cut timeline so captions pause there.
     # BUG FIX — B-ROLL TIMING:
@@ -1989,11 +1974,13 @@ def render(
     ])
     print(f"[ZOOM PASS] Zoompan complete: {_zoomed_path}")
 
-    # Pass 4: burn captions only — final quality encode.
+    # Pass 4: final quality encode.
+    # Caption burning temporarily disabled to verify AV sync in isolation.
+    # Re-enable by replacing the -vf value with f"subtitles={_ass_str}".
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(_zoomed_path),
-        "-vf", f"subtitles={_ass_str}",
+        # "-vf", f"subtitles={_ass_str}",  # captions disabled for AV sync testing
         "-vsync", "cfr",
         "-async", "1",
         "-c:v", "libx264", "-preset", "slow", "-crf", str(output_crf),
