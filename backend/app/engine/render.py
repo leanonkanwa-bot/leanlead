@@ -733,18 +733,26 @@ def _concat_with_zoom(
     n = len(parts)
     if n == 1:
         zoom_f = _zoom_filter_for_level(zoom_levels[0], target_w, target_h)
-        zoom_start = zoom_levels[0] / 100.0
-        zoom_max = zoom_start + 0.03
-        _zp = (
-            f"zoompan=z='min(max({zoom_start:.4f},zoom)+0.0005,{zoom_max:.4f})'"
-            f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-            f":d=1:s={target_w}x{target_h}:fps={fps}"
-        )
-        vf = (
-            f"{zoom_f},setsar=1:1,fps={fps},{_zp},setpts=N/FRAME_RATE/TB"
-            if zoom_f
-            else f"setsar=1:1,fps={fps},{_zp},setpts=N/FRAME_RATE/TB"
-        )
+        seg_dur = _probe_duration(parts[0])
+        if seg_dur >= 1.0:
+            zoom_start = zoom_levels[0] / 100.0
+            zoom_max = zoom_start + 0.03
+            _zp = (
+                f"zoompan=z='min(max({zoom_start:.4f},zoom)+0.0005,{zoom_max:.4f})'"
+                f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                f":d=1:s={target_w}x{target_h}:fps={fps}"
+            )
+            vf = (
+                f"{zoom_f},setsar=1:1,fps={fps},{_zp},setpts=N/FRAME_RATE/TB"
+                if zoom_f
+                else f"setsar=1:1,fps={fps},{_zp},setpts=N/FRAME_RATE/TB"
+            )
+        else:
+            vf = (
+                f"{zoom_f},setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+                if zoom_f
+                else f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+            )
         _run([
             FFMPEG_PATH, "-y", "-loglevel", "error",
             "-fflags", "+genpts", "-i", str(parts[0]),
@@ -772,22 +780,29 @@ def _concat_with_zoom(
             if zoom_f
             else f"setsar=1:1,fps={fps}"
         )
-        fc_parts.append(f"[{i}:v]{vf_step1}[tmp{i}]")
-        # Step 2: slow cinematic push-in (commas in z= escaped as \, for filter_complex)
-        _zs = zoom_level / 100.0
-        _zm = _zs + 0.03
-        _zp_z = f"min(max({_zs:.4f}\\,zoom)+0.0005\\,{_zm:.4f})"
-        _zp = (
-            f"zoompan=z='{_zp_z}'"
-            f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-            f":d=1:s={target_w}x{target_h}:fps={fps}"
-            f",setpts=N/FRAME_RATE/TB"
-        )
-        fc_parts.append(f"[tmp{i}]{_zp}[v{i}]")
+        # Step 2: slow cinematic push-in — skip for short segments (<1s) where
+        # zoompan would stretch a 0.5s clip to an unusable duration.
+        seg_dur = _probe_duration(parts[i])
+        if seg_dur >= 1.0:
+            fc_parts.append(f"[{i}:v]{vf_step1}[tmp{i}]")
+            # Commas in z= expression escaped as \, for filter_complex parser
+            _zs = zoom_level / 100.0
+            _zm = _zs + 0.03
+            _zp_z = f"min(max({_zs:.4f}\\,zoom)+0.0005\\,{_zm:.4f})"
+            _zp = (
+                f"zoompan=z='{_zp_z}'"
+                f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+                f":d=1:s={target_w}x{target_h}:fps={fps}"
+                f",setpts=N/FRAME_RATE/TB"
+            )
+            fc_parts.append(f"[tmp{i}]{_zp}[v{i}]")
+        else:
+            fc_parts.append(f"[{i}:v]{vf_step1},setpts=N/FRAME_RATE/TB[v{i}]")
 
     concat_inputs = "".join(f"[v{i}][{i}:a]" for i in range(n))
     fc_parts.append(f"{concat_inputs}concat=n={n}:v=1:a=1[vout][aout]")
 
+    # filter_complex outputs cannot use -c:a copy — [aout] is a filtered stream.
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         *inputs,
@@ -798,7 +813,7 @@ def _concat_with_zoom(
         "-threads", "4",
         "-x264-params", "rc-lookahead=0:bframes=0",
         "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         str(dst),
     ])
 
