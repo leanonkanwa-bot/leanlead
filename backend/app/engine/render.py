@@ -35,15 +35,8 @@ from app.engine.graphics import (
     render_whiteboard_layout,
     render_slide_layout,
 )
-try:
-    from app.engine.hyperframes_engine import (
-        generate_composition_html as _hf_gen_html,
-        render_composition_to_video as _hf_render,
-    )
-    _HYPERFRAMES_AVAILABLE = True
-except Exception as _hf_err:
-    print(f"[HYPERFRAMES] Import failed (non-fatal): {_hf_err}")
-    _HYPERFRAMES_AVAILABLE = False
+# HyperFrames removed — motion graphics use FFmpeg-native drawtext pipeline
+_HYPERFRAMES_AVAILABLE = False
 
 
 SHORT_PAD_S    = 0.12   # 120ms — word-safe start/end buffer
@@ -344,10 +337,8 @@ def _cut_segment(
     """Per-segment extract.
 
     SYNC: -ss BEFORE -i (fast seek, frame-accurate). Duration via -t.
-    Audio is AAC-re-encoded (not stream-copied) so the trim is exact.
-    With -c:a copy + fast seek, FFmpeg copies from the nearest audio keyframe
-    which starts BEFORE the -ss point, making audio longer than video.
-    aresample=async=1 + -async 1 guarantee audio duration == video duration.
+    Audio uses -c:a copy so the trim is lossless. Fast seek (-ss before -i)
+    snaps to the nearest keyframe; the exact duration is enforced via -t.
     """
     duration = max(0.1, end - start)
     vf = (
@@ -368,9 +359,7 @@ def _cut_segment(
         "-vsync", "cfr",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
-        "-af", "aresample=async=1:min_hard_comp=0.100000:first_pts=0",
-        "-async", "1",
+        "-c:a", "copy",
         str(dst),
     ])
 
@@ -384,7 +373,6 @@ def _concat(parts: list[Path], dst: Path) -> None:
         "-f", "concat", "-safe", "0", "-i", str(list_path),
         "-c", "copy",
         "-vsync", "cfr",
-        "-async", "1",
         str(dst),
     ])
     list_path.unlink(missing_ok=True)
@@ -745,16 +733,23 @@ def _concat_with_zoom(
     n = len(parts)
     if n == 1:
         zoom_f = _zoom_filter_for_level(zoom_levels[0], target_w, target_h)
+        zoom_start = zoom_levels[0] / 100.0
+        zoom_max = zoom_start + 0.03
+        _zp = (
+            f"zoompan=z='min(max({zoom_start:.4f},zoom)+0.0005,{zoom_max:.4f})'"
+            f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            f":d=1:s={target_w}x{target_h}:fps={fps}"
+        )
         vf = (
-            f"{zoom_f},setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+            f"{zoom_f},setsar=1:1,fps={fps},{_zp},setpts=N/FRAME_RATE/TB"
             if zoom_f
-            else f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+            else f"setsar=1:1,fps={fps},{_zp},setpts=N/FRAME_RATE/TB"
         )
         _run([
             FFMPEG_PATH, "-y", "-loglevel", "error",
             "-fflags", "+genpts", "-i", str(parts[0]),
             "-vf", vf,
-            "-vsync", "cfr", "-async", "1",
+            "-vsync", "cfr",
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
             "-threads", "2",
             "-x264-params", "rc-lookahead=0:bframes=0:ref=1:no-mbtree=1",
@@ -771,15 +766,24 @@ def _concat_with_zoom(
     fc_parts: list[str] = []
     for i, zoom_level in enumerate(zoom_levels):
         zoom_f = _zoom_filter_for_level(zoom_level, target_w, target_h)
-        # setsar=1:1 normalizes Sample Aspect Ratio before concat.
-        # Without it, source videos with non-standard SAR (e.g. 1936:1935 from
-        # stream captures) cause "SAR mismatch" errors in the concat filter.
-        vf_chain = (
-            f"{zoom_f},setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+        # Step 1: jump-zoom crop + SAR normalization
+        vf_step1 = (
+            f"{zoom_f},setsar=1:1,fps={fps}"
             if zoom_f
-            else f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+            else f"setsar=1:1,fps={fps}"
         )
-        fc_parts.append(f"[{i}:v]{vf_chain}[v{i}]")
+        fc_parts.append(f"[{i}:v]{vf_step1}[tmp{i}]")
+        # Step 2: slow cinematic push-in (commas in z= escaped as \, for filter_complex)
+        _zs = zoom_level / 100.0
+        _zm = _zs + 0.03
+        _zp_z = f"min(max({_zs:.4f}\\,zoom)+0.0005\\,{_zm:.4f})"
+        _zp = (
+            f"zoompan=z='{_zp_z}'"
+            f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+            f":d=1:s={target_w}x{target_h}:fps={fps}"
+            f",setpts=N/FRAME_RATE/TB"
+        )
+        fc_parts.append(f"[tmp{i}]{_zp}[v{i}]")
 
     concat_inputs = "".join(f"[v{i}][{i}:a]" for i in range(n))
     fc_parts.append(f"{concat_inputs}concat=n={n}:v=1:a=1[vout][aout]")
@@ -789,12 +793,12 @@ def _concat_with_zoom(
         *inputs,
         "-filter_complex", ";".join(fc_parts),
         "-map", "[vout]", "-map", "[aout]",
-        "-vsync", "cfr", "-async", "1",
+        "-vsync", "cfr",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
         "-threads", "4",
         "-x264-params", "rc-lookahead=0:bframes=0",
         "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k",
+        "-c:a", "copy",
         str(dst),
     ])
 
@@ -1165,6 +1169,113 @@ def _health_check(src: Path) -> None:
     size_mb = src.stat().st_size / (1024 * 1024)
     est_min = max(1, int(size_mb / 100))
     print(f"[HEALTH] src={src.name}  size={size_mb:.1f}MB  est_render_time=~{est_min}min")
+
+
+def _best_font() -> str:
+    """Return path to the best available bold font on this system."""
+    import os as _os
+    for _p in [
+        "/usr/local/share/fonts/leanlead/Inter-Bold.otf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
+    ]:
+        if _os.path.exists(_p):
+            return _p
+    return ""
+
+
+def _dt_escape(text: str) -> str:
+    """Escape text for FFmpeg drawtext text= option."""
+    return (
+        text.replace("\\", "\\\\")
+            .replace("'", "\\'")
+            .replace(":", "\\:")
+            .replace("%", "\\%")
+    )
+
+
+def _hex_to_ffmpeg_color(hex6: str) -> str:
+    """Convert #RRGGBB to FFmpeg color string 0xRRGGBB."""
+    return "0x" + hex6.lstrip("#").upper()
+
+
+def _overlay_lower_third(
+    content: dict,
+    at: float,
+    dur: float,
+    brand_color: str,
+    font: str,
+    target_h: int,
+) -> str:
+    """FFmpeg filter chain for a lower-third name+role overlay."""
+    name = _dt_escape(str(content.get("name", content.get("text", ""))))
+    role = _dt_escape(str(content.get("role", content.get("label", ""))))
+    farg = f":fontfile={font}" if font else ""
+    col  = _hex_to_ffmpeg_color(brand_color)
+    ns   = max(28, target_h // 36)
+    rs   = max(20, target_h // 52)
+    et   = f"between(t,{at:.3f},{at+dur:.3f})"
+    return ",".join([
+        f"drawbox=x=0:y=h*0.79:w=w*0.6:h=h*0.15:color=0x000000CC:t=fill:enable='{et}'",
+        f"drawtext=text='{name}'{farg}:fontcolor=white:fontsize={ns}:x=w*0.04:y=h*0.82:enable='{et}'",
+        f"drawtext=text='{role}'{farg}:fontcolor={col}:fontsize={rs}:x=w*0.04:y=h*0.82+{ns+8}:enable='{et}'",
+    ])
+
+
+def _overlay_stat(
+    content: dict,
+    at: float,
+    dur: float,
+    brand_color: str,
+    font: str,
+    target_h: int,
+) -> str:
+    """FFmpeg filter chain for a stat number+label overlay."""
+    number = _dt_escape(str(content.get("number", "")))
+    label  = _dt_escape(str(content.get("label", "")).upper())
+    farg   = f":fontfile={font}" if font else ""
+    col    = _hex_to_ffmpeg_color(brand_color)
+    ns     = max(80, target_h // 10)
+    ls     = max(24, target_h // 40)
+    et     = f"between(t,{at:.3f},{at+dur:.3f})"
+    cx     = "(w-text_w)/2"
+    return ",".join([
+        f"drawbox=x=w*0.15:y=h*0.35:w=w*0.70:h=h*0.30:color=0x000000D9:t=fill:enable='{et}'",
+        f"drawtext=text='{number}'{farg}:fontcolor={col}:fontsize={ns}:x={cx}:y=h*0.38:enable='{et}'",
+        f"drawtext=text='{label}'{farg}:fontcolor=white:fontsize={ls}:x={cx}:y=h*0.38+{ns+8}:enable='{et}'",
+    ])
+
+
+def _overlay_kinetic(
+    content: dict,
+    at: float,
+    dur: float,
+    brand_color: str,
+    font: str,
+    target_h: int,
+) -> str:
+    """FFmpeg filter chain for key_phrase/kinetic text overlay."""
+    phrase = _dt_escape(str(content.get("phrase", content.get("text", ""))))
+    ctx    = _dt_escape(str(content.get("context", "")))
+    farg   = f":fontfile={font}" if font else ""
+    col    = _hex_to_ffmpeg_color(brand_color)
+    ps     = max(48, target_h // 16)
+    cs     = max(22, target_h // 48)
+    et     = f"between(t,{at:.3f},{at+dur:.3f})"
+    parts  = [
+        f"drawbox=x=0:y=h*0.72:w=w:h=h*0.22:color=0x000000CC:t=fill:enable='{et}'",
+    ]
+    if ctx:
+        parts.append(
+            f"drawtext=text='{ctx}'{farg}:fontcolor=white@0.75:fontsize={cs}"
+            f":x=(w-text_w)/2:y=h*0.74:enable='{et}'"
+        )
+    parts.append(
+        f"drawtext=text='{phrase}'{farg}:fontcolor={col}:fontsize={ps}"
+        f":x=(w-text_w)/2:y=h*0.74+{cs+12}:enable='{et}'"
+    )
+    return ",".join(parts)
 
 
 def render(
@@ -1744,7 +1855,6 @@ def render(
     _cmd_p1 += [
         "-frames:v", str(total_frames),
         "-vsync", "cfr",
-        "-async", "1",
         # Lossless intermediate video — only one lossy encode in the final pass.
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
         "-threads", "4",
@@ -1821,7 +1931,6 @@ def render(
             "-filter_complex", _fc_br,
             "-map", "[vout]", "-map", "0:a",
             "-vsync", "cfr",
-            "-async", "1",                  # normalize audio timestamps to video clock
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
             "-threads", "4",
             "-pix_fmt", "yuv420p",
@@ -1854,7 +1963,6 @@ def render(
             "-filter_complex", _fc_ov,
             "-map", "[out]", "-map", "0:a",
             "-vsync", "cfr",
-            "-async", "1",                  # normalize audio timestamps to video clock
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
             "-threads", "4",
             "-x264-params", "rc-lookahead=0:bframes=0",
@@ -1865,70 +1973,44 @@ def render(
         _overlay_intermediates.append(_current_path)
         _current_path = _next_path
 
-    # ── Motion graphics overlay passes (Hyperframes HTML-rendered clips) ────
-    # Each motion graphic is rendered to a short MP4 via headless Chromium,
-    # then overlaid on the base video at its remapped output-timeline position.
-    # Skipped silently when Chromium is unavailable — no crash, just no graphic.
-    if _HYPERFRAMES_AVAILABLE and remapped_motion_graphics:
-        _mg_dir = work_dir / "motion_graphics"
-        _mg_dir.mkdir(parents=True, exist_ok=True)
-        print(f"[HYPERFRAMES] Rendering {len(remapped_motion_graphics)} motion graphic(s)…")
-        for _mgi, _mg in enumerate(remapped_motion_graphics):
+    # ── Motion graphics: FFmpeg-native drawtext overlays ─────────────────
+    if remapped_motion_graphics:
+        _mg_font = _best_font()
+        _mg_filters: list[str] = []
+        _bc = brand_color or "#FF7751"
+        for _mg in remapped_motion_graphics:
             try:
                 _mg_at   = float(_mg.get("at", 0))
                 _mg_dur  = max(0.5, float(_mg.get("duration", 2.5)))
                 _mg_type = str(_mg.get("type", "key_phrase"))
                 _mg_cont = _mg.get("content") or {}
-                _mg_clip = _mg_dir / f"mg_{_mgi:03d}.mp4"
-
-                _mg_html = _hf_gen_html(
-                    graphic_type=_mg_type,
-                    content=_mg_cont,
-                    duration=_mg_dur,
-                    width=target_w,
-                    height=target_h,
-                    brand_color=brand_color or "#FF7751",
-                    font=caption_font.replace(" Bold", "").replace(" Black", "").strip()
-                    if caption_font else "Inter",
-                )
-                _mg_ok = _hf_render(
-                    _mg_html, _mg_clip, _mg_dur, target_w, target_h, fps,
-                    work_dir=_mg_dir,
-                )
-                if not _mg_ok or not _mg_clip.exists():
-                    print(f"[HYPERFRAMES] Graphic {_mgi} skipped (render failed)")
-                    continue
-
-                _next_mg_path = _tmp_dir / f"mg{_mgi}_{output_path.stem}.mp4"
-                _fc_mg = (
-                    f"[1:v]setpts=PTS-STARTPTS+{_mg_at:.3f}/TB[mgv];"
-                    f"[0:v][mgv]overlay=x=0:y=0"
-                    f":enable='between(t,{_mg_at:.3f},{_mg_at + _mg_dur:.3f})'"
-                    f":eof_action=pass[out]"
-                )
-                _run([
-                    FFMPEG_PATH, "-y", "-loglevel", "error",
-                    "-i", str(_current_path),
-                    "-i", str(_mg_clip),
-                    "-filter_complex", _fc_mg,
-                    "-map", "[out]", "-map", "0:a",
-                    "-vsync", "cfr", "-async", "1",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
-                    "-threads", "4",
-                    "-x264-params", "rc-lookahead=0:bframes=0",
-                    "-pix_fmt", "yuv420p",
-                    "-c:a", "copy",
-                    str(_next_mg_path),
-                ])
-                _overlay_intermediates.append(_current_path)
-                _current_path = _next_mg_path
-                print(f"[HYPERFRAMES] Graphic {_mgi} overlaid at t={_mg_at:.2f}s  type={_mg_type}")
+                if _mg_type == "lower_third":
+                    _filt = _overlay_lower_third(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_h)
+                elif _mg_type == "stat":
+                    _filt = _overlay_stat(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_h)
+                else:
+                    _filt = _overlay_kinetic(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_h)
+                _mg_filters.append(_filt)
+                print(f"[MG] Queued {_mg_type} at t={_mg_at:.2f}s")
             except Exception as _mge:
-                print(f"[HYPERFRAMES] Graphic {_mgi} exception (non-fatal): {_mge}")
-        print(f"[HYPERFRAMES] Motion graphics pass complete")
-    else:
-        if remapped_motion_graphics:
-            print(f"[HYPERFRAMES] {len(remapped_motion_graphics)} graphic(s) skipped — Hyperframes unavailable")
+                print(f"[MG] Graphic skipped: {_mge}")
+        if _mg_filters:
+            _mg_path = _tmp_dir / f"mg_{output_path.stem}.mp4"
+            _run([
+                FFMPEG_PATH, "-y", "-loglevel", "error",
+                "-i", str(_current_path),
+                "-vf", ",".join(_mg_filters),
+                "-vsync", "cfr",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
+                "-threads", "4",
+                "-x264-params", "rc-lookahead=0:bframes=0",
+                "-pix_fmt", "yuv420p",
+                "-c:a", "copy",
+                str(_mg_path),
+            ])
+            _overlay_intermediates.append(_current_path)
+            _current_path = _mg_path
+            print(f"[MG] {len(_mg_filters)} graphic(s) overlaid")
 
     _nocap_path = _current_path
 
@@ -1946,45 +2028,12 @@ def render(
         _out_bv, _out_maxrate, _out_bufsize = "8M", "12M", "24M"
     else:
         _out_bv, _out_maxrate, _out_bufsize = "6M", "10M", "20M"
-    # FIX 2 — ZOOMPAN FREEZE: split into two separate passes.
-    # Combining subtitles+zoompan in the same -vf causes libass to duplicate
-    # frames, stretching a 46s video to 48s. Running them in separate ffmpeg
-    # invocations avoids the conflict entirely.
-
-    # Pass 3: slow progressive zoom only — lossless intermediate.
-    # d=1: one output frame per input frame (no duration change).
-    # setpts=N/FRAME_RATE/TB: resets PTS to prevent drift accumulation.
-    _zoomed_path = _tmp_dir / "zoomed_base.mp4"
-    _zoompan_filter = (
-        f"zoompan=z='min(zoom+0.0008,1.06)'"
-        f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-        f":d=1:s={target_w}x{target_h}:fps={fps}"
-        f",setpts=N/FRAME_RATE/TB"
-    )
+    # ── Final pass: burn ASS captions + quality encode ────────────────────
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(_nocap_path),
-        "-vf", _zoompan_filter,
+        "-vf", f"subtitles={_ass_str}",
         "-vsync", "cfr",
-        "-async", "1",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
-        "-threads", "4",
-        "-x264-params", "rc-lookahead=0:bframes=0",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
-        str(_zoomed_path),
-    ])
-    print(f"[ZOOM PASS] Zoompan complete: {_zoomed_path}")
-
-    # Pass 4: final quality encode.
-    # Caption burning temporarily disabled to verify AV sync in isolation.
-    # Re-enable by replacing the -vf value with f"subtitles={_ass_str}".
-    _run([
-        FFMPEG_PATH, "-y", "-loglevel", "error",
-        "-i", str(_zoomed_path),
-        # "-vf", f"subtitles={_ass_str}",  # captions disabled for AV sync testing
-        "-vsync", "cfr",
-        "-async", "1",
         "-c:v", "libx264", "-preset", "slow", "-crf", str(output_crf),
         "-b:v", _out_bv,
         "-maxrate", _out_maxrate,
@@ -1999,7 +2048,6 @@ def render(
     ])
     print(f"[FINAL] Output: {output_path}")
     _nocap_path.unlink(missing_ok=True)
-    _zoomed_path.unlink(missing_ok=True)
     for _p in _overlay_intermediates:
         _p.unlink(missing_ok=True)
 
