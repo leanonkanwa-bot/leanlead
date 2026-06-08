@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     fonts-open-sans \
     curl \
     unzip \
+    chromium \
     && rm -rf /var/lib/apt/lists/*
 
 # Install fonts via Python urllib — follows redirects reliably on Railway,
