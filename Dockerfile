@@ -55,6 +55,11 @@ print(f'{ok}/{len(fonts)} fonts downloaded')
 COPY fonts/ /usr/local/share/fonts/leanlead/
 RUN fc-cache -f -v 2>/dev/null || true
 
+RUN apt-get update && apt-get install -y \
+    nodejs npm \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g hyperframes 2>/dev/null || true
+
 WORKDIR /app/backend
 
 COPY backend/requirements.txt .

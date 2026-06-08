@@ -36,7 +36,10 @@ from app.engine.graphics import (
     render_slide_layout,
 )
 try:
-    from app.engine.hyperframes import generate_motion_graphic_html, render_html_to_video
+    from app.engine.hyperframes_engine import (
+        generate_composition_html as _hf_gen_html,
+        render_composition_to_video as _hf_render,
+    )
     _HYPERFRAMES_AVAILABLE = True
 except Exception as _hf_err:
     print(f"[HYPERFRAMES] Import failed (non-fatal): {_hf_err}")
@@ -1891,7 +1894,7 @@ def render(
                 _mg_cont = _mg.get("content") or {}
                 _mg_clip = _mg_dir / f"mg_{_mgi:03d}.mp4"
 
-                _mg_html = generate_motion_graphic_html(
+                _mg_html = _hf_gen_html(
                     graphic_type=_mg_type,
                     content=_mg_cont,
                     duration=_mg_dur,
@@ -1901,8 +1904,9 @@ def render(
                     font=caption_font.replace(" Bold", "").replace(" Black", "").strip()
                     if caption_font else "Inter",
                 )
-                _mg_ok = render_html_to_video(
-                    _mg_html, _mg_clip, _mg_dur, target_w, target_h, fps
+                _mg_ok = _hf_render(
+                    _mg_html, _mg_clip, _mg_dur, target_w, target_h, fps,
+                    work_dir=_mg_dir,
                 )
                 if not _mg_ok or not _mg_clip.exists():
                     print(f"[HYPERFRAMES] Graphic {_mgi} skipped (render failed)")
