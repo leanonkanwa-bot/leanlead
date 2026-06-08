@@ -1329,6 +1329,12 @@ Rules the JSON must obey:
     NEVER start or end a segment mid-sentence. Every segment starts at a
     sentence boundary (word after pause ≥0.25s) and ends at a sentence
     boundary (word before pause ≥0.25s). Violating this creates audible glitches.
+  - SEGMENT DURATION RULES:
+      Minimum segment duration: 2.0 seconds. NEVER output a segment shorter than 2.0s.
+      Maximum segment duration: 12.0 seconds.
+      If a moment is important but short, extend the end time to reach 2.0s minimum.
+      Never split a sentence into segments under 2.0s each.
+      Short segments cause visual glitches (zoompan artifacts) and look amateurish.
   - keep_segments: include role, score, cut_before_silence, retention_note.
   - Segments with net score ≤ 3 must be dropped unless they are the hook or payoff.
   - Segments with net score ≤ 0 must always be cut — no exceptions.
