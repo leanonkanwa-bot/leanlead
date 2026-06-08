@@ -118,7 +118,7 @@ body {{ display:flex;align-items:center;justify-content:center; }}
     border:1px solid rgba(255,255,255,0.1);
     opacity:0;transform:scale(0.8);
 }}
-.number {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.14)}px;font-weight:900;color:{brand_color};line-height:1; }}
+.number {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.20)}px;font-weight:900;color:{brand_color};line-height:1;text-shadow:0 0 40px {brand_color}80,0 0 80px {brand_color}40; }}
 .label  {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.035)}px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:0.1em;margin-top:12px; }}
 .ctx    {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.025)}px;color:rgba(255,255,255,0.6);margin-top:8px; }}
 </style>
@@ -144,20 +144,30 @@ body {{ display:flex;align-items:center;justify-content:center; }}
 <style>
 * {{ margin:0;padding:0;box-sizing:border-box; }}
 html,body {{ width:{width}px;height:{height}px;overflow:hidden;background:transparent; }}
+.bg {{ position:fixed;bottom:0;left:0;right:0;height:48%;
+      background:linear-gradient(to top,rgba(0,0,0,0.92) 0%,rgba(0,0,0,0.6) 60%,transparent 100%); }}
 body {{ display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
-       padding-bottom:{int(height*0.12)}px; }}
-.small {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.03)}px;color:rgba(255,255,255,0.7);margin-bottom:8px;opacity:0; }}
-.large {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.07)}px;font-weight:800;color:{brand_color};
-         text-align:center;line-height:1.15;opacity:0;transform:scale(0.85);
-         text-shadow:0 4px 20px rgba(0,0,0,0.5); }}
+       padding-bottom:{int(height*0.10)}px;position:relative; }}
+.accent {{ width:56px;height:3px;background:{brand_color};border-radius:2px;
+           margin-bottom:10px;opacity:0;transform:scaleX(0); }}
+.small {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.028)}px;
+          color:rgba(255,255,255,0.75);margin-bottom:10px;opacity:0;
+          letter-spacing:0.08em;text-transform:uppercase; }}
+.large {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.075)}px;
+          font-weight:800;color:{brand_color};text-align:center;line-height:1.1;
+          opacity:0;transform:translateY(20px);
+          text-shadow:0 2px 30px rgba(0,0,0,0.8); }}
 </style>
 </head>
 <body data-duration="{duration}">
+<div class="bg"></div>
+<div class="accent" id="a"></div>
 <div class="small" id="s">{small}</div>
 <div class="large" id="l">{large}</div>
 <script>
-gsap.to("#s",{{opacity:1,y:0,duration:0.3,ease:"power2.out"}});
-gsap.to("#l",{{opacity:1,scale:1,duration:0.4,delay:0.1,ease:"back.out(1.4)"}});
+gsap.to("#a",{{opacity:1,scaleX:1,duration:0.25,ease:"power2.out"}});
+gsap.to("#s",{{opacity:1,duration:0.3,delay:0.1,ease:"power2.out"}});
+gsap.to("#l",{{opacity:1,y:0,duration:0.4,delay:0.15,ease:"back.out(1.4)"}});
 </script>
 </body>
 </html>"""
@@ -289,6 +299,7 @@ def render_composition_to_video(
                     "--disable-gpu",
                     "--disable-dev-shm-usage",
                     f"--window-size={width},{height}",
+                    "--force-device-scale-factor=2",
                     f"--virtual-time-budget={vt_budget_ms}",
                     f"--screenshot={png_path}",
                     f"file://{html_path}",

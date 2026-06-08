@@ -1228,7 +1228,10 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
   /* DISABLED */
   "visual_style_moments": [],
 
-  /* motion_graphics: max 3. Use ONLY at moments of maximum emotional impact.
+  /* motion_graphics: REQUIRED — minimum 1 per keep_segment for short-form.
+     For a 40-second video: 6-8 motion graphics minimum.
+     Every 4-5 seconds there must be EITHER a b-roll clip OR a motion graphic.
+     Never go 5+ seconds with just talking head and no visual element.
      Each entry MUST have: at (source timestamp), duration (0.5–3.0s), type, content.
      type "title_card"  — hook statement or chapter title (max 1 per video)
      type "stat"        — when speaker says a specific number/stat; content: {number, label, context}
@@ -1239,7 +1242,7 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
   */
   "motion_graphics": [
     { "at": <s>, "duration": 2.0, "type": "stat", "content": { "number": "65%", "label": "fail in 10 years", "context": "" } }
-    /* MAX 3 entries */
+    /* MAX 8 entries. Minimum 6 for a 40s+ video. */
   ],
 
   "caption_emphasis_words": ["<word>", "<word>", ...],
@@ -1338,7 +1341,8 @@ Rules the JSON must obey:
   - thumbnail_mot: ONE word, uppercase, maximum emotional charge.
   - hyperframes: MAX 2 total. Kind must be "color". Duration exactly 0.08s. No text. No content.
   - visual_style_moments: must be empty []. Do not generate any entries.
-  - motion_graphics: max 3. Types: stat | key_phrase | checklist | title_card | lower_third.
+  - motion_graphics: max 8. Minimum 6 for any video 40s+. Types: stat | key_phrase | checklist | title_card | lower_third.
+    Every 4-5 seconds must have b-roll OR a motion graphic. Never 5+ seconds of talking head alone.
     Never during hook (first 3s), payoff, or emotional_end beats.
     content fields must match the type (see schema above).
   - sfx_cues: max 1 per 5s window; "whoosh" before topic-change cuts,
@@ -1629,7 +1633,8 @@ def system_prompt(
             "salmon emphasis on hook/key words, "
             "max 2 b-roll (2.0–3.5s each, include description+search_query+type), "
             "max 2 hyperframe color flashes (0.08s each). "
-            "motion_graphics: max 3 (stat/key_phrase/checklist only, not during hook/payoff). "
+            "motion_graphics: max 8, minimum 6 for 40s+ videos (stat/key_phrase/checklist only, not during hook/payoff). "
+            "Every 4-5 seconds must have b-roll OR motion graphic — never 5+ seconds of talking head alone. "
             "visual_style_moments: [] — output empty array, no exceptions. "
             "1 cut per 2–3 seconds. Ruthless filler removal. "
             "New curiosity loop every 15–20s. "
@@ -1645,7 +1650,7 @@ def system_prompt(
         blocks.append(
             "TARGET FORMAT: long — lower-amplitude zoom (100–110%), "
             "re-hook every 30–60s, selective strategic captions on key moments only. "
-            "motion_graphics: max 3 (stat/key_phrase only for long-form). visual_style_moments: [] — empty. "
+            "motion_graphics: max 8 (stat/key_phrase/checklist for long-form). visual_style_moments: [] — empty. "
             "1 cut per 4–6 seconds. Max 2 b-roll per 30s of edit. "
             "New curiosity loop every 15–20s.\n\n"
             "B-ROLL FREQUENCY (long-form): maximum 1 b-roll every 15 seconds. "

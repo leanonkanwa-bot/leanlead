@@ -1217,6 +1217,8 @@ def render(
     ]
     # Resolve any raw planner overlaps before cutting — prevents word repetition.
     keep = _dedup_segments(keep)
+    planned_total = sum(float(s["end"]) - float(s["start"]) for s in keep)
+    print(f"[PLAN] {len(keep)} segments, planned total={planned_total:.3f}s")
     words = _flat_words(transcript)
     src_duration = float(transcript.get("duration", 0.0)) or _probe_duration(src)
 
@@ -1308,8 +1310,8 @@ def render(
                 if s_raw <= ws < e_raw:
                     remapped_words.append(WordTiming(
                         text=w["text"].strip(),
-                        start=seg_offset + (ws - s),
-                        end=seg_offset + (min(we, e_raw) - s),
+                        start=max(0.0, seg_offset + (ws - s)),
+                        end=max(0.0, seg_offset + (min(we, e_raw) - s)),
                     ))
 
         for sil in (plan.silences or []):
@@ -1954,7 +1956,7 @@ def render(
     # setpts=N/FRAME_RATE/TB: resets PTS to prevent drift accumulation.
     _zoomed_path = _tmp_dir / "zoomed_base.mp4"
     _zoompan_filter = (
-        f"zoompan=z='min(zoom+0.0003,1.04)'"
+        f"zoompan=z='min(zoom+0.0008,1.06)'"
         f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
         f":d=1:s={target_w}x{target_h}:fps={fps}"
         f",setpts=N/FRAME_RATE/TB"
