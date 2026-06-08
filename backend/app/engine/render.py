@@ -733,17 +733,10 @@ def _concat_with_zoom(
     n = len(parts)
     if n == 1:
         zoom_f = _zoom_filter_for_level(zoom_levels[0], target_w, target_h)
-        zoom_start = zoom_levels[0] / 100.0
-        zoom_max = zoom_start + 0.03
-        _zp = (
-            f"zoompan=z='min(max({zoom_start:.4f},zoom)+0.0005,{zoom_max:.4f})'"
-            f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-            f":d=1:s={target_w}x{target_h}:fps={fps}"
-        )
         vf = (
-            f"{zoom_f},setsar=1:1,fps={fps},{_zp},setpts=N/FRAME_RATE/TB"
+            f"{zoom_f},setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
             if zoom_f
-            else f"setsar=1:1,fps={fps},{_zp},setpts=N/FRAME_RATE/TB"
+            else f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
         )
         _run([
             FFMPEG_PATH, "-y", "-loglevel", "error",
@@ -766,24 +759,15 @@ def _concat_with_zoom(
     fc_parts: list[str] = []
     for i, zoom_level in enumerate(zoom_levels):
         zoom_f = _zoom_filter_for_level(zoom_level, target_w, target_h)
-        # Step 1: jump-zoom crop + SAR normalization
-        vf_step1 = (
-            f"{zoom_f},setsar=1:1,fps={fps}"
+        # Jump-zoom crop + SAR normalization + PTS reset. No zoompan here —
+        # zoompan in filter_complex changes video duration while audio passes
+        # through unchanged, causing AV sync drift of 2–3s.
+        vf_chain = (
+            f"{zoom_f},setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
             if zoom_f
-            else f"setsar=1:1,fps={fps}"
+            else f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
         )
-        fc_parts.append(f"[{i}:v]{vf_step1}[tmp{i}]")
-        # Step 2: slow cinematic push-in (commas in z= escaped as \, for filter_complex)
-        _zs = zoom_level / 100.0
-        _zm = _zs + 0.03
-        _zp_z = f"min(max({_zs:.4f}\\,zoom)+0.0005\\,{_zm:.4f})"
-        _zp = (
-            f"zoompan=z='{_zp_z}'"
-            f":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-            f":d=1:s={target_w}x{target_h}:fps={fps}"
-            f",setpts=N/FRAME_RATE/TB"
-        )
-        fc_parts.append(f"[tmp{i}]{_zp}[v{i}]")
+        fc_parts.append(f"[{i}:v]{vf_chain}[v{i}]")
 
     concat_inputs = "".join(f"[v{i}][{i}:a]" for i in range(n))
     fc_parts.append(f"{concat_inputs}concat=n={n}:v=1:a=1[vout][aout]")
@@ -1235,20 +1219,27 @@ def _overlay_lower_third(
     dur: float,
     brand_color: str,
     font: str,
+    target_w: int,
     target_h: int,
 ) -> str:
     """FFmpeg filter chain for a lower-third name+role overlay."""
     name = _dt_escape(str(content.get("name", content.get("text", ""))))
     role = _dt_escape(str(content.get("role", content.get("label", ""))))
-    farg = f":fontfile={font}" if font else ""
-    col  = _hex_to_ffmpeg_color(brand_color)
-    ns   = max(28, target_h // 36)
-    rs   = max(20, target_h // 52)
-    et   = f"between(t,{at:.3f},{at+dur:.3f})"
+    farg  = f":fontfile={font}" if font else ""
+    col   = _hex_to_ffmpeg_color(brand_color)
+    ns    = max(28, target_h // 36)
+    rs    = max(20, target_h // 52)
+    et    = f"between(t,{at:.3f},{at+dur:.3f})"
+    box_y = int(target_h * 0.79)
+    box_w = int(target_w * 0.6)
+    box_h = int(target_h * 0.15)
+    tx    = int(target_w * 0.04)
+    ty_n  = int(target_h * 0.82)
+    ty_r  = ty_n + ns + 8
     return ",".join([
-        f"drawbox=x=0:y=h*0.79:w=w*0.6:h=h*0.15:color=0x000000CC:t=fill:enable='{et}'",
-        f"drawtext=text='{name}'{farg}:fontcolor=white:fontsize={ns}:x=w*0.04:y=h*0.82:enable='{et}'",
-        f"drawtext=text='{role}'{farg}:fontcolor={col}:fontsize={rs}:x=w*0.04:y=h*0.82+{ns+8}:enable='{et}'",
+        f"drawbox=x=0:y={box_y}:w={box_w}:h={box_h}:color=0x000000CC:t=fill:enable='{et}'",
+        f"drawtext=text='{name}'{farg}:fontcolor=white:fontsize={ns}:x={tx}:y={ty_n}:enable='{et}'",
+        f"drawtext=text='{role}'{farg}:fontcolor={col}:fontsize={rs}:x={tx}:y={ty_r}:enable='{et}'",
     ])
 
 
@@ -1258,6 +1249,7 @@ def _overlay_stat(
     dur: float,
     brand_color: str,
     font: str,
+    target_w: int,
     target_h: int,
 ) -> str:
     """FFmpeg filter chain for a stat number+label overlay."""
@@ -1268,11 +1260,17 @@ def _overlay_stat(
     ns     = max(80, target_h // 10)
     ls     = max(24, target_h // 40)
     et     = f"between(t,{at:.3f},{at+dur:.3f})"
+    box_x  = int(target_w * 0.15)
+    box_y  = int(target_h * 0.35)
+    box_w  = int(target_w * 0.70)
+    box_h  = int(target_h * 0.30)
+    num_y  = int(target_h * 0.38)
+    lbl_y  = num_y + ns + 8
     cx     = "(w-text_w)/2"
     return ",".join([
-        f"drawbox=x=w*0.15:y=h*0.35:w=w*0.70:h=h*0.30:color=0x000000D9:t=fill:enable='{et}'",
-        f"drawtext=text='{number}'{farg}:fontcolor={col}:fontsize={ns}:x={cx}:y=h*0.38:enable='{et}'",
-        f"drawtext=text='{label}'{farg}:fontcolor=white:fontsize={ls}:x={cx}:y=h*0.38+{ns+8}:enable='{et}'",
+        f"drawbox=x={box_x}:y={box_y}:w={box_w}:h={box_h}:color=0x000000D9:t=fill:enable='{et}'",
+        f"drawtext=text='{number}'{farg}:fontcolor={col}:fontsize={ns}:x={cx}:y={num_y}:enable='{et}'",
+        f"drawtext=text='{label}'{farg}:fontcolor=white:fontsize={ls}:x={cx}:y={lbl_y}:enable='{et}'",
     ])
 
 
@@ -1282,28 +1280,39 @@ def _overlay_kinetic(
     dur: float,
     brand_color: str,
     font: str,
+    target_w: int,
     target_h: int,
 ) -> str:
     """FFmpeg filter chain for key_phrase/kinetic text overlay."""
-    phrase = _dt_escape(str(content.get("phrase", content.get("text", ""))))
-    ctx    = _dt_escape(str(content.get("context", "")))
-    farg   = f":fontfile={font}" if font else ""
-    col    = _hex_to_ffmpeg_color(brand_color)
-    ps     = max(48, target_h // 16)
-    cs     = max(22, target_h // 48)
-    et     = f"between(t,{at:.3f},{at+dur:.3f})"
-    parts  = [
-        f"drawbox=x=0:y=h*0.72:w=w:h=h*0.22:color=0x000000CC:t=fill:enable='{et}'",
+    phrase  = _dt_escape(str(content.get("phrase", content.get("text", ""))))
+    ctx     = _dt_escape(str(content.get("context", "")))
+    farg    = f":fontfile={font}" if font else ""
+    col     = _hex_to_ffmpeg_color(brand_color)
+    ps      = max(48, target_h // 16)
+    cs      = max(22, target_h // 48)
+    et      = f"between(t,{at:.3f},{at+dur:.3f})"
+    bar_y   = int(target_h * 0.72)
+    bar_h   = int(target_h * 0.22)
+    text_y  = bar_y + int(bar_h * 0.15)
+    label_y = text_y + cs + 12
+    parts   = [
+        f"drawbox=x=0:y={bar_y}:w={target_w}:h={bar_h}:color=0x000000CC:t=fill:enable='{et}'",
     ]
     if ctx:
         parts.append(
             f"drawtext=text='{ctx}'{farg}:fontcolor=white@0.75:fontsize={cs}"
-            f":x=(w-text_w)/2:y=h*0.74:enable='{et}'"
+            f":x=(w-text_w)/2:y={text_y}:enable='{et}'"
         )
-    parts.append(
-        f"drawtext=text='{phrase}'{farg}:fontcolor={col}:fontsize={ps}"
-        f":x=(w-text_w)/2:y=h*0.74+{cs+12}:enable='{et}'"
-    )
+        parts.append(
+            f"drawtext=text='{phrase}'{farg}:fontcolor={col}:fontsize={ps}"
+            f":x=(w-text_w)/2:y={label_y}:enable='{et}'"
+        )
+    else:
+        phrase_y = bar_y + (bar_h - ps) // 2
+        parts.append(
+            f"drawtext=text='{phrase}'{farg}:fontcolor={col}:fontsize={ps}"
+            f":x=(w-text_w)/2:y={phrase_y}:enable='{et}'"
+        )
     return ",".join(parts)
 
 
@@ -2015,11 +2024,11 @@ def render(
                 _mg_type = str(_mg.get("type", "key_phrase"))
                 _mg_cont = _mg.get("content") or {}
                 if _mg_type == "lower_third":
-                    _filt = _overlay_lower_third(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_h)
+                    _filt = _overlay_lower_third(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_w, target_h)
                 elif _mg_type == "stat":
-                    _filt = _overlay_stat(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_h)
+                    _filt = _overlay_stat(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_w, target_h)
                 else:
-                    _filt = _overlay_kinetic(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_h)
+                    _filt = _overlay_kinetic(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_w, target_h)
                 _mg_filters.append(_filt)
                 print(f"[MG] Queued {_mg_type} at t={_mg_at:.2f}s")
             except Exception as _mge:
