@@ -941,6 +941,140 @@ The video ends when the viewer has been permanently changed.
 Not informed. Not entertained. Changed.
 """
 
+RETENTION_RULES = """\
+5 HIGH-RETENTION MECHANICS — non-negotiable laws
+
+══════════════════════════════════════════
+MECHANIC 1 — OPEN LOOPS (never close early)
+══════════════════════════════════════════
+
+An open loop = a question in the viewer's mind that isn't answered yet.
+
+OPEN LOOP LAW:
+  Never answer a question before 70% of the video duration.
+  If the speaker says "let me tell you something" → keep the answer for later.
+  If the speaker poses a problem → delay the solution.
+  The first 30% of the video must CREATE tension, not resolve it.
+
+HOW TO CREATE OPEN LOOPS WITH CUTS:
+  Cut BEFORE the speaker finishes a sentence if the next part is the payoff.
+  Example:
+    Speaker says: "The reason I ran 10 miles is..."
+    WRONG: Keep the full sentence in the hook
+    RIGHT: Cut on "The reason I ran 10 miles is..." → show context → come back to the answer
+  This cut IS the hook. The viewer's brain cannot rest until it gets the answer.
+
+LOOP INVENTORY — track every loop you open:
+  After selecting keep_segments, list every question the viewer will have.
+  Verify each question is answered only in the final 30% of the edit.
+  If ANY loop is answered before the 70% mark → reorder or cut the answer segment.
+
+The viewer must constantly think: "WHY? WHAT HAPPENED? THEN WHAT?"
+
+══════════════════════════════════════════
+MECHANIC 2 — PATTERN INTERRUPTS every 7s
+══════════════════════════════════════════
+
+A pattern interrupt = anything that breaks the viewer's prediction.
+A viewer's attention resets every 7–10 seconds without stimulation.
+NEVER let 7 seconds pass without a pattern interrupt.
+
+Types of pattern interrupts (use all of these):
+  Reframe:         Same story told from the opposite angle
+  Time jump:       "But 3 hours earlier..." / "Two years before this..."
+  Contradiction:   "Everyone told me I was wrong. They were right."
+  Rhetorical Q:    Breaks monologue, forces viewer to think ("Do you understand what that means?")
+  Silence-drop:    0.3s silence immediately before the most powerful word — then drop it cold
+
+Identify NATURAL pattern interrupts in the transcript and place segment cuts
+to maximize their impact. A cut at a contradiction beats any zoom effect.
+
+══════════════════════════════════════════
+MECHANIC 3 — TENSION PROGRESSION
+══════════════════════════════════════════
+
+Each segment must feel MORE intense than the previous one.
+Tension never drops until the final payoff resolve.
+
+Score EVERY segment 1–10 for emotional intensity before ordering:
+  1–3  = flat setup, context, breathing room
+  4–6  = building tension, curiosity, mild discomfort
+  7–8  = strong emotional charge, vulnerability, conflict
+  9–10 = peak intensity, shocking revelation, raw payoff
+
+REQUIRED intensity arc:
+  Correct:  3 → 5 → 6 → 7 → 8 → 9 → 10 → 8  (rises then resolves)
+  WRONG:    7 → 5 → 8 → 4 → 9               (random jumps — viewer disengages)
+  WRONG:    5 → 5 → 5 → 5 → 5               (flat — viewer leaves)
+
+Minimum intensity rules:
+  Hook (segment 0):    MUST score 7+  — anything less isn't a hook, it's a warmup
+  Payoff (last):       MUST score 9–10 — the answer must feel worth the wait
+  Context segments:    5–7 range, each one slightly higher than the previous
+
+If the natural transcript order produces a flat or declining arc →
+reorder segments to enforce the rising sequence.
+
+══════════════════════════════════════════
+MECHANIC 4 — AGGRESSIVE SILENCE REMOVAL
+══════════════════════════════════════════
+
+Dead air = viewer's mind wanders = they leave.
+
+SILENCE REMOVAL RULES:
+  Remove ALL pauses > 0.15 seconds between words.
+  Remove ALL filler words: um, uh, like, you know, basically, literally,
+    sort of, kind of, I mean, right?, okay so, and uh, so uh.
+  Remove ALL breathing sounds between sentences.
+  Keep ONLY intentional pauses (speaker pauses for deliberate emphasis).
+
+INTENTIONAL PAUSE DEFINITION:
+  An intentional pause is one where the NEXT word is the most important word
+  in that sentence. Maximum 0.3s. Never longer.
+  Example: "And then I realized...[0.3s pause]...I had been wrong the whole time."
+  Keep that pause. It creates anticipation. The silence IS the tension.
+
+  Signals of an intentional pause:
+    - The word following the pause is the principle/payoff
+    - The speaker's voice drops just before the pause
+    - The pause occurs at a sentence boundary before a revelation
+
+  Signals of dead air (always cut):
+    - Speaker is searching for the next word
+    - Pause occurs mid-thought between filler words
+    - Pause > 0.3s — even "intentional" pauses need a hard cap
+
+══════════════════════════════════════════
+MECHANIC 5 — HOOK REORDERING (most important)
+══════════════════════════════════════════
+
+The most powerful moment in the video MUST be first. This is not optional.
+This is the law of short-form content. Source order = amateur edit.
+
+HOOK SELECTION ALGORITHM:
+  Step 1: Read the ENTIRE transcript
+  Step 2: Find the single most surprising/shocking/counterintuitive moment:
+    - A number that defies expectation ("3am", "10 miles", "$0", "47%")
+    - A contradiction ("I don't run, but I ran 10 miles")
+    - A vulnerability ("everyone said I'd fail")
+    - A specific visceral detail ("came home at 3am, one meal all day")
+    Score: counterintuitive (0–10) + specific (0–10) + curiosity_gap (0–10) ≥ 15
+  Step 3: Place THIS moment at position 0 (first segment, edit order)
+  Step 4: Find the MINIMUM context needed to understand the hook
+  Step 5: Place that context AFTER the hook (position 1–2), not before
+  Step 6: Build tension toward the payoff using the arc in Mechanic 3
+
+HOOK EXAMPLE:
+  Transcript contains: "I joking came home at 3am... I ran 10 miles..."
+  WRONG order: [intro → context → running → TikTok haters → payoff]
+  RIGHT order: [10 miles hook → 3am detail → WHY he ran → haters context → payoff]
+
+  The viewer must think in the first 3 seconds:
+  "Wait... what? I need to know more."
+
+  If they don't think that → the hook failed → find a different segment.
+"""
+
 NARRATIVE_COHERENCE = """\
 NARRATIVE COHERENCE — NEVER CUT THESE
 
@@ -1096,6 +1230,22 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
 {
   "format": "short" | "long",
   "summary": "<one-sentence summary>",
+
+  /* ── Retention metadata ───────────────────────────────────────────────
+     retention_score: estimated 0–100 viewer retention at the 30-second mark.
+       90–100 = hook is irresistible, tension never drops
+       70–89  = solid edit with minor flat spots
+       50–69  = watchable but missing urgency
+       < 50   = go back and revise the hook and arc
+     open_loops: every question you deliberately leave open until the payoff.
+       List them verbatim as the viewer would phrase the question.
+     hook_reason: one sentence — WHY this specific segment was chosen as the hook.
+       Must reference the scoring dimension that made it the highest: counterintuitive /
+       specific / curiosity_gap / vulnerability / number.
+  */
+  "retention_score": <0-100>,
+  "open_loops": ["<question 1 the viewer must stay to answer>", "<question 2>"],
+  "hook_reason": "<why this moment stops the scroll — specific scoring rationale>",
 
   /* ── 9-beat high-retention structure ──────────────────────────────────
      Every line MUST use VERBATIM words from the transcript.
@@ -1385,6 +1535,10 @@ Rules the JSON must obey:
         TENSION → 150. STORY → 130. REALIZATION → 150. PRINCIPLE → 150.
         PAYOFF → 170 (the one use of 170). EMOTIONAL_END → 100 (wide reset).
       Default when in doubt: 130.
+  - retention_score: required. Integer 0–100. Be honest — if the hook is weak, score it < 70.
+  - open_loops: required. Minimum 1 entry. Phrase each as the viewer's unanswered question.
+  - hook_reason: required. One sentence. Name the scoring dimension: counterintuitive /
+    specific / curiosity_gap / vulnerability / number that made this the highest scorer.
   - Be ruthless. Tension > comfort. Specific > generic.
   - Output ONLY JSON. No prose around it.
 """
@@ -1620,6 +1774,7 @@ def system_prompt(
         BROLL_RULES,
         SOUND_DESIGN,
         RETENTION_MECHANICS,
+        RETENTION_RULES,
         VISUAL_PACING,
         CORE_LAW,
         OUTPUT_CONTRACT,
