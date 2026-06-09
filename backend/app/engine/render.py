@@ -795,6 +795,44 @@ def _concat_with_zoom(
     ])
 
 
+def _reencode_clean(src: Path, dst: Path, fps: int) -> None:
+    """Re-encode a segment to force a clean PTS-zero baseline.
+
+    After accurate-seek extraction, PTS may not start at exactly 0 even with
+    avoid_negative_ts. Reordered segments (hook at t=35s played first) arrive
+    with intact container PTS that the concat filter cannot normalise across
+    streams. A full re-encode with setpts=PTS-STARTPTS guarantees every segment
+    handed to _concat_with_zoom starts at t=0 in both video and audio tracks.
+    """
+    _run([
+        FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-i", str(src),
+        "-vf", f"setpts=PTS-STARTPTS,fps={fps}",
+        "-af", "asetpts=PTS-STARTPTS",
+        "-vsync", "cfr",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+        str(dst),
+    ])
+
+
+def _trim_to_audio(src: Path, dst: Path, audio_dur: float) -> None:
+    """Trim src to audio_dur seconds using stream-copy (no re-encode).
+
+    Used to remove the trailing freeze frames that appear when the video
+    stream runs slightly longer than the audio stream after concat.
+    """
+    _run([
+        FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-i", str(src),
+        "-t", f"{audio_dur:.6f}",
+        "-c", "copy",
+        str(dst),
+    ])
+
+
+
 def _render_hyperframe_png(
     color_str: str,
     dst: Path,
@@ -1537,14 +1575,44 @@ def render(
         raise RuntimeError("No keep_segments produced any clip.")
 
     print(f"[ZOOM] Total segments with zoom: {len(zoom_segments)}")
+
+    # PROBLEM 2 FIX — AV DESYNC after reordering:
+    # Re-encode every extracted segment to a clean PTS-zero baseline before
+    # concat. Reordered segments (e.g. hook from t=35s played first) carry
+    # their original container PTS even after accurate-seek extraction; the
+    # concat filter cannot reconcile PTS offsets across audio/video streams,
+    # producing drift. Full re-encode with setpts=PTS-STARTPTS eliminates this.
+    clean_dir = work_dir / "clean_parts"
+    clean_dir.mkdir(parents=True, exist_ok=True)
+    clean_parts: list[Path] = []
+    for _pi, _p in enumerate(parts):
+        _cp = clean_dir / f"clean_{_pi:04d}.mp4"
+        print(f"[CLEAN] Re-encoding segment {_pi} → {_cp.name}")
+        _reencode_clean(_p, _cp, fps)
+        clean_parts.append(_cp)
+
     concat_path = work_dir / "concat.mp4"
-    _concat_with_zoom(parts, zoom_levels, concat_path, target_w, target_h, fps)
+    _concat_with_zoom(clean_parts, zoom_levels, concat_path, target_w, target_h, fps)
     print(f"[AUDIO] Concat+zoom complete: {concat_path}")
-    # BUG 2 FIX — verify AV sync immediately after concat
-    _probe_av(concat_path)
+
+    # Verify AV sync immediately after concat; capture audio duration for trim.
+    _concat_v_dur, _concat_a_dur = _probe_av(concat_path)
     _audio_expected = sum(float(s["end"]) - float(s["start"]) for s in keep
                          if float(s["end"]) > float(s["start"]))
     print(f"[AUDIO] Expected duration (plan boundaries): {_audio_expected:.3f}s")
+
+    # PROBLEM 1 FIX — FREEZE (video longer than audio):
+    # When video stream runs longer than audio, the last frames are silent
+    # freeze frames. Trim concat to exact audio duration using [AV PROBE]
+    # audio as the reference (not planned duration, which may differ).
+    if _concat_a_dur > 0.5 and _concat_v_dur > _concat_a_dur + 0.1:
+        _trimmed_path = work_dir / "concat_trimmed.mp4"
+        print(
+            f"[TRIM] Video ({_concat_v_dur:.3f}s) > audio ({_concat_a_dur:.3f}s) "
+            f"by {_concat_v_dur - _concat_a_dur:+.3f}s — trimming to audio duration"
+        )
+        _trim_to_audio(concat_path, _trimmed_path, _concat_a_dur)
+        concat_path = _trimmed_path
 
     # BUG 3 FIX — DURATION MISMATCH: log the delta for diagnostics only.
     # The words are already correctly positioned via seg_offset (exact video clock),
