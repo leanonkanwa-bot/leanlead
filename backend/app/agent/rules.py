@@ -1335,6 +1335,22 @@ Rules the JSON must obey:
       If a moment is important but short, extend the end time to reach 2.0s minimum.
       Never split a sentence into segments under 2.0s each.
       Short segments cause visual glitches (zoompan artifacts) and look amateurish.
+  - BEAT ASSIGNMENT — MANDATORY VARIETY:
+      Every keep_segment MUST have a "beat" field. Use the 9-beat spine.
+      beat must be one of: hook · amplify · context · tension · story ·
+                           realization · principle · payoff · emotional_end
+      RULES:
+        First segment: ALWAYS beat="hook"
+        Last segment: ALWAYS beat="payoff" or beat="emotional_end"
+        Never more than 2 consecutive segments with the same beat value.
+        Minimum 4 DIFFERENT beats in any video over 20 seconds.
+        Never use beat="story" for more than 30% of all segments.
+      EXAMPLE for 9 segments:
+        [hook, amplify, context, tension, story, story, realization, principle, payoff]
+        NEVER: [story, story, story, story, story, story, story, story, story]
+      The beat drives the zoom level: hook→130, amplify→125, context→100,
+      tension→125, story→112, realization→125, principle→115,
+      payoff→130, emotional_end→112.
   - keep_segments: include role, score, cut_before_silence, retention_note.
   - Segments with net score ≤ 3 must be dropped unless they are the hook or payoff.
   - Segments with net score ≤ 0 must always be cut — no exceptions.

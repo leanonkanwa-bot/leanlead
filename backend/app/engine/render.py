@@ -362,6 +362,12 @@ def _cut_segment(
         "-c:a", "copy",
         str(dst),
     ])
+    actual_dur = _probe_duration(dst)
+    if abs(actual_dur - duration) > 0.5:
+        print(
+            f"[CUT WARNING] {dst.name}: expected={duration:.3f}s "
+            f"actual={actual_dur:.3f}s delta={actual_dur - duration:+.3f}s"
+        )
 
 
 def _concat(parts: list[Path], dst: Path) -> None:
@@ -1101,7 +1107,7 @@ def _dedup_segments(segments: list[dict]) -> list[dict]:
     return result
 
 
-def _merge_short_segments(segments: list[dict], min_duration: float = 1.5) -> list[dict]:
+def _merge_short_segments(segments: list[dict], min_duration: float = 2.0) -> list[dict]:
     """Merge segments shorter than min_duration with the next segment.
 
     Short segments cause zoompan frame-stretching artifacts and look like
@@ -1118,7 +1124,8 @@ def _merge_short_segments(segments: list[dict], min_duration: float = 1.5) -> li
         dur = float(seg["end"]) - float(seg["start"])
         if dur < min_duration and i + 1 < len(segments):
             next_seg = segments[i + 1]
-            print(f"[MERGE] Segment {i} too short ({dur:.2f}s) — merging with next")
+            merged_dur = float(next_seg["end"]) - float(seg["start"])
+            print(f"[MERGE] Segment {i} too short ({dur:.2f}s < {min_duration:.1f}s) — merging with next → {merged_dur:.2f}s")
             seg["end"] = next_seg["end"]
             # Keep current segment's beat/zoom metadata
             merged.append(seg)
@@ -1261,10 +1268,10 @@ def _overlay_stat(
     ls     = max(24, target_h // 40)
     et     = f"between(t,{at:.3f},{at+dur:.3f})"
     box_x  = int(target_w * 0.15)
-    box_y  = int(target_h * 0.35)
+    box_y  = int(target_h * 0.05)
     box_w  = int(target_w * 0.70)
-    box_h  = int(target_h * 0.30)
-    num_y  = int(target_h * 0.38)
+    box_h  = int(target_h * 0.25)
+    num_y  = int(target_h * 0.07)
     lbl_y  = num_y + ns + 8
     cx     = "(w-text_w)/2"
     return ",".join([
@@ -1291,8 +1298,8 @@ def _overlay_kinetic(
     ps      = max(48, target_h // 16)
     cs      = max(22, target_h // 48)
     et      = f"between(t,{at:.3f},{at+dur:.3f})"
-    bar_y   = int(target_h * 0.72)
-    bar_h   = int(target_h * 0.22)
+    bar_y   = int(target_h * 0.65)
+    bar_h   = int(target_h * 0.15)
     text_y  = bar_y + int(bar_h * 0.15)
     label_y = text_y + cs + 12
     parts   = [
@@ -1450,6 +1457,7 @@ def render(
                     "end": seg_offset + (ze - s),
                 })
 
+        _word_count_before = len(remapped_words)
         for tseg in transcript.get("segments", []):
             for w in tseg.get("words", []):
                 ws = float(w["start"])
@@ -1463,6 +1471,12 @@ def render(
                         start=max(0.0, seg_offset + (ws - s)),
                         end=max(0.0, seg_offset + (min(we, e_raw) - s)),
                     ))
+        _word_count_after = len(remapped_words)
+        print(
+            f"[CAP] Segment {i}: s_raw={s_raw:.3f} e_raw={e_raw:.3f} "
+            f"s={s:.3f} e={e:.3f} seg_offset={seg_offset:.3f} "
+            f"words_added={_word_count_after - _word_count_before}"
+        )
 
         for sil in (plan.silences or []):
             try:
@@ -1661,17 +1675,15 @@ def render(
     total_duration = _probe_duration(concat_path)
 
     # Enforce minimum gap between b-roll clips to prevent over-cutting.
-    # Short-form: 8s fixed. Long-form: adaptive — 20% of total duration, min 8s.
-    # A 40s video gets 8s gap; a 5min video gets 60s gap. Prevents all b-roll
-    # from being rejected on short long-form edits.
-    # Also drop any b-roll in the first 3s (hook must show the speaker's face).
-    _MIN_BROLL_GAP_SHORT = 8.0
-    _min_broll_gap = _MIN_BROLL_GAP_SHORT if short_form else max(8.0, total_duration * 0.20)
+    # Short-form: adaptive — max(5s, 15% of total duration). A 37s video gets
+    # 5.55s gap, meaning b-roll can actually land. Long-form: 20% of duration, min 8s.
+    # Also drop any b-roll in the first 2s (hook must show the speaker's face).
+    _min_broll_gap = max(5.0, total_duration * 0.15) if short_form else max(8.0, total_duration * 0.20)
     _filtered_broll: list[tuple[float, float]] = []
     _filtered_queries: list[str] = []
     _last_broll_end = 0.0
     for (br_s, br_e), br_q in zip(remapped_broll, broll_queries):
-        if br_s < 3.0:
+        if br_s < 2.0:
             print(f"[BROLL] Rejected (hook zone): at={br_s:.2f}s query={br_q!r}")
             continue
         gap = br_s - _last_broll_end
