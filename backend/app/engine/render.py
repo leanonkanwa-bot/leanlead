@@ -336,9 +336,9 @@ def _cut_segment(
 ) -> None:
     """Per-segment extract.
 
-    SYNC: -ss BEFORE -i (fast seek, frame-accurate). Duration via -t.
-    Audio uses -c:a copy so the trim is lossless. Fast seek (-ss before -i)
-    snaps to the nearest keyframe; the exact duration is enforced via -t.
+    SYNC: -ss BEFORE -i with -accurate_seek (frame-accurate decode from keyframe).
+    Duration via -t. Audio re-encoded to AAC so it aligns with the video trim
+    point rather than copying from the keyframe boundary (which causes +0–3s drift).
     """
     duration = max(0.1, end - start)
     vf = (
@@ -352,6 +352,7 @@ def _cut_segment(
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-fflags", "+genpts",
         "-ss", f"{start:.6f}",
+        "-accurate_seek",
         "-i", str(src),
         "-t", f"{duration:.6f}",
         "-avoid_negative_ts", "make_zero",
@@ -359,7 +360,7 @@ def _cut_segment(
         "-vsync", "cfr",
         "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
         "-pix_fmt", "yuv420p",
-        "-c:a", "copy",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         str(dst),
     ])
     actual_dur = _probe_duration(dst)
