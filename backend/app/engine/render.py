@@ -1175,6 +1175,36 @@ def _merge_short_segments(segments: list[dict], min_duration: float = 2.0) -> li
     return merged
 
 
+def _fix_word_boundaries(segments: list[dict], all_words: list[dict]) -> list[dict]:
+    """Trim a segment's end when its last spoken word duplicates the first
+    spoken word of the next segment.
+
+    Reordered/adjacent segments can land on the same repeated word (e.g.
+    "...ten miles." / "Ten miles is..."), which plays as an audible repeat.
+    Trimming segment N back to its second-to-last word removes the dupe
+    while leaving segment N+1 (and its own boundary) untouched.
+    """
+    for i in range(len(segments) - 1):
+        seg_a = segments[i]
+        seg_b = segments[i + 1]
+
+        words_a = [w for w in all_words if float(seg_a["start"]) <= float(w["start"]) < float(seg_a["end"])]
+        words_b = [w for w in all_words if float(seg_b["start"]) <= float(w["start"]) < float(seg_b["end"])]
+
+        if not words_a or not words_b:
+            continue
+
+        last_word_a = str(words_a[-1]["text"]).strip().lower().rstrip(".,!?")
+        first_word_b = str(words_b[0]["text"]).strip().lower().rstrip(".,!?")
+
+        if last_word_a and last_word_a == first_word_b:
+            print(f"[BOUNDARY FIX] Removed duplicate word '{last_word_a}' at segment {i}/{i+1} junction")
+            if len(words_a) >= 2:
+                segments[i] = {**seg_a, "end": float(words_a[-2]["end"]) + 0.05}
+
+    return segments
+
+
 def _verify_caption_sync(
     words: list["WordTiming"],
     edited_duration: float,
@@ -1431,6 +1461,8 @@ def render(
     # Resolve any raw planner overlaps before cutting — prevents word repetition.
     keep = _dedup_segments(keep)
     keep = _merge_short_segments(keep)
+    _all_words_flat = [w for tseg in transcript.get("segments", []) for w in tseg.get("words", [])]
+    keep = _fix_word_boundaries(keep, _all_words_flat)
     planned_total = sum(float(s["end"]) - float(s["start"]) for s in keep)
     print(f"[PLAN] {len(keep)} segments, planned total={planned_total:.3f}s")
     words = _flat_words(transcript)

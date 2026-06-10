@@ -1045,34 +1045,152 @@ INTENTIONAL PAUSE DEFINITION:
     - Pause > 0.3s — even "intentional" pauses need a hard cap
 
 ══════════════════════════════════════════
-MECHANIC 5 — HOOK REORDERING (most important)
+MECHANIC 5 — HOOK REORDERING (intelligent, not blind)
 ══════════════════════════════════════════
 
-The most powerful moment in the video MUST be first. This is not optional.
-This is the law of short-form content. Source order = amateur edit.
+The most powerful moment in the video SHOULD be first — but ONLY if it
+passes the HOOK INTELLIGENCE tests (see HOOK_INTELLIGENCE block, Rule 2).
 
-HOOK SELECTION ALGORITHM:
+A segment may ONLY be placed at position 0 if it:
+  - Is understandable with ZERO prior context (STANDALONE TEST)
+  - Makes the viewer think "wait, what? I need to know more" (TENSION TEST)
+  - Does not repeat the first/last word of its new neighbour (NO REPETITION TEST)
+
+If NO segment passes both the standalone test and the tension test at
+7+/10, DO NOT reorder. Keep the original chronological order — the
+video's natural opening is its hook. A confusing "hook" that scores high
+on raw emotion but fails the standalone test is worse than no reorder
+at all.
+
+When reordering IS justified:
   Step 1: Read the ENTIRE transcript
-  Step 2: Find the single most surprising/shocking/counterintuitive moment:
+  Step 2: Find the single most surprising/shocking/counterintuitive moment
+          that ALSO passes the standalone test:
     - A number that defies expectation ("3am", "10 miles", "$0", "47%")
     - A contradiction ("I don't run, but I ran 10 miles")
     - A vulnerability ("everyone said I'd fail")
     - A specific visceral detail ("came home at 3am, one meal all day")
     Score: counterintuitive (0–10) + specific (0–10) + curiosity_gap (0–10) ≥ 15
   Step 3: Place THIS moment at position 0 (first segment, edit order)
-  Step 4: Find the MINIMUM context needed to understand the hook
+  Step 4: Find the MINIMUM context needed to understand the hook (Rule 3)
   Step 5: Place that context AFTER the hook (position 1–2), not before
   Step 6: Build tension toward the payoff using the arc in Mechanic 3
 
 HOOK EXAMPLE:
   Transcript contains: "I joking came home at 3am... I ran 10 miles..."
   WRONG order: [intro → context → running → TikTok haters → payoff]
-  RIGHT order: [10 miles hook → 3am detail → WHY he ran → haters context → payoff]
+  RIGHT order: [10 miles hook → WHY he ran (context) → 3am detail → haters → payoff]
 
   The viewer must think in the first 3 seconds:
   "Wait... what? I need to know more."
 
-  If they don't think that → the hook failed → find a different segment.
+  If they don't think that → the hook failed → find a different segment,
+  or fall back to chronological order.
+"""
+
+HOOK_INTELLIGENCE = """\
+HOOK INTELLIGENCE — 4 RULES (replaces blind "highest score → position 0")
+
+Blindly moving the highest-scoring segment to position 0 causes:
+  1. Word repetition at segment boundaries (last word of prev = first word of next)
+  2. Segments that make no sense out of context
+  3. Videos that die because the "hook" needs setup to land
+
+═══════════════════════════════════════════
+RULE 1 — NEVER CUT MID-SENTENCE
+═══════════════════════════════════════════
+
+A segment MUST start at the beginning of a sentence.
+A segment MUST end at the end of a sentence.
+
+HOW TO DETECT SENTENCE BOUNDARIES:
+  - A sentence STARTS after: a period, exclamation mark, or question mark
+    followed by a pause.
+  - A sentence STARTS after connector words at the beginning of a phrase:
+    "And", "But", "So", "Because" — these open a new clause/sentence.
+  - NEVER start a segment mid-sentence.
+  - NEVER end a segment with a word that continues into the next segment.
+
+IMPLEMENTATION:
+  After selecting a segment's start/end times, snap to the nearest
+  sentence boundary:
+    - Scan ±0.5s for a pause > 0.2s that follows end-of-sentence punctuation.
+    - If found → use that as the boundary.
+    - If not found → extend to the next clear pause (≥ 0.2s gap).
+
+═══════════════════════════════════════════
+RULE 2 — HOOK INTELLIGENCE (not blind reorder)
+═══════════════════════════════════════════
+
+A segment can ONLY be placed as the hook (position 0) if it passes ALL
+three tests below.
+
+TEST A — STANDALONE TEST:
+  Can a stranger understand this segment with ZERO prior context?
+    - References something said before ("that's why", "like I said", "but") → FAIL
+    - Introduces new information the viewer has no context for → FAIL
+    - Creates curiosity entirely on its own → PASS
+
+TEST B — TENSION TEST:
+  Does this segment make the viewer think "wait, what? I need to know more"?
+    - A specific number ("3am", "10 miles") → PASS
+    - A contradiction ("I don't run, but I ran 10 miles") → PASS
+    - A result without its cause ("I showed up anyway") → PASS
+    - A generic statement ("it was really hard") → FAIL
+
+TEST C — NO REPETITION TEST:
+  When this segment is placed after any other segment, does the last word
+  of the previous segment match the first word of this segment?
+    - If yes → adjust the boundary by ±0.3s to avoid the repetition.
+
+HOOK SELECTION ALGORITHM:
+  1. Score each candidate segment 1–10 on TEST A and 1–10 on TEST B.
+  2. Only segments scoring 7+ on BOTH tests are hook candidates.
+  3. If multiple candidates qualify → pick the one with the highest combined score.
+  4. If NO candidate scores 7+ on BOTH tests → DO NOT reorder.
+     Keep the original chronological order. The video's natural opening
+     IS the hook.
+
+═══════════════════════════════════════════
+RULE 3 — CONTEXT PRESERVATION
+═══════════════════════════════════════════
+
+When a segment is moved to the hook position, the MINIMUM context needed
+to understand it must follow IMMEDIATELY.
+
+Example:
+  Hook: "I don't run bro. I ran 10 miles." (source: t=46s)
+  Context needed: WHY did he run 10 miles? → find the segment that answers this.
+  That context segment must be placed at position 1 or 2.
+
+Rule: After placing the hook, ask "what does the viewer need to know next
+to make sense of what they just heard?" The answer = the context segment.
+Place it at position 1.
+
+Resulting edit order:
+  [hook] → [minimum context for hook] → [chronological story] → [payoff]
+
+NOT:
+  [hook] → [random strong segment] → [unrelated segment] → [payoff]
+"""
+
+WORD_BOUNDARY_PROTECTION = """\
+WORD BOUNDARY PROTECTION — RULE 4
+
+Before finalizing any segment boundary, check for word repetition between
+adjacent segments in EDIT order (not source order).
+
+For each consecutive pair (segment N, segment N+1):
+  last_word_of_N    = the last word spoken in segment N (Whisper word timestamps)
+  first_word_of_N+1 = the first word spoken in segment N+1
+
+If last_word_of_N == first_word_of_N+1 (case-insensitive, punctuation-stripped):
+  Adjust segment N's end time: move it back to the previous word boundary
+  (i.e. drop the duplicated trailing word from segment N).
+  Log: "[BOUNDARY FIX] Removed duplicate word '{word}' at segment N/N+1 junction"
+
+This check runs AFTER all segments are selected and ordered — it is the
+final pass before the plan is emitted.
 """
 
 NARRATIVE_COHERENCE = """\
@@ -1133,11 +1251,17 @@ in source chronological order. Source order = amateur edit. Edit order = pro.
 
 REORDERING ALGORITHM — run in this exact sequence:
 
-STEP 1 — FIND THE HOOK (the most powerful moment in the ENTIRE video):
-  Score every sentence. The single highest-scoring segment becomes segment[0].
-  It does NOT matter if this segment is at minute 5 of a 6-minute video.
-  The hook MUST be first. No exceptions. No setup before it. Ever.
-  Example: transcript has 300s of content. Best line at 240s → keep_segments[0].start = 240.
+STEP 1 — FIND THE HOOK (the most powerful moment that PASSES the tests):
+  Score every sentence. Among segments scoring 7+/10 on BOTH the
+  STANDALONE TEST and the TENSION TEST (see HOOK_INTELLIGENCE Rule 2),
+  the highest-scoring one becomes segment[0].
+  It does NOT matter if this segment is at minute 5 of a 6-minute video —
+  AS LONG AS it is understandable with zero prior context.
+  Example: transcript has 300s of content. Best qualifying line at 240s →
+  keep_segments[0].start = 240.
+  If NO segment scores 7+/10 on BOTH tests → DO NOT reorder. Output
+  keep_segments in chronological source order — the natural opening is
+  the hook.
 
 STEP 2 — FIND WHAT MAKES THE HOOK UNDERSTANDABLE:
   Read the hook as a stranger. What MINIMUM context is needed to follow it?
@@ -1631,10 +1755,14 @@ STEP 3 — HOOK SCORING ALGORITHM:
   If no segment scores ≥ 15, pick the highest available and note it in `summary`.
   The hook MUST be ≤ 8s long and must NOT resolve the tension it creates.
 
-STEP 4 — HOOK FIRST (ABSOLUTE):
-  The segment at hook_moment MUST be first in keep_segments.
-  The viewer does not get intro or setup before the hook.
-  Reorder keep_segments so hook appears at t=0 in the edit.
+STEP 4 — HOOK FIRST (CONDITIONAL — see HOOK_INTELLIGENCE Rule 2):
+  The segment at hook_moment becomes first in keep_segments ONLY if it
+  scores 7+/10 on BOTH the standalone test and the tension test.
+  If it passes: reorder keep_segments so it appears at t=0, and place its
+  minimum-context segment immediately after (Rule 3).
+  If it fails either test: do NOT reorder — keep chronological source
+  order. The viewer does not get intro or setup before a hook that passes;
+  a failing "hook" is worse than the natural opening.
 
 STEP 5 — TENSION MECHANICS:
   For every setup (question / problem / curiosity gap):
@@ -1775,6 +1903,8 @@ def system_prompt(
         SOUND_DESIGN,
         RETENTION_MECHANICS,
         RETENTION_RULES,
+        HOOK_INTELLIGENCE,
+        WORD_BOUNDARY_PROTECTION,
         VISUAL_PACING,
         CORE_LAW,
         OUTPUT_CONTRACT,
