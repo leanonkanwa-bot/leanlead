@@ -1254,6 +1254,23 @@ def _dt_escape(text: str) -> str:
     )
 
 
+def _sanitize_drawtext(text: str) -> str:
+    """Strip characters that break FFmpeg drawtext's filter parser.
+
+    Apostrophes (don't, I'm, it's) close the surrounding text='...' quote
+    early, causing FFmpeg to misparse the rest of the filter chain as a new
+    (invalid) filter name. Rather than escape them, drop them entirely.
+    """
+    if not text:
+        return ""
+    text = text.replace("'", "")
+    text = text.replace('"', "")
+    text = text.replace(":", "\\:")
+    text = text.replace(",", " ")
+    text = text.replace("\\", "")
+    return text.strip()
+
+
 def _hex_to_ffmpeg_color(hex6: str) -> str:
     """Convert #RRGGBB to FFmpeg color string 0xRRGGBB."""
     return "0x" + hex6.lstrip("#").upper()
@@ -1269,8 +1286,8 @@ def _overlay_lower_third(
     target_h: int,
 ) -> str:
     """FFmpeg filter chain for a lower-third name+role overlay."""
-    name = _dt_escape(str(content.get("name", content.get("text", ""))))
-    role = _dt_escape(str(content.get("role", content.get("label", ""))))
+    name = _sanitize_drawtext(str(content.get("name", content.get("text", ""))))
+    role = _sanitize_drawtext(str(content.get("role", content.get("label", ""))))
     farg  = f":fontfile={font}" if font else ""
     col   = _hex_to_ffmpeg_color(brand_color)
     ns    = max(28, target_h // 36)
@@ -1299,8 +1316,8 @@ def _overlay_stat(
     target_h: int,
 ) -> str:
     """FFmpeg filter chain for a stat number+label overlay."""
-    number = _dt_escape(str(content.get("number", "")))
-    label  = _dt_escape(str(content.get("label", "")).upper())
+    number = _sanitize_drawtext(str(content.get("number", "")))
+    label  = _sanitize_drawtext(str(content.get("label", "")).upper())
     farg   = f":fontfile={font}" if font else ""
     col    = _hex_to_ffmpeg_color(brand_color)
     ns     = max(80, target_h // 10)
@@ -1330,8 +1347,8 @@ def _overlay_kinetic(
     target_h: int,
 ) -> str:
     """FFmpeg filter chain for key_phrase/kinetic text overlay."""
-    phrase  = _dt_escape(str(content.get("phrase", content.get("text", ""))))
-    ctx     = _dt_escape(str(content.get("context", "")))
+    phrase  = _sanitize_drawtext(str(content.get("phrase", content.get("text", ""))))
+    ctx     = _sanitize_drawtext(str(content.get("context", "")))
     farg    = f":fontfile={font}" if font else ""
     col     = _hex_to_ffmpeg_color(brand_color)
     ps      = max(48, target_h // 16)
@@ -1497,19 +1514,23 @@ def render(
                 })
 
         _word_count_before = len(remapped_words)
-        for tseg in transcript.get("segments", []):
-            for w in tseg.get("words", []):
-                ws = float(w["start"])
-                we = float(w["end"])
-                # Strict plan-boundary whitelist: only words whose source timestamp
-                # falls inside [s_raw, e_raw). Caption time = seg_offset + (ws - s)
-                # which is the identical formula to how video frames are positioned.
-                if s_raw <= ws < e_raw:
-                    remapped_words.append(WordTiming(
-                        text=w["text"].strip(),
-                        start=max(0.0, seg_offset + (ws - s)),
-                        end=max(0.0, seg_offset + (min(we, e_raw) - s)),
-                    ))
+        all_words = [w for tseg in transcript.get("segments", []) for w in tseg.get("words", [])]
+        print(f"[CAP DEBUG] seg {i}: looking for words between {s_raw:.3f} and {e_raw:.3f}")
+        words_in_range = [w for w in all_words if (s_raw - 0.5) <= float(w["start"]) < (e_raw + 0.2)]
+        print(f"[CAP DEBUG] found {len(words_in_range)} words in range")
+        for w in words_in_range:
+            ws = float(w["start"])
+            we = float(w["end"])
+            # Tolerant boundary match: words whose source timestamp falls inside
+            # [s_raw, e_raw) plus a small tolerance window for reordered segments
+            # where snapping pushes the raw boundary slightly off. Caption time =
+            # seg_offset + (ws - s), the identical formula used to position video
+            # frames (s is the actual cut start passed to _cut_segment).
+            remapped_words.append(WordTiming(
+                text=w["text"].strip(),
+                start=max(0.0, seg_offset + (ws - s)),
+                end=max(0.0, seg_offset + (min(we, e_raw) - s)),
+            ))
         _word_count_after = len(remapped_words)
         print(
             f"[CAP] Segment {i}: s_raw={s_raw:.3f} e_raw={e_raw:.3f} "
