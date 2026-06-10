@@ -1406,6 +1406,7 @@ def render(
     except Exception as _fe:
         print(f"[FONT] preload_style_fonts failed (non-fatal): {_fe}")
 
+    skip_captions = True
     short_form = plan.format == "short"
     fps = 30
     pad = SHORT_PAD_S if short_form else LONG_PAD_S
@@ -1864,21 +1865,24 @@ def render(
     _use_moments = _long and bool(remapped_moments)
     if _long and not remapped_moments:
         print("[CAPTIONS] Long-form has no caption_moments — falling back to short-form word-by-word")
-    build_ass(
-        remapped_words,
-        ass_path,
-        video_w=target_w,
-        video_h=target_h,
-        brand_color=brand_color or "#FF7751",
-        caption_font=caption_font,
-        caption_style_map=caption_style_map,
-        video_duration=total_duration,
-        mode="long" if _use_moments else "short",
-        caption_moments=remapped_moments if _use_moments else None,
-        caption_style=caption_style,
-    )
-    print(f"[CAPTIONS] ASS file written: {ass_path}")
-    print(f"[CAPTIONS] ASS file size: {ass_path.stat().st_size} bytes")
+    if not skip_captions:
+        build_ass(
+            remapped_words,
+            ass_path,
+            video_w=target_w,
+            video_h=target_h,
+            brand_color=brand_color or "#FF7751",
+            caption_font=caption_font,
+            caption_style_map=caption_style_map,
+            video_duration=total_duration,
+            mode="long" if _use_moments else "short",
+            caption_moments=remapped_moments if _use_moments else None,
+            caption_style=caption_style,
+        )
+        print(f"[CAPTIONS] ASS file written: {ass_path}")
+        print(f"[CAPTIONS] ASS file size: {ass_path.stat().st_size} bytes")
+    else:
+        print("[CAPTIONS] Disabled (skip_captions=True) — no ASS file generated")
 
     face_cx_pct = 50.0
     face_cy_pct = 50.0
@@ -2158,9 +2162,10 @@ def render(
     # ── Final pass: burn ASS captions ─────────────────────────────────────
     # Separate ffmpeg invocation so subtitle path escaping is handled by the
     # OS arg list (no shell expansion) — only the ffmpeg filter parser sees it.
-    _ass_tmp = _tmp_dir / f"captions_{ass_path.parent.name}.ass"
-    _shutil.copy2(ass_path, _ass_tmp)
-    _ass_str = str(_ass_tmp).replace("\\", "/").replace(":", "\\:")
+    if not skip_captions:
+        _ass_tmp = _tmp_dir / f"captions_{ass_path.parent.name}.ass"
+        _shutil.copy2(ass_path, _ass_tmp)
+        _ass_str = str(_ass_tmp).replace("\\", "/").replace(":", "\\:")
     # Per-format output bitrate targets — prevent quality floor drops on
     # complex scenes while keeping file size reasonable.
     if is_4k:
@@ -2170,10 +2175,13 @@ def render(
     else:
         _out_bv, _out_maxrate, _out_bufsize = "6M", "10M", "20M"
     # ── Final pass: burn ASS captions + quality encode ────────────────────
-    _run([
+    _cmd_final = [
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(_nocap_path),
-        "-vf", f"subtitles={_ass_str}",
+    ]
+    if not skip_captions:
+        _cmd_final += ["-vf", f"subtitles={_ass_str}"]
+    _cmd_final += [
         "-vsync", "cfr",
         "-c:v", "libx264", "-preset", "slow", "-crf", str(output_crf),
         "-b:v", _out_bv,
@@ -2186,7 +2194,8 @@ def render(
         "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         "-movflags", "+faststart",
         str(output_path),
-    ])
+    ]
+    _run(_cmd_final)
     print(f"[FINAL] Output: {output_path}")
     _nocap_path.unlink(missing_ok=True)
     for _p in _overlay_intermediates:
