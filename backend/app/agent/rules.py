@@ -731,6 +731,24 @@ PLACEMENT RULES
   must show the full frame.
 """
 
+CLONED_STYLE = """\
+CLONED VISUAL STYLE — dark accent-glow motion graphics
+
+A reference edit (financial flow-diagram explainer) showed full-frame
+graphics with this look: near-black background, a soft glow of the
+accent colour in the bottom-left corner, bold white sans-serif labels,
+and the accent colour used for icons, connector lines, and key figures.
+Elements build progressively — one piece appears, then a connector,
+then the next piece — rather than all at once.
+
+The renderer now applies this corner-glow treatment automatically to
+full-frame graphics (typography_broll, quote_card, split_screen, versus,
+money_counter) using the active brand_color as the glow/accent colour.
+You don't need any new fields — just lean on these graphic types more
+for financial breakdowns, "where X goes" / process-flow explanations,
+and big-number reveals, and they will carry this look automatically.
+"""
+
 BROLL_RULES = """\
 B-ROLL GOLDEN RULE — concrete visuals only, never for decoration.
 
@@ -1899,6 +1917,7 @@ def system_prompt(
         ZOOM_SYSTEM,
         CAPTION_RULES,
         HYPERFRAMES,
+        CLONED_STYLE,
         BROLL_RULES,
         SOUND_DESIGN,
         RETENTION_MECHANICS,

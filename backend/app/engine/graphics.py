@@ -82,6 +82,54 @@ def _hex_to_rgba(hex6: str | None, fallback: tuple[int, int, int, int]) -> tuple
         return fallback
 
 
+def _radial_gradient(size: int, color_rgb: tuple[int, int, int], max_alpha: int = 90) -> Image.Image:
+    """A square radial gradient: opaque-ish `color_rgb` at the centre fading
+    to transparent at the edges. Built at a fixed small resolution and
+    upscaled, so it stays cheap even for large frame sizes."""
+    base = 256
+    grad = Image.new("RGBA", (base, base), (0, 0, 0, 0))
+    px = grad.load()
+    c = base / 2
+    for y in range(base):
+        dy = y - c
+        for x in range(base):
+            dx = x - c
+            dist = (dx * dx + dy * dy) ** 0.5
+            alpha = max(0, int(max_alpha * (1 - dist / c)))
+            if alpha:
+                px[x, y] = (*color_rgb, alpha)
+    if size != base:
+        grad = grad.resize((size, size), Image.BILINEAR)
+    return grad
+
+
+_GLOW_CORNER_OFFSETS = {
+    "bottom-left":  lambda w, h, s: (-s // 2, h - s // 2),
+    "bottom-right": lambda w, h, s: (w - s // 2, h - s // 2),
+    "top-left":     lambda w, h, s: (-s // 2, -s // 2),
+    "top-right":    lambda w, h, s: (w - s // 2, -s // 2),
+}
+
+
+def _apply_corner_glow(
+    img: Image.Image,
+    accent_hex: str,
+    corner: str = "bottom-left",
+    max_alpha: int = 90,
+) -> Image.Image:
+    """Blend a soft radial accent-colour glow into one corner of a dark
+    background — matches the bottom-left accent glow seen on the cloned
+    reference video's full-frame motion graphics."""
+    w, h = img.size
+    accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
+    glow_size = int(max(w, h) * 1.3)
+    grad = _radial_gradient(glow_size, accent[:3], max_alpha=max_alpha)
+    offset_fn = _GLOW_CORNER_OFFSETS.get(corner, _GLOW_CORNER_OFFSETS["bottom-left"])
+    layer = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+    layer.paste(grad, offset_fn(w, h, glow_size), grad)
+    return Image.alpha_composite(img.convert("RGBA"), layer)
+
+
 def _rounded_rect(
     draw: ImageDraw.ImageDraw,
     bbox: tuple[int, int, int, int],
@@ -417,6 +465,7 @@ def render_quote_card(
     text_rgba: tuple[int, int, int, int] = (255, 255, 255, 255),
 ) -> Path:
     img = Image.new("RGBA", (target_w, target_h), bg_rgba)
+    img = _apply_corner_glow(img, accent_hex)
     draw = ImageDraw.Draw(img)
     accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
 
@@ -473,6 +522,7 @@ def render_split_screen(
     text_rgba: tuple[int, int, int, int] = (255, 255, 255, 255),
 ) -> Path:
     img = Image.new("RGBA", (target_w, target_h), bg_rgba)
+    img = _apply_corner_glow(img, accent_hex)
     draw = ImageDraw.Draw(img)
 
     half = target_w // 2
@@ -604,6 +654,7 @@ def render_versus(
     right_icon: str = "",
 ) -> Path:
     img = Image.new("RGBA", (target_w, target_h), bg_rgba)
+    img = _apply_corner_glow(img, accent_hex)
     draw = ImageDraw.Draw(img)
     accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
 
@@ -700,6 +751,7 @@ def render_typography_broll(
     bg_rgba: tuple[int, int, int, int] = (10, 10, 10, 255),
 ) -> Path:
     img = Image.new("RGBA", (target_w, target_h), bg_rgba)
+    img = _apply_corner_glow(img, accent_hex)
     draw = ImageDraw.Draw(img)
     accent = _hex_to_rgba(accent_hex, PALETTE["blue"])
 
@@ -758,8 +810,10 @@ def render_money_counter(
     target_w: int,
     target_h: int,
     positive: bool = True,
+    accent_hex: str = "#0A84FF",
 ) -> Path:
     img = Image.new("RGBA", (target_w, target_h), (10, 10, 10, 255))
+    img = _apply_corner_glow(img, accent_hex)
     draw = ImageDraw.Draw(img)
     color = (48, 209, 88, 255) if positive else (255, 59, 48, 255)
 
@@ -1309,7 +1363,7 @@ def render_motion_graphic(
         positive = bool(spec.get("positive", True))
         render_money_counter(amount, currency, png,
                              target_w=target_w, target_h=target_h,
-                             positive=positive)
+                             positive=positive, accent_hex=accent_hex)
         if bg_card:
             _apply_bg_card(png, bg_card)
         return RenderedGraphic(
