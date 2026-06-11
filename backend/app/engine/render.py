@@ -35,8 +35,11 @@ from app.engine.graphics import (
     render_whiteboard_layout,
     render_slide_layout,
 )
-# HyperFrames removed — motion graphics use FFmpeg-native drawtext pipeline
-_HYPERFRAMES_AVAILABLE = False
+from app.engine.hyperframes_engine import (
+    generate_composition_html,
+    render_composition_to_video,
+    render_with_hyperframes,
+)
 
 
 SHORT_PAD_S    = 0.12   # 120ms — word-safe start/end buffer
@@ -1275,155 +1278,6 @@ def _health_check(src: Path) -> None:
     print(f"[HEALTH] src={src.name}  size={size_mb:.1f}MB  est_render_time=~{est_min}min")
 
 
-def _best_font() -> str:
-    """Return path to the best available bold font on this system."""
-    import os as _os
-    for _p in [
-        "/usr/local/share/fonts/leanlead/Inter-Bold.otf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-        "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-    ]:
-        if _os.path.exists(_p):
-            return _p
-    return ""
-
-
-def _dt_escape(text: str) -> str:
-    """Escape text for FFmpeg drawtext text= option."""
-    return (
-        text.replace("\\", "\\\\")
-            .replace("'", "\\'")
-            .replace(":", "\\:")
-            .replace("%", "\\%")
-    )
-
-
-def _sanitize_drawtext(text: str) -> str:
-    """Strip characters that break FFmpeg drawtext's filter parser.
-
-    Apostrophes (don't, I'm, it's) close the surrounding text='...' quote
-    early, causing FFmpeg to misparse the rest of the filter chain as a new
-    (invalid) filter name. Rather than escape them, drop them entirely.
-    """
-    if not text:
-        return ""
-    text = text.replace("'", "")
-    text = text.replace('"', "")
-    text = text.replace(":", "\\:")
-    text = text.replace(",", " ")
-    text = text.replace("\\", "")
-    return text.strip()
-
-
-def _hex_to_ffmpeg_color(hex6: str) -> str:
-    """Convert #RRGGBB to FFmpeg color string 0xRRGGBB."""
-    return "0x" + hex6.lstrip("#").upper()
-
-
-def _overlay_lower_third(
-    content: dict,
-    at: float,
-    dur: float,
-    brand_color: str,
-    font: str,
-    target_w: int,
-    target_h: int,
-) -> str:
-    """FFmpeg filter chain for a lower-third name+role overlay."""
-    name = _sanitize_drawtext(str(content.get("name", content.get("text", ""))))
-    role = _sanitize_drawtext(str(content.get("role", content.get("label", ""))))
-    farg  = f":fontfile={font}" if font else ""
-    col   = _hex_to_ffmpeg_color(brand_color)
-    ns    = max(28, target_h // 36)
-    rs    = max(20, target_h // 52)
-    et    = f"between(t,{at:.3f},{at+dur:.3f})"
-    box_y = int(target_h * 0.79)
-    box_w = int(target_w * 0.6)
-    box_h = int(target_h * 0.15)
-    tx    = int(target_w * 0.04)
-    ty_n  = int(target_h * 0.82)
-    ty_r  = ty_n + ns + 8
-    return ",".join([
-        f"drawbox=x=0:y={box_y}:w={box_w}:h={box_h}:color=0x000000CC:t=fill:enable='{et}'",
-        f"drawtext=text='{name}'{farg}:fontcolor=white:fontsize={ns}:x={tx}:y={ty_n}:enable='{et}'",
-        f"drawtext=text='{role}'{farg}:fontcolor={col}:fontsize={rs}:x={tx}:y={ty_r}:enable='{et}'",
-    ])
-
-
-def _overlay_stat(
-    content: dict,
-    at: float,
-    dur: float,
-    brand_color: str,
-    font: str,
-    target_w: int,
-    target_h: int,
-) -> str:
-    """FFmpeg filter chain for a stat number+label overlay."""
-    number = _sanitize_drawtext(str(content.get("number", "")))
-    label  = _sanitize_drawtext(str(content.get("label", "")).upper())
-    farg   = f":fontfile={font}" if font else ""
-    col    = _hex_to_ffmpeg_color(brand_color)
-    ns     = max(80, target_h // 10)
-    ls     = max(24, target_h // 40)
-    et     = f"between(t,{at:.3f},{at+dur:.3f})"
-    box_x  = int(target_w * 0.15)
-    box_y  = int(target_h * 0.05)
-    box_w  = int(target_w * 0.70)
-    box_h  = int(target_h * 0.25)
-    num_y  = int(target_h * 0.07)
-    lbl_y  = num_y + ns + 8
-    cx     = "(w-text_w)/2"
-    return ",".join([
-        f"drawbox=x={box_x}:y={box_y}:w={box_w}:h={box_h}:color=0x000000D9:t=fill:enable='{et}'",
-        f"drawtext=text='{number}'{farg}:fontcolor={col}:fontsize={ns}:x={cx}:y={num_y}:enable='{et}'",
-        f"drawtext=text='{label}'{farg}:fontcolor=white:fontsize={ls}:x={cx}:y={lbl_y}:enable='{et}'",
-    ])
-
-
-def _overlay_kinetic(
-    content: dict,
-    at: float,
-    dur: float,
-    brand_color: str,
-    font: str,
-    target_w: int,
-    target_h: int,
-) -> str:
-    """FFmpeg filter chain for key_phrase/kinetic text overlay."""
-    phrase  = _sanitize_drawtext(str(content.get("phrase", content.get("text", ""))))
-    ctx     = _sanitize_drawtext(str(content.get("context", "")))
-    farg    = f":fontfile={font}" if font else ""
-    col     = _hex_to_ffmpeg_color(brand_color)
-    ps      = max(48, target_h // 16)
-    cs      = max(22, target_h // 48)
-    et      = f"between(t,{at:.3f},{at+dur:.3f})"
-    bar_y   = int(target_h * 0.65)
-    bar_h   = int(target_h * 0.15)
-    text_y  = bar_y + int(bar_h * 0.15)
-    label_y = text_y + cs + 12
-    parts   = [
-        f"drawbox=x=0:y={bar_y}:w={target_w}:h={bar_h}:color=0x000000CC:t=fill:enable='{et}'",
-    ]
-    if ctx:
-        parts.append(
-            f"drawtext=text='{ctx}'{farg}:fontcolor=white@0.75:fontsize={cs}"
-            f":x=(w-text_w)/2:y={text_y}:enable='{et}'"
-        )
-        parts.append(
-            f"drawtext=text='{phrase}'{farg}:fontcolor={col}:fontsize={ps}"
-            f":x=(w-text_w)/2:y={label_y}:enable='{et}'"
-        )
-    else:
-        phrase_y = bar_y + (bar_h - ps) // 2
-        parts.append(
-            f"drawtext=text='{phrase}'{farg}:fontcolor={col}:fontsize={ps}"
-            f":x=(w-text_w)/2:y={phrase_y}:enable='{et}'"
-        )
-    return ",".join(parts)
-
-
 def render(
     src: Path,
     transcript: dict[str, Any],
@@ -2169,44 +2023,63 @@ def render(
         _overlay_intermediates.append(_current_path)
         _current_path = _next_path
 
-    # ── Motion graphics: FFmpeg-native drawtext overlays ─────────────────
+    # ── Motion graphics: HyperFrames HTML → MP4, alpha-composited overlay ─
     if remapped_motion_graphics:
-        _mg_font = _best_font()
-        _mg_filters: list[str] = []
+        _mg_dir = work_dir / "motion_graphics"
+        _mg_dir.mkdir(parents=True, exist_ok=True)
         _bc = brand_color or "#FF7751"
-        for _mg in remapped_motion_graphics:
+        for _mi, _mg in enumerate(remapped_motion_graphics):
             try:
                 _mg_at   = float(_mg.get("at", 0))
                 _mg_dur  = max(0.5, float(_mg.get("duration", 2.5)))
-                _mg_type = str(_mg.get("type", "key_phrase"))
-                _mg_cont = _mg.get("content") or {}
-                if _mg_type == "lower_third":
-                    _filt = _overlay_lower_third(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_w, target_h)
-                elif _mg_type == "stat":
-                    _filt = _overlay_stat(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_w, target_h)
-                else:
-                    _filt = _overlay_kinetic(_mg_cont, _mg_at, _mg_dur, _bc, _mg_font, target_w, target_h)
-                _mg_filters.append(_filt)
-                print(f"[MG] Queued {_mg_type} at t={_mg_at:.2f}s")
+                _mg_type = str(_mg.get("type", "lower_third"))
+                _mg_content = {
+                    "text":    _mg.get("text", ""),
+                    "subtext": _mg.get("subtext", ""),
+                    "style":   _mg.get("style", "momentum"),
+                }
+                _mg_html = generate_composition_html(
+                    _mg_type, _mg_content, _mg_dur, target_w, target_h, _bc,
+                )
+                _mg_html_path = _mg_dir / f"mg{_mi:02d}.html"
+                _mg_html_path.write_text(_mg_html, encoding="utf-8")
+                _mg_clip_path = _mg_dir / f"mg{_mi:02d}.mp4"
+                _rendered = render_with_hyperframes(
+                    _mg_html_path, _mg_clip_path, target_w, target_h, fps,
+                )
+                if not _rendered:
+                    _rendered = render_composition_to_video(
+                        _mg_html, _mg_clip_path, _mg_dur, target_w, target_h, fps=fps, work_dir=_mg_dir,
+                    )
+                if not _rendered or not _mg_clip_path.exists():
+                    print(f"[MG] {_mg_type} #{_mi} skipped: render failed")
+                    continue
+
+                _next_path = _tmp_dir / f"mg{_mi}_{output_path.stem}.mp4"
+                _fc_mg = (
+                    f"[1:v]setpts=PTS+{_mg_at:.3f}/TB[mg];"
+                    f"[0:v][mg]overlay=x=0:y=0"
+                    f":enable='between(t,{_mg_at:.3f},{_mg_at + _mg_dur:.3f})':format=auto[out]"
+                )
+                _run([
+                    FFMPEG_PATH, "-y", "-loglevel", "error",
+                    "-i", str(_current_path),
+                    "-i", str(_mg_clip_path),
+                    "-filter_complex", _fc_mg,
+                    "-map", "[out]", "-map", "0:a",
+                    "-vsync", "cfr",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
+                    "-threads", "4",
+                    "-x264-params", "rc-lookahead=0:bframes=0",
+                    "-pix_fmt", "yuv420p",
+                    "-c:a", "copy",
+                    str(_next_path),
+                ])
+                _overlay_intermediates.append(_current_path)
+                _current_path = _next_path
+                print(f"[MG] {_mg_type} #{_mi} overlaid at t={_mg_at:.2f}s")
             except Exception as _mge:
-                print(f"[MG] Graphic skipped: {_mge}")
-        if _mg_filters:
-            _mg_path = _tmp_dir / f"mg_{output_path.stem}.mp4"
-            _run([
-                FFMPEG_PATH, "-y", "-loglevel", "error",
-                "-i", str(_current_path),
-                "-vf", ",".join(_mg_filters),
-                "-vsync", "cfr",
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
-                "-threads", "4",
-                "-x264-params", "rc-lookahead=0:bframes=0",
-                "-pix_fmt", "yuv420p",
-                "-c:a", "copy",
-                str(_mg_path),
-            ])
-            _overlay_intermediates.append(_current_path)
-            _current_path = _mg_path
-            print(f"[MG] {len(_mg_filters)} graphic(s) overlaid")
+                print(f"[MG] Graphic #{_mi} skipped: {_mge}")
 
     _nocap_path = _current_path
 

@@ -12,6 +12,7 @@ advances the Chromium clock so animations settle before the screenshot.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -48,6 +49,33 @@ def is_hyperframes_available() -> bool:
         return False
 
 
+def render_with_hyperframes(html_path: Path, output_path: Path, width: int, height: int, fps: int) -> bool:
+    """Render a standalone HTML composition to a transparent MP4 via the HyperFrames CLI."""
+    npx = _find(_NPX_BINS) or "npx"
+    try:
+        result = subprocess.run(
+            [
+                npx, "hyperframes", "render",
+                str(html_path),
+                "--output", str(output_path),
+                "--width", str(width),
+                "--height", str(height),
+                "--fps", str(fps),
+            ],
+            capture_output=True, text=True, timeout=120,
+        )
+    except Exception as e:
+        print(f"[HF] CLI error: {e}")
+        return False
+
+    if result.returncode == 0 and Path(output_path).exists():
+        print(f"[HF] Rendered: {output_path}")
+        return True
+
+    print(f"[HF] CLI failed: {result.stderr[:200]}")
+    return False
+
+
 # ── HTML generation (GSAP compositions) ──────────────────────────────────────
 
 def _esc(t: str) -> str:
@@ -57,6 +85,23 @@ def _esc(t: str) -> str:
          .replace(">", "&gt;")
          .replace('"', "&quot;")
     )
+
+
+def _style_palette(style: str, brand_color: str) -> dict:
+    """Theme tokens for the motion-board graphic styles.
+
+    momentum  → Anton, uppercase, lime accent on black (matches captions._build_momentum_ass)
+    priestley → Inter, gold accent on burgundy/cream (matches captions._build_priestley_ass)
+    """
+    if style == "priestley":
+        return {
+            "font": "Inter", "weight": "800", "transform": "none",
+            "text": "#FDFBF7", "accent": "#FFDE4D", "bg": "#2B080C",
+        }
+    return {
+        "font": "Anton", "weight": "900", "transform": "uppercase",
+        "text": "#FFFFFF", "accent": brand_color or "#CCFF00", "bg": "#000000",
+    }
 
 
 def generate_composition_html(
@@ -69,6 +114,101 @@ def generate_composition_html(
     font: str = "Inter",
 ) -> str:
     """Return GSAP-animated HTML for a motion graphic overlay."""
+
+    if graphic_type == "kinetic_title":
+        text = _esc(str(content.get("text", "")).upper())
+        subtext = _esc(str(content.get("subtext", "")))
+        pal = _style_palette(str(content.get("style", "momentum")), brand_color)
+        sub_div = f'<div class="subtitle" id="st">{subtext}</div>' if subtext else ""
+        sub_js = (
+            f'gsap.to("#st",{{opacity:1,y:0,duration:0.3,delay:0.15,ease:"power2.out"}});\n'
+            f'gsap.to("#st",{{opacity:0,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");'
+            if subtext else ""
+        )
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+* {{ margin:0;padding:0;box-sizing:border-box; }}
+body {{
+    width:{width}px;height:{height}px;background:transparent;overflow:hidden;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:{int(height*0.025)}px;
+}}
+.title {{
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.11)}px;font-weight:{pal["weight"]};
+    color:{pal["text"]};text-transform:{pal["transform"]};text-align:center;line-height:1.05;
+    max-width:{int(width*0.86)}px;opacity:0;transform:scale(0.9);
+    text-shadow:0 4px 24px rgba(0,0,0,0.6);
+}}
+.subtitle {{
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.04)}px;font-weight:700;
+    color:{pal["accent"]};text-transform:{pal["transform"]};text-align:center;
+    letter-spacing:0.06em;opacity:0;transform:translateY(16px);
+}}
+</style>
+</head>
+<body data-duration="{duration:.3f}">
+<div class="title" id="t">{text}</div>
+{sub_div}
+<script>
+gsap.timeline()
+  .to("#t",{{opacity:1,scale:1,duration:0.35,ease:"back.out(1.7)"}})
+  .to("#t",{{opacity:0,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");
+{sub_js}
+</script>
+</body>
+</html>"""
+
+    if graphic_type == "stat_card":
+        text = _esc(str(content.get("text", "")))
+        subtext = _esc(str(content.get("subtext", "")).upper())
+        pal = _style_palette(str(content.get("style", "momentum")), brand_color)
+        sub_div = f'<div class="label" id="lb">{subtext}</div>' if subtext else ""
+        sub_js = (
+            'gsap.to("#lb",{opacity:1,y:0,duration:0.3,delay:0.2,ease:"power2.out"});'
+            if subtext else ""
+        )
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+* {{ margin:0;padding:0;box-sizing:border-box; }}
+body {{ width:{width}px;height:{height}px;background:transparent;overflow:hidden;
+        display:flex;align-items:center;justify-content:center; }}
+.card {{
+    background:{pal["bg"]}E6;border-radius:28px;padding:{int(height*0.05)}px {int(width*0.07)}px;
+    text-align:center;border:2px solid {pal["accent"]}55;
+    opacity:0;transform:scale(0.8);
+}}
+.number {{
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.18)}px;font-weight:{pal["weight"]};
+    color:{pal["accent"]};line-height:1;text-shadow:0 0 40px {pal["accent"]}66;
+}}
+.label {{
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.035)}px;font-weight:700;
+    color:{pal["text"]};text-transform:{pal["transform"]};letter-spacing:0.1em;
+    margin-top:{int(height*0.015)}px;opacity:0;transform:translateY(10px);
+}}
+</style>
+</head>
+<body data-duration="{duration:.3f}">
+<div class="card" id="c">
+    <div class="number">{text}</div>
+    {sub_div}
+</div>
+<script>
+gsap.timeline()
+  .to("#c",{{opacity:1,scale:1,duration:0.4,ease:"back.out(1.7)"}})
+  .to("#c",{{opacity:0,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");
+{sub_js}
+</script>
+</body>
+</html>"""
 
     if graphic_type == "title_card":
         text = _esc(str(content.get("text", "")).upper())
@@ -250,8 +390,18 @@ gsap.fromTo("#b",{{x:-{width*1.2},rotation:-4}},{{x:0,rotation:-4,duration:0.5,e
 </html>"""
 
     if graphic_type == "step_diagram":
-        step  = _esc(str(content.get("step", "01")))
-        title = _esc(str(content.get("title", content.get("text", ""))).upper())
+        raw_text = str(content.get("text", ""))
+        subtext = _esc(str(content.get("subtext", "")))
+        pal = _style_palette(str(content.get("style", "momentum")), brand_color)
+        m = re.search(r"\d+", raw_text)
+        step_num = m.group(0) if m else "•"
+        title = _esc(raw_text.upper())
+        sub_div = f'<div class="desc" id="d">{subtext}</div>' if subtext else ""
+        sub_js = (
+            f'gsap.to("#d",{{opacity:1,y:0,duration:0.35,delay:0.25,ease:"power2.out"}});\n'
+            f'gsap.to("#d",{{opacity:0,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");'
+            if subtext else ""
+        )
         return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -259,35 +409,37 @@ gsap.fromTo("#b",{{x:-{width*1.2},rotation:-4}},{{x:0,rotation:-4,duration:0.5,e
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <style>
 * {{ margin:0;padding:0;box-sizing:border-box; }}
-html,body {{ width:{width}px;height:{height}px;overflow:hidden;background:#0D0D0D; }}
-body {{ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:{int(height*0.04)}px; }}
-.step {{
-    font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.05)}px;font-weight:900;
-    color:{brand_color};letter-spacing:0.3em;opacity:0;transform:translateY(-20px);
-}}
-.icon {{
-    width:{int(height*0.24)}px;height:{int(height*0.24)}px;border-radius:50%;
-    border:4px solid {brand_color};display:flex;align-items:center;justify-content:center;
-    opacity:0;transform:scale(0.6);
-}}
-.icon::before {{
-    content:'';width:46%;height:46%;border-radius:50%;background:{brand_color};
-    box-shadow:0 0 30px {brand_color}99;
+body {{ width:{width}px;height:{height}px;background:transparent;overflow:hidden;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:{int(height*0.03)}px; }}
+.badge {{
+    width:{int(height*0.16)}px;height:{int(height*0.16)}px;border-radius:50%;
+    background:{pal["accent"]};display:flex;align-items:center;justify-content:center;
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.07)}px;font-weight:{pal["weight"]};
+    color:{pal["bg"]};opacity:0;transform:scale(0.6);
+    box-shadow:0 0 30px {pal["accent"]}80;
 }}
 .title {{
-    font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.045)}px;font-weight:800;
-    color:#fff;text-align:center;max-width:{int(width*0.8)}px;opacity:0;transform:translateY(20px);
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.05)}px;font-weight:{pal["weight"]};
+    color:{pal["text"]};text-transform:{pal["transform"]};text-align:center;
+    max-width:{int(width*0.8)}px;opacity:0;transform:translateY(20px);
+}}
+.desc {{
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.03)}px;font-weight:600;
+    color:{pal["accent"]};text-align:center;max-width:{int(width*0.7)}px;
+    opacity:0;transform:translateY(15px);
 }}
 </style>
 </head>
-<body data-duration="{duration}">
-<div class="step" id="s">STEP {step}</div>
-<div class="icon" id="i"></div>
+<body data-duration="{duration:.3f}">
+<div class="badge" id="b">{step_num}</div>
 <div class="title" id="t">{title}</div>
+{sub_div}
 <script>
-gsap.to("#s",{{opacity:1,y:0,duration:0.35,ease:"power2.out"}});
-gsap.to("#i",{{opacity:1,scale:1,duration:0.45,delay:0.1,ease:"back.out(1.6)"}});
-gsap.to("#t",{{opacity:1,y:0,duration:0.4,delay:0.2,ease:"power2.out"}});
+gsap.timeline()
+  .to("#b",{{opacity:1,scale:1,duration:0.4,ease:"back.out(1.7)"}})
+  .to("#t",{{opacity:1,y:0,duration:0.35,ease:"power2.out"}},"-=0.15")
+  .to(["#b","#t"],{{opacity:0,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");
+{sub_js}
 </script>
 </body>
 </html>"""
@@ -422,9 +574,11 @@ body {{ display:flex;align-items:flex-end;justify-content:flex-start;
 </body>
 </html>"""
 
-    # Transparent fallback (lower_third or unknown type)
-    name = _esc(str(content.get("name", content.get("text", ""))))
-    role = _esc(str(content.get("role", content.get("label", ""))))
+    # lower_third (and fallback for unknown types) — text/subtext schema
+    text = _esc(str(content.get("text", content.get("name", ""))))
+    subtext = _esc(str(content.get("subtext", content.get("role", ""))))
+    pal = _style_palette(str(content.get("style", "momentum")), brand_color)
+    sub_div = f'<div class="subtext" id="sub">{subtext}</div>' if subtext else ""
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -432,17 +586,30 @@ body {{ display:flex;align-items:flex-end;justify-content:flex-start;
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <style>
 * {{ margin:0;padding:0;box-sizing:border-box; }}
-html,body {{ width:{width}px;height:{height}px;overflow:hidden;background:transparent; }}
-body {{ display:flex;align-items:flex-end;padding:0 {int(width*0.05)}px {int(height*0.10)}px; }}
-.lower {{ background:rgba(0,0,0,0.80);border-left:4px solid {brand_color};
-          padding:12px 20px;border-radius:4px 8px 8px 4px;opacity:0; }}
-.name {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.04)}px;font-weight:700;color:#fff; }}
-.role {{ font-family:'{font}',Inter,sans-serif;font-size:{int(height*0.025)}px;color:{brand_color};margin-top:4px; }}
+body {{ width:{width}px;height:{height}px;background:transparent;overflow:hidden;
+        display:flex;align-items:flex-end;padding:0 {int(width*0.05)}px {int(height*0.10)}px; }}
+.lower {{
+    background:{pal["bg"]}E6;border-left:6px solid {pal["accent"]};
+    padding:{int(height*0.018)}px {int(width*0.025)}px;border-radius:4px 10px 10px 4px;
+    opacity:0;transform:translateX(-30px);
+}}
+.text {{
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.04)}px;font-weight:{pal["weight"]};
+    color:{pal["text"]};text-transform:{pal["transform"]};
+}}
+.subtext {{
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.025)}px;font-weight:600;
+    color:{pal["accent"]};margin-top:4px;
+}}
 </style>
 </head>
-<body data-duration="{duration}">
-<div class="lower" id="lt"><div class="name">{name}</div><div class="role">{role}</div></div>
-<script>gsap.to("#lt",{{opacity:1,y:0,duration:0.35,ease:"power2.out"}});</script>
+<body data-duration="{duration:.3f}">
+<div class="lower" id="lt"><div class="text">{text}</div>{sub_div}</div>
+<script>
+gsap.timeline()
+  .to("#lt",{{opacity:1,x:0,duration:0.35,ease:"power2.out"}})
+  .to("#lt",{{opacity:0,x:-30,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");
+</script>
 </body>
 </html>"""
 

@@ -667,6 +667,18 @@ Return all of them as `motion_graphics`: list of objects with `at`,
 `duration`, `kind`, plus the kind-specific fields above.
 """
 
+MOTION_BOARD_RULES = """\
+MOTION BOARD RULES:
+- Create 1 motion graphic every 5-7 seconds
+- Each graphic must appear exactly when speaker says the trigger_word
+- Duration must not exceed the time until next sentence
+- Types to use based on content:
+  * kinetic_title: for the hook statement (first 5s)
+  * stat_card: when speaker mentions a number ($X, X%, X years)
+  * lower_third: for key phrases and concepts
+  * step_diagram: when speaker says 'step 1', 'first', 'second', etc.
+"""
+
 VISUAL_STYLES = """\
 VISUAL STYLES — three cinematic layouts for high-impact moments
 
@@ -1520,21 +1532,23 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
   /* DISABLED */
   "visual_style_moments": [],
 
-  /* motion_graphics: REQUIRED — minimum 1 per keep_segment for short-form.
-     For a 40-second video: 6-8 motion graphics minimum.
-     Every 4-5 seconds there must be EITHER a b-roll clip OR a motion graphic.
-     Never go 5+ seconds with just talking head and no visual element.
-     Each entry MUST have: at (source timestamp), duration (0.5–3.0s), type, content.
-     type "title_card"  — hook statement or chapter title (max 1 per video)
-     type "stat"        — when speaker says a specific number/stat; content: {number, label, context}
-     type "key_phrase"  — most powerful line; content: {phrase, context}
-     type "checklist"   — when speaker lists 2–5 items; content: {title, items:[]}
-     type "lower_third" — speaker introduction; content: {name, role}
-     NEVER place a graphic during: hook (first 3s), payoff/emotional_end beats, b-roll windows.
+  /* motion_graphics: the MOTION BOARD — a list of animation beats rendered
+     via real HyperFrames HTML→MP4 compositions and alpha-composited onto
+     the video. See MOTION BOARD RULES for placement/timing/type guidance.
+     Each entry MUST have: at, duration, type, text, subtext, style, trigger_word.
+       at           — output-timeline timestamp (seconds) when the graphic appears
+       duration     — seconds on screen; must not exceed time until next sentence
+       type         — "kinetic_title" | "stat_card" | "lower_third" | "step_diagram"
+       text         — exact text to display (verbatim or tightly derived from transcript)
+       subtext      — smaller supporting text below `text` (can be "")
+       style        — matches the active editing_style: "momentum" | "priestley"
+       trigger_word — the exact word being spoken when this graphic appears
   */
   "motion_graphics": [
-    { "at": <s>, "duration": 2.0, "type": "stat", "content": { "number": "65%", "label": "fail in 10 years", "context": "" } }
-    /* MAX 8 entries. Minimum 6 for a 40s+ video. */
+    { "at": <s>, "duration": 2.5, "type": "kinetic_title"|"stat_card"|"lower_third"|"step_diagram",
+      "text": "<exact text to display>", "subtext": "<smaller supporting text>",
+      "style": "momentum"|"priestley", "trigger_word": "<word being said when this appears>" }
+    /* 1 graphic every 5–7 seconds. See MOTION BOARD RULES. */
   ],
 
   "caption_emphasis_words": ["<word>", "<word>", ...],
@@ -1980,6 +1994,7 @@ def system_prompt(
         ZOOM_SYSTEM,
         CAPTION_RULES,
         HYPERFRAMES,
+        MOTION_BOARD_RULES,
         CLONED_STYLE,
         BROLL_RULES,
         SOUND_DESIGN,
