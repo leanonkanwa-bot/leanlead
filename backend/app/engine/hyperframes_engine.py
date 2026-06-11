@@ -104,6 +104,209 @@ def _style_palette(style: str, brand_color: str) -> dict:
     }
 
 
+def prompt_to_gsap_config(prompt: str) -> dict:
+    """Parse a natural-language hf_prompt into GSAP/CSS animation parameters.
+
+    Recognizes entry/exit animation keywords, position, background (color,
+    opacity, frosted-glass blur), hex colors, font-size as % of frame height,
+    and explicit cubic-bezier/ms timing — falling back to sane defaults for
+    anything not mentioned in the prompt.
+    """
+    p = (prompt or "").lower()
+    cfg: dict = {
+        "entry_ease": "power2.out",
+        "entry_from": {"opacity": 0},
+        "exit_ease": "power2.in",
+        "exit_to": {"opacity": 0},
+        "position": "center",
+        "bg_color": None,
+        "blur": False,
+        "text_color": None,
+        "accent_color": None,
+        "font_size_pct": None,
+        "entry_duration": 0.3,
+        "exit_duration": 0.2,
+    }
+
+    # ── Entry animation ──────────────────────────────────────────────────
+    if "slam" in p or "pop" in p:
+        cfg["entry_ease"] = "back.out(1.7)"
+        cfg["entry_from"]["scale"] = 0.8
+    if "bounce" in p:
+        cfg["entry_ease"] = "elastic.out(1, 0.3)"
+        cfg["entry_from"].setdefault("scale", 0.8)
+    if re.search(r"slides?\s+(?:up\s+)?from\s+(?:the\s+)?bottom|slides?\s+up", p):
+        cfg["entry_from"]["y"] = 50
+    elif re.search(r"slides?\s+(?:down\s+)?from\s+(?:the\s+)?top|slides?\s+down", p):
+        cfg["entry_from"]["y"] = -50
+    if re.search(r"slides?\s+(?:in\s+)?from\s+(?:the\s+)?left", p):
+        cfg["entry_from"]["x"] = -100
+    elif re.search(r"slides?\s+(?:in\s+)?from\s+(?:the\s+)?right", p):
+        cfg["entry_from"]["x"] = 100
+    if "fade" in p:
+        cfg["entry_from"].setdefault("opacity", 0)
+
+    m = re.search(r"cubic-bezier\(\s*([\d.,\s]+?)\s*\)", prompt, re.I)
+    if m:
+        cfg["entry_ease"] = f"cubic-bezier({m.group(1)})"
+
+    # ── Exit animation ───────────────────────────────────────────────────
+    if "slide" in p and ("back down" in p or "down on exit" in p or "slides down" in p):
+        cfg["exit_to"]["y"] = 50
+    if "scale down" in p or "scales down" in p:
+        cfg["exit_to"]["scale"] = 0.85
+    if "instant" in p and "cut" in p:
+        cfg["exit_duration"] = 0.0
+
+    # ── Position ─────────────────────────────────────────────────────────
+    if "top-left" in p or "top left" in p:
+        cfg["position"] = "top_left"
+    elif "top-right" in p or "top right" in p:
+        cfg["position"] = "top_right"
+    elif "bottom-left" in p or "bottom left" in p:
+        cfg["position"] = "bottom_left"
+    elif "bottom-right" in p or "bottom right" in p:
+        cfg["position"] = "bottom_right"
+    elif "bottom" in p:
+        cfg["position"] = "bottom_center"
+    elif "top" in p:
+        cfg["position"] = "top_center"
+
+    # ── Background ───────────────────────────────────────────────────────
+    if "frosted glass" in p or "backdrop-filter" in p or "glass" in p:
+        cfg["blur"] = True
+    m = re.search(r"rgba?\([^)]+\)", prompt, re.I)
+    if m:
+        cfg["bg_color"] = m.group(0)
+
+    # ── Colors ───────────────────────────────────────────────────────────
+    hexes = re.findall(r"#[0-9a-fA-F]{6}", prompt)
+    if hexes:
+        cfg["text_color"] = hexes[0]
+        if len(hexes) > 1:
+            cfg["accent_color"] = hexes[1]
+
+    # ── Typography size ──────────────────────────────────────────────────
+    m = re.search(r"(\d+(?:\.\d+)?)\s*%\s*(?:of\s+(?:the\s+)?)?frame\s+height", prompt, re.I)
+    if m:
+        cfg["font_size_pct"] = float(m.group(1)) / 100.0
+
+    # ── Timing (explicit ms overrides for entry/exit) ───────────────────
+    durs_ms = re.findall(r"(\d+)\s*ms", prompt, re.I)
+    if durs_ms:
+        cfg["entry_duration"] = int(durs_ms[0]) / 1000.0
+        if len(durs_ms) > 1:
+            cfg["exit_duration"] = int(durs_ms[-1]) / 1000.0
+
+    return cfg
+
+
+def _render_from_prompt(content: dict, duration: float, width: int, height: int, brand_color: str) -> str:
+    """Render a motion graphic driven by a rich `hf_prompt` description."""
+    cfg = prompt_to_gsap_config(str(content.get("hf_prompt", "")))
+    text = _esc(str(content.get("text", "")))
+    subtext = _esc(str(content.get("subtext", "")))
+    pal = _style_palette(str(content.get("style", "momentum")), brand_color)
+
+    text_color = cfg["text_color"] or pal["text"]
+    accent_color = cfg["accent_color"] or pal["accent"]
+    font_size = max(1, int(height * (cfg["font_size_pct"] or 0.08)))
+    entry_dur = cfg["entry_duration"]
+    exit_dur = cfg["exit_duration"]
+
+    align_map = {
+        "top_left":      ("flex-start", "flex-start"),
+        "top_center":    ("center", "flex-start"),
+        "top_right":     ("flex-end", "flex-start"),
+        "center":        ("center", "center"),
+        "bottom_left":   ("flex-start", "flex-end"),
+        "bottom_center": ("center", "flex-end"),
+        "bottom_right":  ("flex-end", "flex-end"),
+    }
+    justify_content, align_items = align_map.get(cfg["position"], ("center", "center"))
+
+    bg_color = cfg["bg_color"] or "transparent"
+    blur_css = (
+        "backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);"
+        if cfg["blur"] else ""
+    )
+
+    entry_from = cfg["entry_from"]
+    transforms = []
+    if "x" in entry_from:
+        transforms.append(f"translateX({entry_from['x']}px)")
+    if "y" in entry_from:
+        transforms.append(f"translateY({entry_from['y']}px)")
+    if "scale" in entry_from:
+        transforms.append(f"scale({entry_from['scale']})")
+    initial_transform = " ".join(transforms) if transforms else "none"
+    initial_opacity = entry_from.get("opacity", 0)
+
+    entry_props = ["opacity:1"]
+    if "x" in entry_from:
+        entry_props.append("x:0")
+    if "y" in entry_from:
+        entry_props.append("y:0")
+    if "scale" in entry_from:
+        entry_props.append("scale:1")
+    entry_props.append(f"duration:{entry_dur:.3f}")
+    entry_props.append(f'ease:"{cfg["entry_ease"]}"')
+
+    exit_to = dict(cfg["exit_to"])
+    exit_to.setdefault("opacity", 0)
+    exit_props = [f"{k}:{v}" for k, v in exit_to.items()]
+    exit_props.append(f"duration:{exit_dur:.3f}")
+    exit_props.append(f'ease:"{cfg["exit_ease"]}"')
+
+    sub_html = f'<div class="hf-sub" id="hsub">{subtext}</div>' if subtext else ""
+    sub_js = (
+        f'gsap.to("#hsub",{{opacity:1,duration:{entry_dur:.3f},delay:0.1,ease:"power2.out"}});\n'
+        f'gsap.to("#hsub",{{opacity:0,duration:{exit_dur:.3f},ease:"power2.in"}},"{duration:.3f}-{exit_dur:.3f}");'
+        if subtext else ""
+    )
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+* {{ margin:0;padding:0;box-sizing:border-box; }}
+body {{
+    width:{width}px;height:{height}px;background:transparent;overflow:hidden;
+    display:flex;align-items:{align_items};justify-content:{justify_content};
+    padding:{int(height*0.06)}px {int(width*0.06)}px;
+}}
+.hf-card {{
+    background:{bg_color};{blur_css}
+    border-radius:20px;padding:{int(height*0.025)}px {int(width*0.03)}px;
+    opacity:{initial_opacity};transform:{initial_transform};
+    text-align:center;
+}}
+.hf-text {{
+    font-family:'{pal["font"]}',sans-serif;font-size:{font_size}px;font-weight:{pal["weight"]};
+    color:{text_color};text-transform:{pal["transform"]};line-height:1.1;
+}}
+.hf-sub {{
+    font-family:'{pal["font"]}',sans-serif;font-size:{int(font_size*0.35)}px;font-weight:600;
+    color:{accent_color};margin-top:{int(height*0.012)}px;opacity:0;
+}}
+</style>
+</head>
+<body data-duration="{duration:.3f}">
+<div class="hf-card" id="hf">
+  <div class="hf-text" id="hft">{text}</div>
+  {sub_html}
+</div>
+<script>
+gsap.to("#hf",{{{",".join(entry_props)}}});
+gsap.to("#hf",{{{",".join(exit_props)}}},"{duration:.3f}-{exit_dur:.3f}");
+{sub_js}
+</script>
+</body>
+</html>"""
+
+
 def generate_composition_html(
     graphic_type: str,
     content: dict,
@@ -114,6 +317,9 @@ def generate_composition_html(
     font: str = "Inter",
 ) -> str:
     """Return GSAP-animated HTML for a motion graphic overlay."""
+
+    if content.get("hf_prompt"):
+        return _render_from_prompt(content, duration, width, height, brand_color)
 
     if graphic_type == "kinetic_title":
         text = _esc(str(content.get("text", "")).upper())

@@ -2034,9 +2034,10 @@ def render(
                 _mg_dur  = max(0.5, float(_mg.get("duration", 2.5)))
                 _mg_type = str(_mg.get("type", "lower_third"))
                 _mg_content = {
-                    "text":    _mg.get("text", ""),
-                    "subtext": _mg.get("subtext", ""),
-                    "style":   _mg.get("style", "momentum"),
+                    "text":      _mg.get("text", ""),
+                    "subtext":   _mg.get("subtext", ""),
+                    "style":     _mg.get("style", "momentum"),
+                    "hf_prompt": _mg.get("hf_prompt", ""),
                 }
                 _mg_html = generate_composition_html(
                     _mg_type, _mg_content, _mg_dur, target_w, target_h, _bc,

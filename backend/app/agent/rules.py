@@ -679,6 +679,42 @@ MOTION BOARD RULES:
   * step_diagram: when speaker says 'step 1', 'first', 'second', etc.
 """
 
+HYPERFRAMES_PROMPT_GUIDE = """\
+MOTION GRAPHIC PROMPT RULES:
+For each motion_graphic, write a hf_prompt that includes:
+1. ENTRY: How does it appear? (slide from direction, scale pop, fade, slam)
+2. TYPOGRAPHY: Font size (as % of frame height), weight, color (hex),
+   text transform, letter spacing
+3. BACKGROUND: Color, opacity, blur (frosted glass = backdrop-filter blur)
+4. POSITION: Exact position on screen (top/center/bottom + left/center/right)
+5. TIMING: Entry duration (ms), hold duration, exit duration (ms)
+6. EXIT: How does it leave? (fade, slide out, scale down, cut)
+7. STYLE REFERENCE: Which aesthetic?
+   (liquid glass, bold kinetic, minimal corporate, neon glow, etc.)
+
+QUALITY EXAMPLES:
+
+GOOD PROMPT (stat card):
+"Dark pill-shaped card (rgba 0,0,0,0.85, border-radius 20px) appears at
+top-left corner (x=5%, y=5%) with a scale pop from 0.8 to 1.0 over 300ms
+using back.out easing. Shows '$200' in brand color at 18% frame height,
+font-weight 900, then 'per year' in white at 4% frame height below.
+Subtle brand color glow (box-shadow 0 0 30px brand_color at 40% opacity).
+Hold for 1.8s. Exit: fade to 0 over 200ms."
+
+GOOD PROMPT (key phrase lower third):
+"Full-width bar at bottom 15% of frame. Background: linear gradient
+from brand_color at 90% opacity to transparent. Bar slides up from
+below in 250ms cubic-bezier(0.16,1,0.3,1). Text centered: small
+context label in white 60% opacity at 2.5% height, large phrase
+in white bold at 6% height. Both appear with staggered fade
+(context first, phrase 100ms later). Duration 2.5s. Bar slides
+back down on exit over 200ms."
+
+BAD PROMPT (too generic):
+"Show the text 10 MILES in the center"
+"""
+
 VISUAL_STYLES = """\
 VISUAL STYLES — three cinematic layouts for high-impact moments
 
@@ -1534,8 +1570,9 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
 
   /* motion_graphics: the MOTION BOARD — a list of animation beats rendered
      via real HyperFrames HTML→MP4 compositions and alpha-composited onto
-     the video. See MOTION BOARD RULES for placement/timing/type guidance.
-     Each entry MUST have: at, duration, type, text, subtext, style, trigger_word.
+     the video. See MOTION BOARD RULES + MOTION GRAPHIC PROMPT RULES for
+     placement/timing/type/prompt guidance.
+     Each entry MUST have: at, duration, type, text, subtext, style, trigger_word, hf_prompt.
        at           — output-timeline timestamp (seconds) when the graphic appears
        duration     — seconds on screen; must not exceed time until next sentence
        type         — "kinetic_title" | "stat_card" | "lower_third" | "step_diagram"
@@ -1543,11 +1580,15 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
        subtext      — smaller supporting text below `text` (can be "")
        style        — matches the active editing_style: "momentum" | "priestley"
        trigger_word — the exact word being spoken when this graphic appears
+       hf_prompt    — a RICH 3-5 sentence natural-language description of the
+                      animation (entry, typography, background, position, timing,
+                      exit). See MOTION GRAPHIC PROMPT RULES.
   */
   "motion_graphics": [
     { "at": <s>, "duration": 2.5, "type": "kinetic_title"|"stat_card"|"lower_third"|"step_diagram",
       "text": "<exact text to display>", "subtext": "<smaller supporting text>",
-      "style": "momentum"|"priestley", "trigger_word": "<word being said when this appears>" }
+      "style": "momentum"|"priestley", "trigger_word": "<word being said when this appears>",
+      "hf_prompt": "<rich 3-5 sentence animation description — see MOTION GRAPHIC PROMPT RULES>" }
     /* 1 graphic every 5–7 seconds. See MOTION BOARD RULES. */
   ],
 
@@ -1995,6 +2036,7 @@ def system_prompt(
         CAPTION_RULES,
         HYPERFRAMES,
         MOTION_BOARD_RULES,
+        HYPERFRAMES_PROMPT_GUIDE,
         CLONED_STYLE,
         BROLL_RULES,
         SOUND_DESIGN,
