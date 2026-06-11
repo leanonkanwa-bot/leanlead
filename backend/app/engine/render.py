@@ -425,6 +425,33 @@ def _probe_av(path: Path) -> tuple[float, float]:
         return 0.0, 0.0
 
 
+def _probe_av_durations(path: Path, label: str = "") -> tuple[float, float]:
+    """Probe per-stream video/audio durations and log delta for AV-sync diagnostics.
+
+    Used to bracket every encode pass (concat, zoompan, b-roll overlay, motion
+    graphics overlay, final output) and pinpoint where video and audio
+    durations diverge.
+    """
+    import json as _json
+    try:
+        result = subprocess.run(
+            [FFPROBE_PATH, "-v", "quiet", "-print_format", "json",
+             "-show_streams", str(path)],
+            capture_output=True, text=True, timeout=20,
+        )
+        data = _json.loads(result.stdout) if result.stdout.strip() else {}
+        v_dur = a_dur = 0.0
+        for s in data.get("streams", []):
+            if s.get("codec_type") == "video":
+                v_dur = float(s.get("duration", 0) or 0)
+            elif s.get("codec_type") == "audio":
+                a_dur = float(s.get("duration", 0) or 0)
+        print(f"[AV PROBE {label}] video={v_dur:.3f}s audio={a_dur:.3f}s delta={a_dur-v_dur:+.3f}s")
+        return v_dur, a_dur
+    except Exception as _e:
+        print(f"[AV PROBE {label}] probe failed for {path.name}: {_e}")
+        return 0.0, 0.0
+
 
 def _concat_audio_xfade(parts: list[Path], dst: Path) -> None:
     """Concatenate segments with 50ms exponential audio crossfade at every cut.
@@ -1524,6 +1551,7 @@ def render(
 
     # Verify AV sync immediately after concat; capture audio duration for trim.
     _concat_v_dur, _concat_a_dur = _probe_av(concat_path)
+    _probe_av_durations(concat_path, "concat")
     _audio_expected = sum(float(s["end"]) - float(s["start"]) for s in keep
                          if float(s["end"]) > float(s["start"]))
     print(f"[AUDIO] Expected duration (plan boundaries): {_audio_expected:.3f}s")
@@ -1922,6 +1950,7 @@ def render(
         len(ok_graphics), len(remapped_silences),
     )
     _run(_cmd_p1)
+    _probe_av_durations(_base_path, "after_zoompan")
 
     # ── B-roll overlay passes (full-screen Pexels stock video) ───────────
     # For each remapped b-roll window: fetch a stock clip from Pexels,
@@ -1992,6 +2021,7 @@ def render(
             _current_path = _next_br_path
 
     print(f"[BROLL] Downloaded {_broll_clips_downloaded} clip(s) successfully")
+    _probe_av_durations(_current_path, "after_broll")
 
     # ── Overlay passes: one ffmpeg call per graphic clip ──────────────────
     for _j, (_clip_path, _rg) in enumerate(zip(graphic_clip_paths, ok_graphics)):
@@ -2058,7 +2088,7 @@ def render(
 
                 _next_path = _tmp_dir / f"mg{_mi}_{output_path.stem}.mp4"
                 _fc_mg = (
-                    f"[1:v]setpts=PTS+{_mg_at:.3f}/TB[mg];"
+                    f"[1:v]format=yuva420p,setpts=PTS+{_mg_at:.3f}/TB[mg];"
                     f"[0:v][mg]overlay=x=0:y=0"
                     f":enable='between(t,{_mg_at:.3f},{_mg_at + _mg_dur:.3f})':format=auto[out]"
                 )
@@ -2081,6 +2111,7 @@ def render(
                 print(f"[MG] {_mg_type} #{_mi} overlaid at t={_mg_at:.2f}s")
             except Exception as _mge:
                 print(f"[MG] Graphic #{_mi} skipped: {_mge}")
+        _probe_av_durations(_current_path, "after_motion_graphics")
 
     _nocap_path = _current_path
 
@@ -2118,10 +2149,12 @@ def render(
         "-af", "loudnorm=I=-14:TP=-1:LRA=7",
         "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
         "-movflags", "+faststart",
+        "-shortest",
         str(output_path),
     ]
     _run(_cmd_final)
     print(f"[FINAL] Output: {output_path}")
+    _probe_av_durations(output_path, "final_output")
     _nocap_path.unlink(missing_ok=True)
     for _p in _overlay_intermediates:
         _p.unlink(missing_ok=True)
