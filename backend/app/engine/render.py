@@ -1238,31 +1238,26 @@ def _fix_word_boundaries(segments: list[dict], all_words: list[dict]) -> list[di
     plays as an audible repeat. Trimming segment N back removes the dupe
     while leaving segment N+1 (and its own boundary) untouched.
 
+    The ±0.5s/+0.2s word-matching window mirrors the tolerance used for
+    caption remapping (`words_in_range`), so boundary words that snapping
+    pushed slightly outside [start, end) are still considered.
+
     Checks (in order):
-      1. Two-word duplicate — "I wanted" / "I wanted ..." — a strong signal
-         of an actual repeat regardless of which words are involved.
-      2. Single-word duplicate — only for substantive words (not common
+      1. Single-word duplicate — only for substantive words (not common
          function words, which coincidentally repeat in normal speech).
+      2. Two-word duplicate — "I wanted" / "I wanted ..." — a strong signal
+         of an actual repeat even when the single-word check doesn't fire
+         (e.g. last word of N is "wanted" but first word of N+1 is "I").
     """
     for i in range(len(segments) - 1):
         seg_a = segments[i]
         seg_b = segments[i + 1]
 
-        words_a = [w for w in all_words if float(seg_a["start"]) <= float(w["start"]) < float(seg_a["end"])]
-        words_b = [w for w in all_words if float(seg_b["start"]) <= float(w["start"]) < float(seg_b["end"])]
+        words_a = [w for w in all_words if float(seg_a["start"]) - 0.5 <= float(w["start"]) < float(seg_a["end"]) + 0.2]
+        words_b = [w for w in all_words if float(seg_b["start"]) - 0.5 <= float(w["start"]) < float(seg_b["end"]) + 0.2]
 
         if not words_a or not words_b:
             continue
-
-        # ── Two-word duplicate check ──────────────────────────────────────
-        if len(words_a) >= 2 and len(words_b) >= 2:
-            last_two = " ".join(str(w["text"]).strip().lower().rstrip(".,!?;:") for w in words_a[-2:])
-            first_two = " ".join(str(w["text"]).strip().lower().rstrip(".,!?;:") for w in words_b[:2])
-            if last_two and last_two == first_two:
-                print(f"[BOUNDARY FIX] Two-word duplicate '{last_two}' at segment {i}/{i+1} junction")
-                if len(words_a) >= 3:
-                    segments[i] = {**seg_a, "end": float(words_a[-3]["end"]) + 0.05}
-                continue
 
         # ── Single-word duplicate check (exact match, non-common words) ───
         last_word_a = str(words_a[-1]["text"]).strip().lower().rstrip(".,!?;:")
@@ -1273,9 +1268,19 @@ def _fix_word_boundaries(segments: list[dict], all_words: list[dict]) -> list[di
             and last_word_a == first_word_b
             and last_word_a not in _BOUNDARY_COMMON_WORDS
         ):
-            print(f"[BOUNDARY FIX] Removed duplicate word '{last_word_a}' at segment {i}/{i+1} junction")
+            print(f"[BOUNDARY FIX] Single duplicate '{last_word_a}' seg {i}/{i+1}")
             if len(words_a) >= 2:
                 segments[i] = {**seg_a, "end": float(words_a[-2]["end"]) + 0.05}
+            continue
+
+        # ── Two-word duplicate check ──────────────────────────────────────
+        if len(words_a) >= 2 and len(words_b) >= 2:
+            last_two = " ".join(str(w["text"]).strip().lower().rstrip(".,!?;:") for w in words_a[-2:])
+            first_two = " ".join(str(w["text"]).strip().lower().rstrip(".,!?;:") for w in words_b[:2])
+            if last_two == first_two and len(last_two) > 3:
+                print(f"[BOUNDARY FIX] Two-word duplicate '{last_two}' seg {i}/{i+1}")
+                if len(words_a) >= 3:
+                    segments[i] = {**seg_a, "end": float(words_a[-3]["end"]) + 0.05}
 
     return segments
 
@@ -1389,6 +1394,11 @@ def render(
     keep = _merge_short_segments(keep)
     _all_words_flat = [w for tseg in transcript.get("segments", []) for w in tseg.get("words", [])]
     keep = _fix_word_boundaries(keep, _all_words_flat)
+    # FIX 3: boundary trimming can shrink a segment's planned duration (end -
+    # start) below the minimum — re-run the merge pass so a segment that was
+    # fine before trimming (e.g. a 5s hook trimmed down to 0.55s) still gets
+    # merged with its neighbor instead of playing as a near-instant glitch.
+    keep = _merge_short_segments(keep)
     planned_total = sum(float(s["end"]) - float(s["start"]) for s in keep)
     print(f"[PLAN] {len(keep)} segments, planned total={planned_total:.3f}s")
     words = _flat_words(transcript)
@@ -1481,18 +1491,29 @@ def render(
         print(f"[CAP DEBUG] seg {i}: looking for words between {s_raw:.3f} and {e_raw:.3f}")
         words_in_range = [w for w in all_words if (s_raw - 0.5) <= float(w["start"]) < (e_raw + 0.2)]
         print(f"[CAP DEBUG] found {len(words_in_range)} words in range")
+        # FIX 1 — CAPTION DESYNC: scale each word's position proportionally
+        # from the planned source span [s_raw, e_raw) into the actual edit
+        # span [0, actual_edit_dur). A plain (ws - s) offset overflows past
+        # this segment's video frames whenever snapping/padding shrinks the
+        # cut well below the planned duration, landing captions on the
+        # WRONG segment's footage.
+        source_dur = e_raw - s_raw
+        actual_edit_dur = e - s
         for w in words_in_range:
             ws = float(w["start"])
             we = float(w["end"])
-            # Tolerant boundary match: words whose source timestamp falls inside
-            # [s_raw, e_raw) plus a small tolerance window for reordered segments
-            # where snapping pushes the raw boundary slightly off. Caption time =
-            # seg_offset + (ws - s), the identical formula used to position video
-            # frames (s is the actual cut start passed to _cut_segment).
+            if source_dur > 0:
+                start_progress = (ws - s_raw) / source_dur
+                end_progress = (min(we, e_raw) - s_raw) / source_dur
+                remapped_start = seg_offset + start_progress * actual_edit_dur
+                remapped_end = seg_offset + end_progress * actual_edit_dur
+            else:
+                remapped_start = seg_offset
+                remapped_end = seg_offset
             remapped_words.append(WordTiming(
                 text=w["text"].strip(),
-                start=max(0.0, seg_offset + (ws - s)),
-                end=max(0.0, seg_offset + (min(we, e_raw) - s)),
+                start=max(0.0, remapped_start),
+                end=max(0.0, remapped_end),
             ))
         _word_count_after = len(remapped_words)
         print(
