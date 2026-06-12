@@ -825,6 +825,55 @@ def _chroma_keyed_html(html_content: str) -> str:
     )
 
 
+def _render_with_puppeteer(
+    html_content: str,
+    output_path: Path,
+    duration: float,
+    w: int,
+    h: int,
+    fps: int,
+    work_dir: Path,
+) -> bool:
+    """Render via the hf_render.mjs Puppeteer script under Xvfb (Railway)."""
+    script_path = Path(__file__).parent / "hf_render.mjs"
+    if not script_path.exists():
+        return False
+
+    html_path = work_dir / f"{Path(output_path).stem}_comp.html"
+    html_path.write_text(html_content, encoding="utf-8")
+
+    # Try with Xvfb display
+    env = os.environ.copy()
+    env["DISPLAY"] = ":99"
+
+    try:
+        result = subprocess.run(
+            [
+                "node", str(script_path),
+                str(html_path),
+                str(output_path),
+                str(duration),
+                str(w),
+                str(h),
+                str(fps),
+            ],
+            capture_output=True, text=True, timeout=60, env=env,
+        )
+    except Exception as e:
+        html_path.unlink(missing_ok=True)
+        print(f"[HF] Puppeteer error: {e}")
+        return False
+
+    html_path.unlink(missing_ok=True)
+
+    if result.returncode == 0 and Path(output_path).exists() and Path(output_path).stat().st_size > 0:
+        print(f"[HF] Puppeteer rendered: {output_path}")
+        return True
+    else:
+        print(f"[HF] Puppeteer failed: {result.stderr[:200]}")
+        return False
+
+
 def render_composition_to_video(
     html_content: str,
     output_path: Path,
@@ -838,11 +887,12 @@ def render_composition_to_video(
 
     Priority order:
       1. Chromium single-screenshot → FFmpeg video (settled animation state)
-      2. FFmpeg drawtext fallback (no browser required)
+      2. Puppeteer + Xvfb (real browser, real GSAP animations)
+      3. FFmpeg drawtext fallback (no browser required)
 
     The HyperFrames CLI path is intentionally skipped here — `npx hyperframes`
     needs Node + a display and reliably fails on headless hosts (Railway).
-    Both remaining paths render against CHROMA_KEY_HEX so render.py's overlay
+    All remaining paths render against CHROMA_KEY_HEX so render.py's overlay
     pass can `colorkey` it out for real per-pixel transparency.
 
     Returns True when a usable clip was produced at output_path.
@@ -900,7 +950,23 @@ def render_composition_to_video(
         finally:
             png_path.unlink(missing_ok=True)
     else:
-        print("[HYPERFRAMES] No chromium binary found — using ffmpeg text fallback")
+        print("[HYPERFRAMES] No chromium binary found")
+
+    # ── Puppeteer + Xvfb (real browser, real GSAP animations) ────────────
+    try:
+        subprocess.Popen(
+            ["Xvfb", ":99", "-screen", "0", "1920x1080x24"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        import time as _time
+        _time.sleep(1)
+    except Exception:
+        pass
+
+    if _render_with_puppeteer(keyed_html, output_path, duration, width, height, fps, work_dir):
+        html_path.unlink(missing_ok=True)
+        return True
 
     # ── FFmpeg drawtext fallback — no browser required ───────────────────
     html_path.unlink(missing_ok=True)
