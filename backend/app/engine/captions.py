@@ -259,7 +259,9 @@ def _ass_header(
     style: str = "impact",
     brand_color: str | None = None,
 ) -> str:
-    primary = _hex_to_ass_bgr(color_hex)
+    # Main caption text is always white — color_hex/brand_color are not used
+    # as Style PrimaryColour anywhere (RULE 1: white-only Style headers).
+    primary = "&H00FFFFFF"
 
     play_res_y = 1920 if short_form else 1080
     play_res_x = 1080 if short_form else 1920
@@ -273,16 +275,15 @@ def _ass_header(
     alignment = 2
     margin_v  = round(play_res_y * 0.18)  # 346px for 9:16, 194px for 16:9
 
-    # Emphasis color: brand primary overrides the default salmon
-    _emph_ass = _hex_to_ass_bgr(brand_color) if brand_color else EMPHASIS_COLOR_ASS
-
     # Both styles use the same positioning; style only affects grouping / animations.
+    # brand_color is never a Style PrimaryColour — only inline {\c...} override
+    # tags in the dialogue text may use it (RULE 2).
     default_line = (
         f"Style: Default,{font_name},{cap_size},{primary},{primary},"
         f"&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
     )
     emphasis_line = (
-        f"Style: Emphasis,{font_name},{cap_size_emph},{_emph_ass},{_emph_ass},"
+        f"Style: Emphasis,{font_name},{cap_size_emph},&H00FFFFFF,&H00FFFFFF,"
         f"&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,0,1,{alignment},60,60,{margin_v},1"
     )
 
@@ -298,19 +299,17 @@ def _ass_header(
         tl_large_mv  = round(play_res_y * 0.13)
         # Small line sits directly above the large line with ~12px clearance
         tl_small_mv  = tl_large_mv + tl_large_sz + round(play_res_y * 0.012)
-        # TL_Large color: use brand primary if provided, else gold/cream (#F5E6C8)
-        tl_large_color = _hex_to_ass_bgr(brand_color) if brand_color else "&H00C8E6F5"
-        # White at ~70% opacity: ASS alpha 0x4D ≈ 30% transparent → 70% visible
-        tl_small_color = "&H4DFFFFFF"
+        # TL_Large/TL_Small: white text always (RULE 1) — brand_color may only
+        # appear via inline {\c...} override tags in the dialogue text.
         tl_large_line = (
             f"Style: TL_Large,{font_name},{tl_large_sz},"
-            f"{tl_large_color},{tl_large_color},"
+            f"&H00FFFFFF,&H00FFFFFF,"
             f"&H00000000,&H80000000,"   # OutlineColour, BackColour (50% black box)
             f"1,0,0,0,100,100,0,0,3,10,0,{alignment},60,60,{tl_large_mv},1"
         )
         tl_small_line = (
             f"Style: TL_Small,{font_name},{tl_small_sz},"
-            f"{tl_small_color},{tl_small_color},"
+            f"&H00FFFFFF,&H00FFFFFF,"
             f"&H00000000,&H70000000,"   # OutlineColour, BackColour (56% black box)
             f"0,0,0,0,100,100,0,0,3,6,0,{alignment},60,60,{tl_small_mv},1"
         )
@@ -461,16 +460,17 @@ def _build_long_form_ass(
         # Concept: Montserrat Bold, white, lower-third (Alignment=2), 2px outline
         f"Style: Concept,Montserrat Bold,{concept_sz},&H00FFFFFF,&H00FFFFFF,"
         f"&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,0,2,40,40,{concept_mv},1\n"
-        # Stat: Montserrat Bold, brand color, center-screen (Alignment=5), 3px outline
-        # Stats/numbers remain center-screen for maximum visual impact.
-        f"Style: Stat,Montserrat Bold,{stat_sz},{brand_ass},{brand_ass},"
+        # Stat: Montserrat Bold, white, center-screen (Alignment=5), 3px outline.
+        # brand_color is applied via apply_emphasis() inline tags on the
+        # specific number/word, never as the Style's base color.
+        f"Style: Stat,Montserrat Bold,{stat_sz},&H00FFFFFF,&H00FFFFFF,"
         f"&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,0,5,40,40,0,1\n"
         # StatContext: Montserrat Bold, white, center (Alignment=5), 1px outline
         f"Style: StatContext,Montserrat Bold,{stat_ctx_sz},&H00FFFFFF,&H00FFFFFF,"
         f"&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,1,0,5,40,40,{stat_ctx_mv},1\n"
-        # Mantra/Quote: Playfair Display Bold, brand color, bottom-center (Alignment=2), 2px outline
+        # Mantra/Quote: Playfair Display Bold, white, bottom-center (Alignment=2), 2px outline.
         # Alignment=2 keeps mantra/quote below the face — safe on all talking-head videos.
-        f"Style: Mantra,Playfair Display Bold,{mantra_sz},{brand_ass},{brand_ass},"
+        f"Style: Mantra,Playfair Display Bold,{mantra_sz},&H00FFFFFF,&H00FFFFFF,"
         f"&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,2,0,2,40,40,{concept_mv},1\n"
         # List: Montserrat Bold, white, middle-left (Alignment=4), MarginL=80, 2px outline
         f"Style: List,Montserrat Bold,{list_sz},&H00FFFFFF,&H00FFFFFF,"
@@ -766,12 +766,14 @@ def _build_momentum_ass(
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        # Word: bold white caps, heavy black outline — pops over any background
-        f"Style: Word,Anton,{font_size},{white_ass},{lime_ass},"
+        # Word: bold white caps, heavy black outline — pops over any background.
+        # Lime emphasis on digits/%/$ is applied via inline {\c...} override
+        # tags in the dialogue text (RULE 2), never as the Style color.
+        f"Style: Word,Anton,{font_size},{white_ass},{white_ass},"
         f"{black_ass},&H00000000,-1,0,0,0,100,100,0,0,1,5,0,"
         f"2,{margin_lr},{margin_lr},{margin_v},1\n"
-        # TitleCard: lime text on near-black, center — for hook/stat/mantra moments
-        f"Style: TitleCard,Anton,{title_size},{lime_ass},{white_ass},"
+        # TitleCard: white text on near-black, center — for hook/stat/mantra moments
+        f"Style: TitleCard,Anton,{title_size},{white_ass},{white_ass},"
         f"{black_ass},&HCC000000,-1,0,0,0,100,100,0,0,1,0,0,"
         f"5,60,60,60,1\n"
         "\n[Events]\n"
