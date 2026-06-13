@@ -316,96 +316,85 @@ def generate_composition_html(
 
     if graphic_type == "kinetic_title":
         text = _esc(str(content.get("text", "")).upper())
-        subtext = _esc(str(content.get("subtext", "")))
-        pal = _style_palette(str(content.get("style", "momentum")), brand_color)
-        sub_div = f'<div class="subtitle" id="st">{subtext}</div>' if subtext else ""
-        sub_js = (
-            f'gsap.to("#st",{{opacity:1,y:0,duration:0.3,delay:0.15,ease:"power2.out"}});\n'
-            f'gsap.to("#st",{{opacity:0,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");'
-            if subtext else ""
-        )
         return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <style>
 * {{ margin:0;padding:0;box-sizing:border-box; }}
-body {{
-    width:{width}px;height:{height}px;background:transparent;overflow:hidden;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:{int(height*0.025)}px;
+html,body {{ width:{width}px;height:{height}px;overflow:hidden;background:transparent !important; }}
+.overlay {{
+    position:absolute;inset:0;background:rgba(0,0,0,0.7);
+    display:flex;align-items:center;justify-content:center;
 }}
 .title {{
-    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.11)}px;font-weight:{pal["weight"]};
-    color:{pal["text"]};text-transform:{pal["transform"]};text-align:center;line-height:1.05;
-    max-width:{int(width*0.86)}px;opacity:0;transform:scale(0.9);
-    text-shadow:0 4px 24px rgba(0,0,0,0.6);
-}}
-.subtitle {{
-    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.04)}px;font-weight:700;
-    color:{pal["accent"]};text-transform:{pal["transform"]};text-align:center;
-    letter-spacing:0.06em;opacity:0;transform:translateY(16px);
+    font-family:'Inter',sans-serif;font-size:{int(height*0.10)}px;font-weight:900;
+    color:#FFFFFF;text-align:center;line-height:1.05;
+    max-width:{int(width*0.86)}px;
+    text-shadow:0 0 4px {brand_color},0 0 18px {brand_color};
 }}
 </style>
 </head>
-<body data-duration="{duration:.3f}">
-<div class="title" id="t">{text}</div>
-{sub_div}
-<script>
-gsap.timeline()
-  .to("#t",{{opacity:1,scale:1,duration:0.35,ease:"back.out(1.7)"}})
-  .to("#t",{{opacity:0,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");
-{sub_js}
-</script>
+<body>
+<div class="overlay"><div class="title">{text}</div></div>
+</body>
+</html>"""
+
+    if graphic_type == "chapter_marker":
+        text = _esc(str(content.get("text", "")))
+        return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+* {{ margin:0;padding:0;box-sizing:border-box; }}
+html,body {{ width:{width}px;height:{height}px;overflow:hidden;background:transparent !important; }}
+.pill {{
+    position:absolute;top:5%;left:50%;transform:translateX(-50%);
+    background:{brand_color};padding:8px 20px;border-radius:30px;
+}}
+.text {{
+    font-family:'Inter',sans-serif;font-size:{int(height*0.03)}px;font-weight:700;
+    color:#FFFFFF;white-space:nowrap;
+}}
+</style>
+</head>
+<body>
+<div class="pill"><div class="text">{text}</div></div>
 </body>
 </html>"""
 
     if graphic_type == "stat_card":
         text = _esc(str(content.get("text", "")))
         subtext = _esc(str(content.get("subtext", "")).upper())
-        pal = _style_palette(str(content.get("style", "momentum")), brand_color)
-        sub_div = f'<div class="label" id="lb">{subtext}</div>' if subtext else ""
-        sub_js = (
-            'gsap.to("#lb",{opacity:1,y:0,duration:0.3,delay:0.2,ease:"power2.out"});'
-            if subtext else ""
-        )
+        sub_div = f'<div class="label">{subtext}</div>' if subtext else ""
         return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <style>
 * {{ margin:0;padding:0;box-sizing:border-box; }}
-body {{ width:{width}px;height:{height}px;background:transparent;overflow:hidden;
-        display:flex;align-items:center;justify-content:center; }}
+html,body {{ width:{width}px;height:{height}px;overflow:hidden;background:transparent !important; }}
 .card {{
-    background:{pal["bg"]}E6;border-radius:28px;padding:{int(height*0.05)}px {int(width*0.07)}px;
-    text-align:center;border:2px solid {pal["accent"]}55;
-    opacity:0;transform:scale(0.8);
+    position:absolute;top:5%;left:5%;
+    background:#1a1a1a;border-radius:20px;padding:24px 32px;
+    display:inline-flex;flex-direction:column;align-items:flex-start;
 }}
 .number {{
-    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.18)}px;font-weight:{pal["weight"]};
-    color:{pal["accent"]};line-height:1;text-shadow:0 0 40px {pal["accent"]}66;
+    font-family:'Inter',sans-serif;font-size:{int(height*0.15)}px;font-weight:900;
+    color:{brand_color};line-height:1;
 }}
 .label {{
-    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.035)}px;font-weight:700;
-    color:{pal["text"]};text-transform:{pal["transform"]};letter-spacing:0.1em;
-    margin-top:{int(height*0.015)}px;opacity:0;transform:translateY(10px);
+    font-family:'Inter',sans-serif;font-size:{int(height*0.04)}px;font-weight:700;
+    color:#FFFFFF;letter-spacing:0.08em;margin-top:{int(height*0.01)}px;
 }}
 </style>
 </head>
-<body data-duration="{duration:.3f}">
-<div class="card" id="c">
+<body>
+<div class="card">
     <div class="number">{text}</div>
     {sub_div}
 </div>
-<script>
-gsap.timeline()
-  .to("#c",{{opacity:1,scale:1,duration:0.4,ease:"back.out(1.7)"}})
-  .to("#c",{{opacity:0,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");
-{sub_js}
-</script>
 </body>
 </html>"""
 
@@ -776,39 +765,31 @@ body {{ display:flex;align-items:flex-end;justify-content:flex-start;
     # lower_third (and fallback for unknown types) — text/subtext schema
     text = _esc(str(content.get("text", content.get("name", ""))))
     subtext = _esc(str(content.get("subtext", content.get("role", ""))))
-    pal = _style_palette(str(content.get("style", "momentum")), brand_color)
-    sub_div = f'<div class="subtext" id="sub">{subtext}</div>' if subtext else ""
+    sub_div = f'<div class="subtext">{subtext}</div>' if subtext else ""
     return f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
 <style>
 * {{ margin:0;padding:0;box-sizing:border-box; }}
-body {{ width:{width}px;height:{height}px;background:transparent;overflow:hidden;
-        display:flex;align-items:flex-end;padding:0 {int(width*0.05)}px {int(height*0.10)}px; }}
-.lower {{
-    background:{pal["bg"]}E6;border-left:6px solid {pal["accent"]};
-    padding:{int(height*0.018)}px {int(width*0.025)}px;border-radius:4px 10px 10px 4px;
-    opacity:0;transform:translateX(-30px);
+html,body {{ width:{width}px;height:{height}px;overflow:hidden;background:transparent !important; }}
+.bar {{
+    position:absolute;left:0;bottom:0;width:100%;height:20%;
+    background:{brand_color}D9;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;
 }}
 .text {{
-    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.04)}px;font-weight:{pal["weight"]};
-    color:{pal["text"]};text-transform:{pal["transform"]};
+    font-family:'Inter',sans-serif;font-size:{int(height*0.05)}px;font-weight:800;color:#FFFFFF;
 }}
 .subtext {{
-    font-family:'{pal["font"]}',sans-serif;font-size:{int(height*0.025)}px;font-weight:600;
-    color:{pal["accent"]};margin-top:4px;
+    font-family:'Inter',sans-serif;font-size:{int(height*0.03)}px;color:rgba(255,255,255,0.7);
+    margin-top:{int(height*0.01)}px;
 }}
 </style>
 </head>
-<body data-duration="{duration:.3f}">
-<div class="lower" id="lt"><div class="text">{text}</div>{sub_div}</div>
-<script>
-gsap.timeline()
-  .to("#lt",{{opacity:1,x:0,duration:0.35,ease:"power2.out"}})
-  .to("#lt",{{opacity:0,x:-30,duration:0.2,ease:"power2.in"}},"{duration:.3f}-0.2");
-</script>
+<body>
+<div class="bar"><div class="text">{text}</div>{sub_div}</div>
 </body>
 </html>"""
 
