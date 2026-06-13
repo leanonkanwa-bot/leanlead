@@ -70,6 +70,10 @@ CATEGORY_COLOR_ASS: dict[str, str] = {
 
 PUNCT_RE = re.compile(r"[.,!?;:\"'()\[\]…–—]")
 
+# Matches digits, %, $ — the only tokens allowed to take brand_color emphasis.
+# Main caption text is always white; brand_color is reserved for these.
+_EMPH_RE = re.compile(r"\d|%|\$")
+
 # Whisper word timestamps are systematically 50–150ms earlier than when words
 # are actually spoken (known faster-whisper alignment bias). This constant
 # shifts all captions forward so they match actual lip movement.
@@ -921,8 +925,9 @@ def build_ass(
     keyword_sz = round(88 * play_res_y / 1920)
     context_sz = round(48 * play_res_y / 1920)
 
-    # Colors
-    keyword_color = _hex_to_ass_bgr(brand_color) if brand_color else EMPHASIS_COLOR_ASS
+    # Colors. Main caption text is always white — brand_color is reserved for
+    # inline emphasis tags on digit/%/$ tokens (see _EMPH_RE usage below).
+    emph_color_ass = _hex_to_ass_bgr(brand_color) if brand_color else EMPHASIS_COLOR_ASS
     context_color = "&H66FFFFFF"  # white at ~60% opacity (ASS alpha 0x66 ≈ 40% transparent)
     outline_color = "&H00000000"  # black
     back_color    = "&H00000000"  # transparent
@@ -944,8 +949,10 @@ def build_ass(
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        # Keyword: current phrase — bold, brand color, 88px, 3px outline, bottom
-        f"Style: Keyword,{keyword_font},{keyword_sz},{keyword_color},{keyword_color},"
+        # Keyword: current phrase — white, 88px, 3px outline, bottom.
+        # brand_color is applied per-word via inline override tags for
+        # digit/%/$ emphasis only (see _EMPH_RE), never as the base color.
+        f"Style: Keyword,{keyword_font},{keyword_sz},&H00FFFFFF,&H00FFFFFF,"
         f"{outline_color},{back_color},1,0,0,0,100,100,0,0,1,3,0,2,60,60,{keyword_mv},1\n"
         # Context: previous phrase — same font, 60% white, 48px, 2px outline, above keyword
         f"Style: Context,{context_font},{context_sz},{context_color},{context_color},"
@@ -974,8 +981,6 @@ def build_ass(
             if caption_style == "kinetic"
             else r"{\fad(50,0)\t(\fscx95\fscy95,\fscx100\fscy100)}"
         )
-        emphasis_ass = _hex_to_ass_bgr(brand_color) if brand_color else EMPHASIS_COLOR_ASS
-        _emph_re = re.compile(r"\d|%|\$")
         lines = [header]
         for gi, group in enumerate(groups):
             clean = [_strip_punct(w.text) for w in group]
@@ -997,8 +1002,8 @@ def build_ass(
             if video_duration is not None and end > video_duration:
                 end = video_duration
             word_text = clean[0].upper()
-            if _emph_re.search(word_text):
-                word_text = f"{{\\c{emphasis_ass}}}{word_text}{{\\c&H00FFFFFF&}}"
+            if _EMPH_RE.search(word_text):
+                word_text = f"{{\\c{emph_color_ass}}}{word_text}{{\\c&H00FFFFFF&}}"
             lines.append(f"Dialogue: 1,{_ts(start)},{_ts(end)},Word,,0,0,0,,{_word_anim}{word_text}")
         output_path.write_text("\n".join(lines), encoding="utf-8")
         return output_path
@@ -1066,12 +1071,17 @@ def build_ass(
         if video_duration is not None and end > video_duration:
             end = video_duration
 
-        phrase_text = " ".join(
+        display_words = [
             w.capitalize() if i == 0 else w.lower()
             for i, w in enumerate(clean)
+        ]
+        phrase_text = " ".join(display_words)
+        emph_text = " ".join(
+            f"{{\\c{emph_color_ass}}}{dw}{{\\c&H00FFFFFF&}}" if _EMPH_RE.search(dw) else dw
+            for dw in display_words
         )
 
-        lines.append(f"Dialogue: 1,{_ts(start)},{_ts(end)},Keyword,,0,0,0,,{_kw_anim}{phrase_text}")
+        lines.append(f"Dialogue: 1,{_ts(start)},{_ts(end)},Keyword,,0,0,0,,{_kw_anim}{emph_text}")
         lines.append(f"Dialogue: 0,{_ts(start)},{_ts(end)},Context,,0,0,0,,{_ctx_anim}{prev_text}")
         prev_text = phrase_text
 
