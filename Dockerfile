@@ -15,6 +15,7 @@ WORKDIR /app/backend
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./
+RUN cd app/engine && npm ci --omit=dev 2>/dev/null || npm install --omit=dev 2>/dev/null || true
 COPY editor_frontend/ /app/editor_frontend/
 COPY frontend/ /app/frontend/
 EXPOSE 8000
