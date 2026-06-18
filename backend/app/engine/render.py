@@ -1500,30 +1500,34 @@ def render(
 
             if _slide_ok and _slide_vid.exists():
                 _audio_tmp = _slide_dir / f"slide_audio_{i:04d}.aac"
-                _run([
-                    FFMPEG_PATH, "-y", "-loglevel", "error",
-                    "-ss", f"{s:.6f}", "-accurate_seek",
-                    "-i", str(cut_src),
-                    "-t", f"{slide_dur:.6f}",
-                    "-vn", "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
-                    str(_audio_tmp),
-                ])
-                _run([
-                    FFMPEG_PATH, "-y", "-loglevel", "error",
-                    "-i", str(_slide_vid),
-                    "-i", str(_audio_tmp),
-                    "-map", "0:v", "-map", "1:a",
-                    "-c:v", "copy", "-c:a", "copy",
-                    "-avoid_negative_ts", "make_zero",
-                    "-shortest", str(part),
-                ])
                 try:
-                    _audio_tmp.unlink(missing_ok=True)
-                    _slide_vid.unlink(missing_ok=True)
-                except Exception:
-                    pass
-                print(f"[MG] Segment {i}: {_mg_path} ({slide_dur:.1f}s)")
-            else:
+                    _run([
+                        FFMPEG_PATH, "-y", "-loglevel", "error",
+                        "-ss", f"{s:.6f}", "-accurate_seek",
+                        "-i", str(cut_src),
+                        "-t", f"{slide_dur:.6f}",
+                        "-vn", "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+                        str(_audio_tmp),
+                    ])
+                    _run([
+                        FFMPEG_PATH, "-y", "-loglevel", "error",
+                        "-i", str(_slide_vid),
+                        "-i", str(_audio_tmp),
+                        "-map", "0:v", "-map", "1:a",
+                        "-c:v", "copy", "-c:a", "copy",
+                        "-avoid_negative_ts", "make_zero",
+                        "-shortest", str(part),
+                    ])
+                    try:
+                        _audio_tmp.unlink(missing_ok=True)
+                        _slide_vid.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+                    print(f"[MG] Segment {i}: {_mg_path} ({slide_dur:.1f}s)")
+                except Exception as _mux_err:
+                    print(f"[MG] Segment {i}: audio/mux failed: {_mux_err} — falling back to speaker footage")
+                    _slide_ok = False
+            if not _slide_ok:
                 print(f"[MG] Segment {i}: render failed, using speaker footage")
                 if use_proxy:
                     _cut_proxy_segment(cut_src, s, e, part)
