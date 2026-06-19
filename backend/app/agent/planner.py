@@ -734,6 +734,8 @@ def plan_edit(
     )
 
     text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+    print(f"[RAW MODEL RESPONSE LENGTH] {len(text)} chars")
+    print(f"[RAW MODEL RESPONSE] {text}")
     plan = _extract_json(text)
     _model_format = plan.get("format", "<missing>")
     plan["format"] = fmt
