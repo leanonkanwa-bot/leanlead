@@ -766,7 +766,9 @@ def plan_edit(
 
     text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
     plan = _extract_json(text)
+    _model_format = plan.get("format", "<missing>")
     plan["format"] = fmt
+    print(f"[FORMAT] user_hint={fmt!r} model_originally_said={_model_format!r} final_format={fmt!r}")
     return EditPlan(raw=plan)
 
 
