@@ -61,7 +61,11 @@ def _cache_path(font_name: str, weight: int = 700) -> Path:
 def _download_from_google(font_name: str, weight: int = 700) -> Path | None:
     """Download a font file from the Google Fonts CSS2 API and cache it."""
     try:
-        family = font_name.replace(" ", "+")
+        clean_name = re.sub(
+            r"\s*(Bold|Regular|Light|Medium|SemiBold|ExtraBold|Black|Italic)\s*$",
+            "", font_name, flags=re.IGNORECASE,
+        ).strip() or font_name
+        family = clean_name.replace(" ", "+")
         url = (
             f"https://fonts.googleapis.com/css2?family={family}:wght@{weight}&display=swap"
         )

@@ -889,25 +889,33 @@ def build_ass(
     play_res_x = video_w
     play_res_y = video_h
 
-    # Font resolution: use font_manager (download from Google Fonts on demand)
-    # with fallback to the legacy _ensure_font() if font_manager is unavailable.
     _requested_font = caption_font or "Inter Bold"
     print(f"[FONT] User requested: {_requested_font}")
-    if _FONT_MANAGER_AVAILABLE:
-        _fm_get_path(_requested_font)          # ensure downloaded + fc-cache
-        font_family = _fm_get_family(_requested_font)
+    if caption_style in ("impact", "kinetic", "karaoke"):
+        if _FONT_MANAGER_AVAILABLE:
+            _fm_get_path(_requested_font)
+            font_family = _fm_get_family(_requested_font)
+        else:
+            font_family = _ensure_font(_requested_font)
+        keyword_font = font_family
+        context_font = font_family
     else:
-        font_family = _ensure_font(_requested_font)
-    keyword_font = font_family
-    context_font = font_family
+        if _FONT_MANAGER_AVAILABLE:
+            _fm_get_path("Playfair Display Bold")
+            _fm_get_path("Montserrat Bold")
+            keyword_font = _fm_get_family("Playfair Display Bold")
+            context_font = _fm_get_family("Montserrat Bold")
+        else:
+            keyword_font = _ensure_font("Playfair Display Bold")
+            context_font = _ensure_font("Montserrat Bold")
 
     # Font sizes scaled from 1920px reference.
     keyword_sz = round(88 * play_res_y / 1920)
     context_sz = round(48 * play_res_y / 1920)
 
-    # Colors. Main caption text is always white — brand_color is reserved for
-    # inline emphasis tags on digit/%/$ tokens (see _EMPH_RE usage below).
+    # Colors. brand_color is the Keyword line color for twolevel; other styles use white.
     emph_color_ass = _hex_to_ass_bgr(brand_color) if brand_color else EMPHASIS_COLOR_ASS
+    keyword_color = emph_color_ass if caption_style == "twolevel" and brand_color else "&H00FFFFFF"
     context_color = "&H66FFFFFF"  # white at ~60% opacity (ASS alpha 0x66 ≈ 40% transparent)
     outline_color = "&H00000000"  # black
     back_color    = "&H00000000"  # transparent
@@ -929,10 +937,8 @@ def build_ass(
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        # Keyword: current phrase — white, 88px, 3px outline, bottom.
-        # brand_color is applied per-word via inline override tags for
-        # digit/%/$ emphasis only (see _EMPH_RE), never as the base color.
-        f"Style: Keyword,{keyword_font},{keyword_sz},&H00FFFFFF,&H00FFFFFF,"
+        # Keyword: current phrase — brand_color (twolevel) or white (other styles).
+        f"Style: Keyword,{keyword_font},{keyword_sz},{keyword_color},{keyword_color},"
         f"{outline_color},{back_color},1,0,0,0,100,100,0,0,1,3,0,2,60,60,{keyword_mv},1\n"
         # Context: previous phrase — same font, 60% white, 48px, 2px outline, above keyword
         f"Style: Context,{context_font},{context_sz},{context_color},{context_color},"

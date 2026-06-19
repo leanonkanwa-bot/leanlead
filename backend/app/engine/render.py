@@ -1371,6 +1371,8 @@ def render(
 
     skip_captions = False
     short_form = plan.format == "short"
+    if short_form:
+        caption_style = "twolevel"
     fps = 30
     pad = SHORT_PAD_S if short_form else LONG_PAD_S
 
