@@ -766,7 +766,7 @@ def plan_edit(
 
     text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
     plan = _extract_json(text)
-    plan.setdefault("format", fmt)
+    plan["format"] = fmt
     return EditPlan(raw=plan)
 
 

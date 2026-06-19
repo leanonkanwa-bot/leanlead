@@ -212,20 +212,13 @@ def run_job(
             template=template,
         )
 
-        # Override format_hint based on platform if specified.
-        effective_format: FormatHint = format_hint
-        if platform.lower() in ("tiktok", "reels", "instagram", "youtube shorts", "shorts"):
-            effective_format = "short"
-        elif platform.lower() in ("youtube", "linkedin"):
-            effective_format = "long"
-
         # ── Step 6: Planning ───────────────────────────────────────────────
         store.update(job_id, status="planning", progress=40,
                      message="Asking the agent for an edit plan…")
         plan = plan_edit(
             transcript_clean,
             enriched_instructions,
-            format_hint=effective_format,
+            format_hint=format_hint,
             brand_color=brand_color,
             caption_color=caption_color,
             caption_position=caption_position,
