@@ -1509,8 +1509,11 @@ slide_content: Structured data — include whatever fields match the content:
   {{ "title": "...", "items": [...], "value": "...", "label": "..." }}
 
 SELECTION LOGIC:
-- Only during EXPLANATION sections (never hook, story, emotional moments).
-- Match the graphic to what the speaker is ACTUALLY doing.
+- Allowed on beats: CONTEXT, STORY, AMPLIFY, TENSION, PRINCIPLE (any segment
+  where the speaker is explaining, proving, or illustrating a point with data).
+- NEVER on: HOOK, PAYOFF, EMOTIONAL_END, REALIZATION (these need the speaker's face).
+- The is_slide segment REPLACES the speaker segment at that timestamp — set
+  is_slide: true on the keep_segment itself, do NOT create a separate entry.
 - accent_color must always be "#00C3FF" for long-form.
 """
 
