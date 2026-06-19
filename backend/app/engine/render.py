@@ -1655,10 +1655,18 @@ def render(
             except (TypeError, ValueError):
                 continue
             if s_raw <= m_at < e_raw:
+                if source_dur > 0:
+                    m_start_progress = (m_at - s_raw) / source_dur
+                    m_end_progress = (min(m_end, e_raw) - s_raw) / source_dur
+                    rm_start = seg_offset + m_start_progress * actual_edit_dur
+                    rm_end = seg_offset + m_end_progress * actual_edit_dur
+                else:
+                    rm_start = seg_offset
+                    rm_end = seg_offset
                 remapped_moments.append({
                     **moment,
-                    "start": seg_offset + (m_at - s),
-                    "end":   min(seg_offset + (m_end - s), seg_offset + (e - s)),
+                    "start": max(0.0, rm_start),
+                    "end":   max(0.0, rm_end),
                 })
 
         for mg in (plan.motion_graphics or []):
