@@ -652,6 +652,17 @@ def plan_edit(
                     "  storytelling with no concrete numbers, steps, or named concepts.\n"
                     "  HARD CAP: maximum 4 motion graphics per video.  Pick the most impactful\n"
                     "  moments — prefer sections where visual explanation adds the most value.\n\n"
+                    + (
+                    "  SLIDE DURATION — MICRO-SLIDES (source video is under 90s):\n"
+                    "  Your edited plan will likely be 30–60s total.  Slides must be SHORT:\n"
+                    "  1–3 seconds each.  Think 'visual punctuation' — a number flashing in\n"
+                    "  brand color, a quick stat callout, a single checkmark or label.\n"
+                    "  NOT full explainer slides.  Include 1–2 micro-slides if any concrete\n"
+                    "  number, stat, or named concept exists in the transcript.\n\n"
+                    if duration < 90 else
+                    "  SLIDE DURATION: 5–20 seconds each.  Full animated explainer slides —\n"
+                    "  step-by-step calculations, timelines, bar charts, before/after splits.\n\n"
+                    ) +
                     "  Add an entry inside keep_segments with these fields:\n"
                     '    { "start": N.N, "end": N.N, "is_slide": true,\n'
                     '      "concept_description": "<rich natural-language description of the visual>",\n'
@@ -660,7 +671,13 @@ def plan_edit(
                     '      "beat": "explanation", "zoom_level": 100, "caption_style": "priestley" }\n\n'
                     "  concept_description: A detailed visual brief (2-4 sentences) describing what\n"
                     "  the motion graphic should look like.  Be SPECIFIC about layout, shapes,\n"
-                    "  colors, and animation.  Examples of good descriptions:\n"
+                    "  colors, and animation.  Examples:\n"
+                    + (
+                    '    - "The number 47% in large cyan text, scale-up pop animation, white\n'
+                    '       label below reads \'Success Rate\'. Quick 2-second flash."\n'
+                    '    - "A single checkmark icon animating in next to the text \'Step 1\n'
+                    '       Complete\' in white on dark background. 1.5 seconds."\n\n'
+                    if duration < 90 else
                     '    - "A dark background with a large digital counter counting up from 0 to\n'
                     '       1,500,000 in cyan. Label below reads \'Total Revenue\' in white."\n'
                     '    - "A horizontal bar chart with 4 bars growing from left to right,\n'
@@ -669,12 +686,13 @@ def plan_edit(
                     '    - "A before/after split screen. Left side dark-tinted with red accent\n'
                     '       showing \'Old Method\' and \'2 hours/day\'. Right side bright with cyan\n'
                     '       accent showing \'New Method\' and \'20 minutes/day\'."\n\n'
+                    ) +
                     "  slide_content: Structured data extracted verbatim from the transcript:\n"
                     '    { "title": "<heading>", "items": [...], "value": "<number>",\n'
                     '      "label": "<label>", "steps": [...] }\n'
                     "  Include whatever fields match the content — there is no fixed schema.\n\n"
                     "  Rules:\n"
-                    "  - Slides last 5–20s.  No captions on slide segments.\n"
+                    f"  - Slides last {'1–3s (micro-slides)' if duration < 90 else '5–20s'}.  No captions on slide segments.\n"
                     "  - start/end = SOURCE timestamps where audio is extracted.\n"
                     "  - Only during EXPLANATION sections (never hook, story, emotional moments).\n"
                     "  - Match the graphic to what the speaker is ACTUALLY doing in that moment.\n"
