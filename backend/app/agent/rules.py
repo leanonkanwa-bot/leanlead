@@ -1447,16 +1447,49 @@ SECTION TRANSITIONS:
 # Long-form slide replacement templates
 # ---------------------------------------------------------------------------
 
-LONG_FORM_SLIDE_STYLE = """\
-LONG-FORM MOTION GRAPHICS SYSTEM
+def _long_form_slide_style(source_duration: float = 0.0) -> str:
+    is_micro = source_duration > 0 and source_duration < 90
+    dur_rule = (
+        "Graphics must be BRIEF — 1 to 3 seconds each (micro-slides).\n"
+        "  Think 'visual punctuation': a number flashing in brand color, a quick\n"
+        "  stat callout, a single checkmark.  NOT full explainer slides.\n"
+        "  Include 1–2 micro-slides if ANY concrete number, stat, or named\n"
+        "  concept exists in the transcript."
+        if is_micro else
+        "Graphics last 5–20 seconds each — full animated explainer slides\n"
+        "  (step-by-step calculations, timelines, bar charts, before/after splits)."
+    )
+    examples = (
+        '  - "The number [X]% in large cyan text, scale-up pop, white label\n'
+        "     below reads '[label from transcript]'. Quick 2-second flash.\"\n"
+        '  - "A single checkmark icon animating in next to \'[step from\n'
+        "     transcript]' in white on dark background. 1.5 seconds.\""
+        if is_micro else
+        '  - "Large counter counting up from 0 to [actual number from transcript] in\n'
+        "     cyan on dark background.  Label below reads '[actual label]' in white.\"\n"
+        '  - "Horizontal bar chart with [N] bars labeled [actual labels].  Bars grow\n'
+        "     left to right in sequence, cyan with white text.\"\n"
+        '  - "Before/after split: left side dark-tinted \'[old way from transcript]\',\n'
+        "     right side cyan-accented '[new way from transcript]'.\""
+    )
+    mg_min = "Include AT LEAST 1–2 micro-slides for content-rich videos." if is_micro else (
+        "For content-rich videos (financial concepts, numbered steps, processes,\n"
+        "  statistics, frameworks), identify AT LEAST 2 moments worth a motion\n"
+        "  graphic.  Only output zero if the content is genuinely abstract\n"
+        "  storytelling with no concrete numbers, steps, or named concepts."
+    )
+    return f"""\
+LONG-FORM MOTION GRAPHICS SYSTEM — REQUIRED
 ===================================
 When the speaker explains a concept, formula, statistic, comparison, or
-progression, you may REPLACE speaker footage with a full-screen animated
-motion graphic.  Audio continues under the graphic.  NO captions on these
-segments.  Graphics must last 5–20 seconds each.
+progression, INSERT a full-screen animated motion graphic that REPLACES
+speaker footage.  Audio continues under the graphic.  NO captions on
+these segments.
+  {dur_rule}
 
 HARD CAP: maximum 4 motion graphics per video.  Pick the most impactful
-explanation moments.  Zero graphics is valid if nothing fits.
+explanation moments.
+  {mg_min}
 
 CRITICAL — CONTENT MUST COME FROM THIS VIDEO'S TRANSCRIPT:
 All text/numbers in slide_content MUST be extracted verbatim or summarized
@@ -1466,35 +1499,18 @@ placeholder text, never copy examples from this prompt.
 Each motion graphic appears as an entry inside keep_segments with:
   "is_slide": true,
   "concept_description": "<rich 2-4 sentence visual brief>",
-  "slide_content": { <structured text/numbers from transcript> },
+  "slide_content": {{ <structured text/numbers from transcript> }},
   "accent_color": "#00C3FF"
 
-concept_description: Describe the VISUAL you want — layout, shapes, colors,
-animation.  Be specific.  The system will generate custom HTML/CSS/GSAP
-animation from this description.  You are NOT limited to fixed templates —
-describe any visual concept that matches what the speaker is explaining.
-
-Examples of good concept_descriptions (DO NOT COPY these — write descriptions
-specific to THIS video's content):
-  - "Large counter counting up from 0 to [actual number from transcript] in
-     cyan on dark background.  Label below reads '[actual label]' in white."
-  - "Horizontal bar chart with [N] bars labeled [actual labels].  Bars grow
-     left to right in sequence, cyan with white text."
-  - "Before/after split: left side dark-tinted '[old way from transcript]',
-     right side cyan-accented '[new way from transcript]'."
-  - "Flow diagram: source card '[name]' on left, dashed lines to [N]
-     destination cards on right labeled '[actual names]'."
-  - "Checklist of [N] items from transcript, each revealing with a cyan
-     checkmark animation, staggered 0.3s apart."
+concept_description examples (write descriptions specific to THIS video):
+{examples}
 
 slide_content: Structured data — include whatever fields match the content:
-  { "title": "...", "items": [...], "value": "...", "label": "...",
-    "steps": [...], "source": "...", "destinations": [...] }
+  {{ "title": "...", "items": [...], "value": "...", "label": "..." }}
 
-SELECTION LOGIC — content-aware, never forced:
+SELECTION LOGIC:
 - Only during EXPLANATION sections (never hook, story, emotional moments).
-- Match the graphic to what the speaker is ACTUALLY doing: calculations get
-  charts/counters, lists get checklists, comparisons get split screens.
+- Match the graphic to what the speaker is ACTUALLY doing.
 - accent_color must always be "#00C3FF" for long-form.
 """
 
@@ -2117,6 +2133,7 @@ def system_prompt(
     caption_position: str | None = None,
     caption_font: str | None = None,
     editing_style: str = "viral",
+    source_duration: float = 0.0,
 ) -> str:
     blocks = [IDENTITY, CORE_VOICE, SIMPLE_HEAVY, AUDIENCE_CONTEXT]
     if editing_style == "priestley":
@@ -2247,7 +2264,7 @@ def system_prompt(
             "  list_item (portrait): position='bottom_center' (Alignment=2)\n\n"
             + _zoom_level_rules
             + "\n\n"
-            + LONG_FORM_SLIDE_STYLE
+            + _long_form_slide_style(source_duration)
         )
     else:
         blocks.append(_zoom_level_rules)
