@@ -857,34 +857,32 @@ def build_ass(
     """
     output_path = Path(output_path)
 
-    # Priestley style: dedicated renderer — completely separate from other modes.
-    if caption_style == "priestley":
-        return _build_priestley_ass(
-            words, output_path, video_w=video_w, video_h=video_h,
-            video_duration=video_duration, caption_moments=caption_moments,
-        )
-
-    # Momentum style: dedicated renderer — completely separate from other modes.
-    if caption_style == "momentum":
-        return _build_momentum_ass(
-            words, output_path, video_w=video_w, video_h=video_h,
-            video_duration=video_duration, caption_moments=caption_moments,
-        )
-
-    # Long-form: selective moments only — NO fallback to word-by-word.
+    # Long-form ALWAYS uses selective moments — caption_style is irrelevant.
     if mode == "long":
         if caption_moments:
             return _build_long_form_ass(
                 caption_moments, output_path,
                 video_w=video_w, video_h=video_h, brand_color=brand_color,
             )
-        # No moments → intentional silence; write empty ASS (no captions at all).
         output_path.write_text(
             "[Script Info]\nScriptType: v4.00+\n\n[V4+ Styles]\n\n[Events]\n",
             encoding="utf-8",
         )
         print("[CAPTIONS LONG] No caption_moments — empty ASS (no captions)")
         return output_path
+
+    # Short-form: route by caption_style.
+    if caption_style == "priestley":
+        return _build_priestley_ass(
+            words, output_path, video_w=video_w, video_h=video_h,
+            video_duration=video_duration, caption_moments=caption_moments,
+        )
+
+    if caption_style == "momentum":
+        return _build_momentum_ass(
+            words, output_path, video_w=video_w, video_h=video_h,
+            video_duration=video_duration, caption_moments=caption_moments,
+        )
 
     play_res_x = video_w
     play_res_y = video_h
