@@ -847,7 +847,7 @@ Placement (must match the spoken context precisely):
   B-roll types to suggest based on content:
     Time references (3AM, morning, years)  → clock / alarm / sunrise visual
     Location references (city, home, gym)  → relevant place visual
-    Numbers / stats                        → graphic overlay (motion_graphics)
+    Numbers / stats                        → graphic overlay (is_slide in keep_segments for long-form)
     Physical action (run, drive, fight)    → action footage
 
 Each b-roll suggestion's `at` is the EXACT START of the sentence whose
@@ -1685,29 +1685,11 @@ Reply with a SINGLE JSON object, no prose, matching this schema:
   /* DISABLED */
   "visual_style_moments": [],
 
-  /* motion_graphics: the MOTION BOARD — a list of animation beats rendered
-     via real HyperFrames HTML→MP4 compositions and alpha-composited onto
-     the video. See MOTION BOARD RULES + MOTION GRAPHIC PROMPT RULES for
-     placement/timing/type/prompt guidance.
-     Each entry MUST have: at, duration, type, text, subtext, style, trigger_word, hf_prompt.
-       at           — output-timeline timestamp (seconds) when the graphic appears
-       duration     — seconds on screen; must not exceed time until next sentence
-       type         — "kinetic_title" | "stat_card" | "lower_third" | "step_diagram"
-       text         — exact text to display (verbatim or tightly derived from transcript)
-       subtext      — smaller supporting text below `text` (can be "")
-       style        — matches the active editing_style: "momentum" | "priestley"
-       trigger_word — the exact word being spoken when this graphic appears
-       hf_prompt    — a RICH 3-5 sentence natural-language description of the
-                      animation (entry, typography, background, position, timing,
-                      exit). See MOTION GRAPHIC PROMPT RULES.
+  /* motion_graphics: DEPRECATED — do NOT output this field.
+     Motion graphics are now inline is_slide entries in keep_segments.
+     See LONG-FORM MOTION GRAPHICS SYSTEM in the system prompt.
   */
-  "motion_graphics": [
-    { "at": <s>, "duration": 2.5, "type": "kinetic_title"|"stat_card"|"lower_third"|"step_diagram",
-      "text": "<exact text to display>", "subtext": "<smaller supporting text>",
-      "style": "momentum"|"priestley", "trigger_word": "<word being said when this appears>",
-      "hf_prompt": "<rich 3-5 sentence animation description — see MOTION GRAPHIC PROMPT RULES>" }
-    /* 1 graphic every 5–7 seconds. See MOTION BOARD RULES. */
-  ],
+  "motion_graphics": [],
 
   "caption_emphasis_words": ["<word>", "<word>", ...],
 
@@ -1827,10 +1809,7 @@ Rules the JSON must obey:
   - thumbnail_mot: ONE word, uppercase, maximum emotional charge.
   - hyperframes: MAX 2 total. Kind must be "color". Duration exactly 0.08s. No text. No content.
   - visual_style_moments: must be empty []. Do not generate any entries.
-  - motion_graphics: max 8. Minimum 6 for any video 40s+. Types: stat | key_phrase | checklist | title_card | lower_third.
-    Every 4-5 seconds must have b-roll OR a motion graphic. Never 5+ seconds of talking head alone.
-    Never during hook (first 3s), payoff, or emotional_end beats.
-    content fields must match the type (see schema above).
+  - motion_graphics: must be empty []. Motion graphics use is_slide entries in keep_segments (long-form only).
   - sfx_cues: max 1 per 5s window; "whoosh" before topic-change cuts,
     "impact" with punch_in zooms, "riser" 0.5s before new sections,
     "click" on top-3 emphasis words only.
@@ -2144,7 +2123,7 @@ def system_prompt(
     effective_brand = brand_color or "#FF7751"
     blocks.append(
         f"AESTHETIC PRESET — {_EDUTAINMENT_BRAND}\n"
-        f"  Active brand_color: {effective_brand} — use for hyperframes, motion graphics accents."
+        f"  Active brand_color: {effective_brand} — use for hyperframes and accent elements."
     )
 
     blocks.extend([
@@ -2160,8 +2139,6 @@ def system_prompt(
         ZOOM_SYSTEM,
         CAPTION_RULES,
         HYPERFRAMES,
-        MOTION_BOARD_RULES,
-        HYPERFRAMES_PROMPT_GUIDE,
         CLONED_STYLE,
         BROLL_RULES,
         SOUND_DESIGN,
@@ -2204,8 +2181,7 @@ def system_prompt(
             "salmon emphasis on hook/key words, "
             "max 2 b-roll (2.0–3.5s each, include description+search_query+type), "
             "max 2 hyperframe color flashes (0.08s each). "
-            "motion_graphics: max 8, minimum 6 for 40s+ videos (stat/key_phrase/checklist only, not during hook/payoff). "
-            "Every 4-5 seconds must have b-roll OR motion graphic — never 5+ seconds of talking head alone. "
+            "motion_graphics: [] — output empty array (motion graphics are inline is_slide entries in keep_segments for long-form only). "
             "visual_style_moments: [] — output empty array, no exceptions. "
             "1 cut per 2–3 seconds. Ruthless filler removal. "
             "New curiosity loop every 15–20s. "
@@ -2221,7 +2197,7 @@ def system_prompt(
         blocks.append(
             "TARGET FORMAT: long — lower-amplitude zoom (100–110%), "
             "re-hook every 30–60s, selective strategic captions on key moments only. "
-            "motion_graphics: max 8 (stat/key_phrase/checklist for long-form). visual_style_moments: [] — empty. "
+            "motion_graphics: [] — output empty array (motion graphics are inline is_slide entries in keep_segments). visual_style_moments: [] — empty. "
             "1 cut per 4–6 seconds. Max 2 b-roll per 30s of edit. "
             "New curiosity loop every 15–20s.\n\n"
             "B-ROLL FREQUENCY (long-form): maximum 1 b-roll every 15 seconds. "
