@@ -1766,22 +1766,14 @@ def render(
         print(f"[CAP DEBUG] seg {i}: looking for words between {s_raw:.3f} and {e_effective:.3f}")
         words_in_range = [w for w in all_words if (s_raw - 0.05) <= float(w["start"]) < (e_effective + 0.05)]
         print(f"[CAP DEBUG] found {len(words_in_range)} words in range")
-        # Caption remap: proportional scaling from source span [s_raw, e_effective)
-        # into edit span [0, actual_edit_dur). e_effective includes sentence-boundary
-        # extension so words from the extension are captured and correctly placed.
-        source_dur = e_effective - s_raw
-        actual_edit_dur = e - s
+        # Caption remap: direct offset from the padded cut start (s).
+        # The audio is extracted verbatim (no time-stretch), so a word at
+        # source time ws appears at edit time seg_offset + (ws - s).
         for w in words_in_range:
             ws = float(w["start"])
             we = float(w["end"])
-            if source_dur > 0:
-                start_progress = (ws - s_raw) / source_dur
-                end_progress = (min(we, e_effective) - s_raw) / source_dur
-                remapped_start = seg_offset + start_progress * actual_edit_dur
-                remapped_end = seg_offset + end_progress * actual_edit_dur
-            else:
-                remapped_start = seg_offset
-                remapped_end = seg_offset
+            remapped_start = seg_offset + (ws - s)
+            remapped_end = seg_offset + (we - s)
             remapped_words.append(WordTiming(
                 text=w["text"].strip(),
                 start=max(0.0, remapped_start),
@@ -1825,14 +1817,8 @@ def render(
             except (TypeError, ValueError):
                 continue
             if s_raw <= m_at < e_effective:
-                if source_dur > 0:
-                    m_start_progress = (m_at - s_raw) / source_dur
-                    m_end_progress = (min(m_end, e_effective) - s_raw) / source_dur
-                    rm_start = seg_offset + m_start_progress * actual_edit_dur
-                    rm_end = seg_offset + m_end_progress * actual_edit_dur
-                else:
-                    rm_start = seg_offset
-                    rm_end = seg_offset
+                rm_start = seg_offset + (m_at - s)
+                rm_end = seg_offset + (min(m_end, e) - s)
                 remapped_moments.append({
                     **moment,
                     "start": max(0.0, rm_start),
@@ -1846,14 +1832,9 @@ def render(
             except (TypeError, ValueError):
                 continue
             if s_raw <= mg_at < e_raw:
-                # Same proportional remap as words above -- a plain (mg_at - s)
-                # offset can land outside [0, actual_edit_dur) whenever
-                # snapping/padding shrinks the cut, placing the graphic on the
-                # wrong segment's footage or outside the enable() window.
-                at_progress = (mg_at - s_raw) / source_dur if source_dur > 0 else 0.0
                 remapped_motion_graphics.append({
                     **mg,
-                    "at":       max(0.0, seg_offset + at_progress * actual_edit_dur),
+                    "at":       max(0.0, seg_offset + (mg_at - s)),
                     "duration": mg_dur,
                 })
 
@@ -2160,7 +2141,7 @@ def render(
     # short-form captions if the planner produced none (better than zero captions).
     _long = not short_form
     _use_moments = _long and bool(remapped_moments)
-    print(f"[CAPTIONS] short_form={short_form} _long={_long} remapped_moments={len(remapped_moments)} _use_moments={_use_moments} → mode={'long' if _use_moments else 'short'}")
+    print(f"[CAPTIONS] short_form={short_form} _long={_long} remapped_moments={len(remapped_moments)} _use_moments={_use_moments} -> mode={'long' if _use_moments else 'short'}")
     if _long and not remapped_moments:
         print("[CAPTIONS] Long-form has no caption_moments -- falling back to short-form word-by-word")
     if not skip_captions:
@@ -2432,7 +2413,8 @@ def render(
     if not skip_captions:
         _ass_tmp = _tmp_dir / f"captions_{ass_path.parent.name}.ass"
         _shutil.copy2(ass_path, _ass_tmp)
-        _ass_str = str(_ass_tmp).replace("\\", "/").replace(":", "\\:")
+        _ass_fwd = str(_ass_tmp).replace("\\", "/").replace(":", "\\:")
+        _ass_str = f"filename='{_ass_fwd}'"
     # Per-format output bitrate targets -- prevent quality floor drops on
     # complex scenes while keeping file size reasonable.
     if is_4k:

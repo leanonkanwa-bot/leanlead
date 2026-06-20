@@ -139,10 +139,10 @@ def _get_font_path(font_name: str) -> str:
     for candidate in (font_name, font_name + " Bold"):
         path = FONT_MAP.get(candidate)
         if path and os.path.exists(path):
-            print(f"[FONT] Using: {font_name} → {path}")
+            print(f"[FONT] Using: {font_name} -> {path}")
             return path
     fallback = FONT_MAP["default"]
-    print(f"[FONT] NOT FOUND: {font_name} → falling back to {fallback}")
+    print(f"[FONT] NOT FOUND: {font_name} -> falling back to {fallback}")
     return fallback
 
 
@@ -198,7 +198,7 @@ def _ensure_font(font_name: str) -> str:
                 with open(dst, "wb") as f:
                     f.write(data)
                 os.system("fc-cache -f /usr/local/share/fonts/leanlead/ 2>/dev/null")
-                print(f"[FONT] Downloaded: {font_name} ({len(data)} bytes) → {dst}")
+                print(f"[FONT] Downloaded: {font_name} ({len(data)} bytes) -> {dst}")
                 family = (
                     font_name
                     .replace(" ExtraBold", "")

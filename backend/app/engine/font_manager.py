@@ -100,7 +100,7 @@ def _download_from_google(font_name: str, weight: int = 700) -> Path | None:
                 )
                 print(
                     f"[FONT] Downloaded: {font_name} weight={weight} "
-                    f"→ {dst} ({len(data)} bytes)"
+                    f"-> {dst} ({len(data)} bytes)"
                 )
                 return dst
             except Exception as inner:
@@ -115,7 +115,7 @@ def _download_from_google(font_name: str, weight: int = 700) -> Path | None:
 def get_font_path(font_name: str, weight: int = 700) -> str:
     """Return an absolute font file path usable as FFmpeg fontfile= value.
 
-    Priority: pre-installed → /tmp cache → Google Fonts download → DejaVu fallback.
+    Priority: pre-installed -> /tmp cache -> Google Fonts download -> DejaVu fallback.
     """
     key = _normalize(font_name)
 
@@ -123,13 +123,13 @@ def get_font_path(font_name: str, weight: int = 700) -> str:
     if key in PREINSTALLED:
         path = PREINSTALLED[key]
         if path.exists():
-            print(f"[FONT] Pre-installed: {font_name} → {path}")
+            print(f"[FONT] Pre-installed: {font_name} -> {path}")
             return str(path)
 
     # 2. Cached from a previous download this session
     cached = _cache_path(font_name, weight)
     if cached.exists() and cached.stat().st_size > 1000:
-        print(f"[FONT] Cached: {font_name} → {cached}")
+        print(f"[FONT] Cached: {font_name} -> {cached}")
         return str(cached)
 
     # 3. Download from Google Fonts
