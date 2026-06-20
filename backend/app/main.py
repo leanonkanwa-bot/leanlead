@@ -73,8 +73,10 @@ app = FastAPI(title="AI Video Editor Agent", version="0.1.0")
 
 @app.on_event("startup")
 def _on_startup() -> None:
+    import os as _os
     _commit_file = Path(__file__).resolve().parent.parent / "COMMIT_HASH"
     _commit = _commit_file.read_text().strip() if _commit_file.exists() else "unknown"
+    _commit = _os.environ.get("RAILWAY_GIT_COMMIT_SHA", "") or _commit
     print(f"[BUILD] Running commit: {_commit}")
     _cleanup_old_uploads()
 
