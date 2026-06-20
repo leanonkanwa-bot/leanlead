@@ -277,10 +277,33 @@ def _snap_to_word_boundary(
 
 
 _DANGLING_WORDS = frozenset([
-    "which", "that", "because", "so", "but", "and", "when", "if", "as",
-    "while", "since", "although", "where", "who", "what", "how",
-    "whether", "though", "unless", "until", "after", "before",
+    "the", "a", "an", "this", "that", "these", "those", "my", "your",
+    "his", "her", "its", "our", "their", "which", "because", "so", "but",
+    "and", "when", "if", "as", "while", "since", "although", "where",
+    "who", "what", "how", "whether", "though", "unless", "until", "after",
+    "before", "is", "are", "was", "were", "will", "would", "can", "could",
+    "should", "to", "of", "in", "on", "at", "for", "with", "by", "from",
+    "into", "not", "no", "or", "nor",
 ])
+
+
+def _is_sentence_boundary(end_t: float, transcript: dict[str, Any]) -> bool:
+    """Check if end_t lands at a sentence boundary using segment-level text."""
+    for seg in transcript.get("segments", []):
+        seg_text = str(seg.get("text", ""))
+        seg_end = float(seg.get("end", 0))
+        if abs(seg_end - end_t) < 0.3 and seg_text.rstrip().endswith((".", "!", "?")):
+            return True
+        seg_words = seg.get("words", [])
+        for wi, w in enumerate(seg_words):
+            we = float(w.get("end", 0))
+            if abs(we - end_t) < 0.15:
+                pos = seg_text.find(str(w.get("text", "")))
+                if pos >= 0:
+                    after = seg_text[pos + len(str(w.get("text", ""))):pos + len(str(w.get("text", ""))) + 2]
+                    if any(c in after for c in ".!?"):
+                        return True
+    return False
 
 
 def _extend_for_semantic_completeness(
@@ -289,11 +312,13 @@ def _extend_for_semantic_completeness(
     src_duration: float,
     search_window: float = 3.0,
 ) -> float:
-    """Extend a segment end time if the last word is a dangling conjunction.
+    """Extend a segment end if it cuts mid-sentence.
 
-    Example: "I ran 10 miles which is..." -- cutting after "is" leaves an
-    incomplete thought. This function scans forward up to search_window seconds
-    to find the next natural pause (≥0.3s) or sentence-ending punctuation.
+    Checks: (1) is the last word a dangling word (article, conjunction,
+    preposition, auxiliary verb)? (2) does the cut point land at a
+    sentence boundary (period/question/exclamation in segment text)?
+    If mid-sentence, extends forward to the next sentence boundary or
+    natural pause, capped at search_window seconds.
     """
     import re as _re
     last_text: str | None = None
@@ -306,10 +331,16 @@ def _extend_for_semantic_completeness(
                 last_text = _re.sub(r"[.,!?;:\"\'-]", "", raw).lower()
                 last_end = we
 
-    if not last_text or last_text not in _DANGLING_WORDS:
+    if not last_text:
         return end_t
 
-    # Scan forward: find the next pause ≥ 0.3s or sentence-ending punctuation.
+    needs_extension = last_text in _DANGLING_WORDS
+    if not needs_extension and not _is_sentence_boundary(end_t, transcript):
+        needs_extension = True
+
+    if not needs_extension:
+        return end_t
+
     prev_word_end: float | None = last_end
     for seg in transcript.get("segments", []):
         for w in seg.get("words", []):
@@ -320,15 +351,15 @@ def _extend_for_semantic_completeness(
                 continue
             if ws_t > end_t + search_window:
                 break
-            # Natural pause before this word -> cut here
             if prev_word_end is not None and ws_t - prev_word_end >= 0.3:
+                print(f"[BOUNDARY FIX] extended segment end {end_t:.3f} -> {prev_word_end:.3f} (pause)")
                 return min(prev_word_end, src_duration)
-            # Sentence-ending punctuation on this word -> include it
-            if str(w.get("text", "")).strip().endswith((".", "!", "?")):
+            if _is_sentence_boundary(we, transcript):
+                print(f"[BOUNDARY FIX] extended segment end {end_t:.3f} -> {we:.3f} (sentence end)")
                 return min(we, src_duration)
             prev_word_end = we
 
-    return end_t  # no clean extension found -- keep original end
+    return end_t
 
 
 def _cut_segment(
@@ -1591,7 +1622,7 @@ def render(
         _word_count_before = len(remapped_words)
         all_words = [w for tseg in transcript.get("segments", []) for w in tseg.get("words", [])]
         print(f"[CAP DEBUG] seg {i}: looking for words between {s_raw:.3f} and {e_raw:.3f}")
-        words_in_range = [w for w in all_words if (s_raw - 0.5) <= float(w["start"]) < (e_raw + 0.2)]
+        words_in_range = [w for w in all_words if (s_raw - 0.05) <= float(w["start"]) < (e_raw + 0.05)]
         print(f"[CAP DEBUG] found {len(words_in_range)} words in range")
         # FIX 1 -- CAPTION DESYNC: scale each word's position proportionally
         # from the planned source span [s_raw, e_raw) into the actual edit
