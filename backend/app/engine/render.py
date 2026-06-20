@@ -781,6 +781,110 @@ MOMENTUM_ZOOM: dict[str, int] = {
 MAX_ZOOM_MOMENTUM = 150
 
 
+def _build_zoom_t_expr(
+    zoom_entries: list[dict],
+    default_zoom: float = 1.0,
+) -> str:
+    """Build an FFmpeg time-based expression for zoom factor Z(t).
+
+    Uses `t` (seconds) instead of frame numbers. Returns a nested if()
+    expression with cosine ease-in-out for drift, quadratic for punch_in.
+    """
+    if not zoom_entries:
+        return str(default_zoom)
+
+    sorted_entries = sorted(zoom_entries, key=lambda e: float(e.get("start", 0)))
+
+    parts: list[str] = []
+    for entry in sorted_entries:
+        es = float(entry.get("start", 0))
+        ee = float(entry.get("end", es + 0.1))
+        zf = float(entry.get("from", default_zoom))
+        zt = float(entry.get("to", zf))
+        kind = str(entry.get("kind", "drift"))
+        ed = max(0.001, ee - es)
+
+        p = f"(t-{es:.4f})/{ed:.4f}"
+        if kind == "punch_in" or kind == "pull_out":
+            ease = f"{zf}+({zt}-{zf})*{p}*{p}"
+        else:
+            ease = f"{zf}+({zt}-{zf})*(1-cos({p}*PI))/2"
+
+        parts.append(f"if(between(t\\,{es:.4f}\\,{ee:.4f})\\,{ease}")
+
+    expr = ""
+    for p in parts:
+        expr += p + "\\,"
+    expr += str(default_zoom)
+    expr += ")" * len(parts)
+    return expr
+
+
+def _apply_animated_zoom(
+    src: Path, dst: Path,
+    zoom_entries: list[dict],
+    seg_offset: float,
+    target_w: int, target_h: int,
+    fps: int, duration: float,
+    default_zoom: float = 1.3,
+) -> bool:
+    """Apply animated zoom using scale+crop with time-varying expressions.
+
+    Much faster than zoompan — operates on decoded video frames rather than
+    re-reading source per frame. zoom_entries are in edit-timeline coords;
+    seg_offset converts to per-segment local time.
+    """
+    dz = default_zoom / 100.0 if default_zoom > 10 else default_zoom
+
+    local_entries = []
+    for ze in zoom_entries:
+        zs = float(ze.get("start", 0)) - seg_offset
+        zend = float(ze.get("end", 0)) - seg_offset
+        if zend <= 0 or zs >= duration:
+            continue
+        local_entries.append({
+            **ze,
+            "start": max(0, zs),
+            "end": min(duration, zend),
+        })
+
+    z_expr = _build_zoom_t_expr(local_entries, dz)
+
+    max_zoom = dz
+    for e in local_entries:
+        max_zoom = max(max_zoom, float(e.get("from", dz)), float(e.get("to", dz)))
+    max_zoom = min(max_zoom + 0.05, 2.5)
+
+    sw = int(target_w * max_zoom)
+    sh = int(target_h * max_zoom)
+    sw += sw % 2
+    sh += sh % 2
+
+    cw = target_w
+    ch = target_h
+    cx = f"(iw-{cw})*({z_expr}-1)/({max_zoom:.4f}-1)/2"
+    cy = f"(ih-{ch})*({z_expr}-1)/({max_zoom:.4f}-1)/2"
+
+    vf = (
+        f"scale={sw}:{sh}:flags=bilinear,"
+        f"crop={cw}:{ch}:{cx}:{cy},"
+        f"setsar=1:1"
+    )
+
+    _run([
+        FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-i", str(src),
+        "-vf", vf,
+        "-vsync", "cfr",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
+        "-threads", "4",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "copy",
+        str(dst),
+    ])
+    return dst.exists()
+
+
 def _zoom_filter_for_level(zoom_level: int, target_w: int, target_h: int) -> str | None:
     """Return an FFmpeg vf string for a jump zoom at the given level.
 
@@ -808,25 +912,56 @@ def _concat_with_zoom(
     target_w: int,
     target_h: int,
     fps: int,
+    zoom_entries_per_seg: list[list[dict]] | None = None,
+    seg_durations: list[float] | None = None,
 ) -> None:
-    """Concat segments with per-segment jump zoom in a single ffmpeg pass.
+    """Concat segments with per-segment zoom (animated or static fallback).
 
-    Folds the zoom encode into the concat step, eliminating a separate
-    _apply_segment_zoom() pass. Uses filter_complex concat filter so each
-    segment's scale+crop zoom is applied inline before concatenation.
-    Single-segment shortcut avoids the concat filter overhead.
+    If zoom_entries_per_seg is provided and a segment has entries, uses
+    animated scale+crop zoom (smooth drift/punch_in interpolation).
+    Otherwise falls back to the static jump-zoom crop.
     """
+    import tempfile as _tf
+
     n = len(parts)
+    zoomed_parts: list[Path] = []
+    _tmp_zoomed: list[Path] = []
+
+    for i in range(n):
+        entries = (zoom_entries_per_seg[i] if zoom_entries_per_seg and i < len(zoom_entries_per_seg) else [])
+        dur = (seg_durations[i] if seg_durations and i < len(seg_durations) else 0)
+        has_animation = bool(entries) and dur > 0
+
+        if has_animation:
+            zoomed = Path(_tf.gettempdir()) / f"zoom_seg_{i}_{parts[i].stem}.mp4"
+            ok = _apply_animated_zoom(
+                parts[i], zoomed, entries, seg_offset=0.0,
+                target_w=target_w, target_h=target_h,
+                fps=fps, duration=dur,
+                default_zoom=zoom_levels[i] / 100.0,
+            )
+            if ok and zoomed.exists():
+                zoomed_parts.append(zoomed)
+                _tmp_zoomed.append(zoomed)
+                continue
+        zoomed_parts.append(parts[i])
+
+    # Concat all parts (with static zoom applied inline for non-animated segments)
     if n == 1:
-        zoom_f = _zoom_filter_for_level(zoom_levels[0], target_w, target_h)
-        vf = (
-            f"{zoom_f},setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
-            if zoom_f
-            else f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
-        )
+        p = zoomed_parts[0]
+        is_animated = p != parts[0]
+        if is_animated:
+            vf = f"fps={fps},setpts=N/FRAME_RATE/TB"
+        else:
+            zoom_f = _zoom_filter_for_level(zoom_levels[0], target_w, target_h)
+            vf = (
+                f"{zoom_f},setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+                if zoom_f
+                else f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+            )
         _run([
             FFMPEG_PATH, "-y", "-loglevel", "error",
-            "-fflags", "+genpts", "-i", str(parts[0]),
+            "-fflags", "+genpts", "-i", str(p),
             "-vf", vf,
             "-vsync", "cfr",
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
@@ -836,42 +971,44 @@ def _concat_with_zoom(
             "-c:a", "copy",
             str(dst),
         ])
-        return
+    else:
+        inputs: list[str] = []
+        for p in zoomed_parts:
+            inputs += ["-fflags", "+genpts", "-i", str(p)]
 
-    inputs: list[str] = []
-    for p in parts:
-        inputs += ["-fflags", "+genpts", "-i", str(p)]
+        fc_parts: list[str] = []
+        for i in range(n):
+            is_animated = zoomed_parts[i] != parts[i]
+            if is_animated:
+                vf_chain = f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+            else:
+                zoom_f = _zoom_filter_for_level(zoom_levels[i], target_w, target_h)
+                vf_chain = (
+                    f"{zoom_f},setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+                    if zoom_f
+                    else f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
+                )
+            fc_parts.append(f"[{i}:v]{vf_chain}[v{i}]")
 
-    fc_parts: list[str] = []
-    for i, zoom_level in enumerate(zoom_levels):
-        zoom_f = _zoom_filter_for_level(zoom_level, target_w, target_h)
-        # Jump-zoom crop + SAR normalization + PTS reset. No zoompan here --
-        # zoompan in filter_complex changes video duration while audio passes
-        # through unchanged, causing AV sync drift of 2–3s.
-        vf_chain = (
-            f"{zoom_f},setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
-            if zoom_f
-            else f"setsar=1:1,fps={fps},setpts=N/FRAME_RATE/TB"
-        )
-        fc_parts.append(f"[{i}:v]{vf_chain}[v{i}]")
+        concat_inputs = "".join(f"[v{i}][{i}:a]" for i in range(n))
+        fc_parts.append(f"{concat_inputs}concat=n={n}:v=1:a=1[vout][aout]")
 
-    concat_inputs = "".join(f"[v{i}][{i}:a]" for i in range(n))
-    fc_parts.append(f"{concat_inputs}concat=n={n}:v=1:a=1[vout][aout]")
+        _run([
+            FFMPEG_PATH, "-y", "-loglevel", "error",
+            *inputs,
+            "-filter_complex", ";".join(fc_parts),
+            "-map", "[vout]", "-map", "[aout]",
+            "-vsync", "cfr",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
+            "-threads", "4",
+            "-x264-params", "rc-lookahead=0:bframes=0",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
+            str(dst),
+        ])
 
-    # filter_complex outputs cannot use -c:a copy -- [aout] is a filtered stream.
-    _run([
-        FFMPEG_PATH, "-y", "-loglevel", "error",
-        *inputs,
-        "-filter_complex", ";".join(fc_parts),
-        "-map", "[vout]", "-map", "[aout]",
-        "-vsync", "cfr",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
-        "-threads", "4",
-        "-x264-params", "rc-lookahead=0:bframes=0",
-        "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "192k", "-ar", "44100",
-        str(dst),
-    ])
+    for tmp in _tmp_zoomed:
+        tmp.unlink(missing_ok=True)
 
 
 def _reencode_clean(src: Path, dst: Path, fps: int) -> None:
@@ -1457,6 +1594,8 @@ def render(
     parts: list[Path] = []
     zoom_levels: list[int] = []
     zoom_segments: list[int] = []
+    seg_offsets: list[float] = []
+    seg_durations: list[float] = []
     cum = 0.0  # exact video output timeline -- no audio-handle inflation
     remapped_zoom: list[dict[str, Any]] = []
     remapped_words: list[WordTiming] = []
@@ -1482,6 +1621,7 @@ def render(
         if i + 1 < len(keep):
             _next_s_raw = float(keep[i + 1]["start"])
             e = min(e, max(s + 0.15, _next_s_raw - 0.05))
+        e_effective = e  # source end AFTER extension, BEFORE padding — used for caption remap
         # Hard Rule 2 -- pad cut edges
         s = max(0.0, s - pad)
         e = min(src_duration, e + pad) if src_duration > 0 else e + pad
@@ -1575,6 +1715,8 @@ def render(
             zoom_segments.append(i)
             zoom_levels.append(zoom_level)
             parts.append(part)
+            seg_offsets.append(cum)
+            seg_durations.append(slide_dur)
             seg_offset = cum
             cut_timestamps.append(cum)
             slide_ranges.append((cum, cum + slide_dur))
@@ -1621,23 +1763,20 @@ def render(
 
         _word_count_before = len(remapped_words)
         all_words = [w for tseg in transcript.get("segments", []) for w in tseg.get("words", [])]
-        print(f"[CAP DEBUG] seg {i}: looking for words between {s_raw:.3f} and {e_raw:.3f}")
-        words_in_range = [w for w in all_words if (s_raw - 0.05) <= float(w["start"]) < (e_raw + 0.05)]
+        print(f"[CAP DEBUG] seg {i}: looking for words between {s_raw:.3f} and {e_effective:.3f}")
+        words_in_range = [w for w in all_words if (s_raw - 0.05) <= float(w["start"]) < (e_effective + 0.05)]
         print(f"[CAP DEBUG] found {len(words_in_range)} words in range")
-        # FIX 1 -- CAPTION DESYNC: scale each word's position proportionally
-        # from the planned source span [s_raw, e_raw) into the actual edit
-        # span [0, actual_edit_dur). A plain (ws - s) offset overflows past
-        # this segment's video frames whenever snapping/padding shrinks the
-        # cut well below the planned duration, landing captions on the
-        # WRONG segment's footage.
-        source_dur = e_raw - s_raw
+        # Caption remap: proportional scaling from source span [s_raw, e_effective)
+        # into edit span [0, actual_edit_dur). e_effective includes sentence-boundary
+        # extension so words from the extension are captured and correctly placed.
+        source_dur = e_effective - s_raw
         actual_edit_dur = e - s
         for w in words_in_range:
             ws = float(w["start"])
             we = float(w["end"])
             if source_dur > 0:
                 start_progress = (ws - s_raw) / source_dur
-                end_progress = (min(we, e_raw) - s_raw) / source_dur
+                end_progress = (min(we, e_effective) - s_raw) / source_dur
                 remapped_start = seg_offset + start_progress * actual_edit_dur
                 remapped_end = seg_offset + end_progress * actual_edit_dur
             else:
@@ -1685,10 +1824,10 @@ def render(
                 m_end = float(moment.get("end", m_at + 3.0))
             except (TypeError, ValueError):
                 continue
-            if s_raw <= m_at < e_raw:
+            if s_raw <= m_at < e_effective:
                 if source_dur > 0:
                     m_start_progress = (m_at - s_raw) / source_dur
-                    m_end_progress = (min(m_end, e_raw) - s_raw) / source_dur
+                    m_end_progress = (min(m_end, e_effective) - s_raw) / source_dur
                     rm_start = seg_offset + m_start_progress * actual_edit_dur
                     rm_end = seg_offset + m_end_progress * actual_edit_dur
                 else:
@@ -1718,6 +1857,8 @@ def render(
                     "duration": mg_dur,
                 })
 
+        seg_offsets.append(cum)
+        seg_durations.append(e - s)
         if parts:  # record cut point in output timeline
             cut_timestamps.append(cum)
         cum += (e - s)  # exact segment duration -- no audio-handle inflation
@@ -1742,8 +1883,29 @@ def render(
         _reencode_clean(_p, _cp, fps)
         clean_parts.append(_cp)
 
+    # Build per-segment zoom entries from remapped_zoom for animated zoom.
+    zoom_entries_per_seg: list[list[dict]] = [[] for _ in clean_parts]
+    for rz in remapped_zoom:
+        rz_start = float(rz.get("start", 0))
+        for si in range(len(seg_offsets)):
+            so = seg_offsets[si]
+            sd = seg_durations[si]
+            if so <= rz_start < so + sd:
+                zoom_entries_per_seg[si].append({
+                    **rz,
+                    "start": rz_start - so,
+                    "end": float(rz.get("end", rz_start)) - so,
+                })
+                break
+    _n_animated = sum(1 for e in zoom_entries_per_seg if e)
+    print(f"[ZOOM] Animated segments: {_n_animated}/{len(clean_parts)} (rest use static crop)")
+
     concat_path = work_dir / "concat.mp4"
-    _concat_with_zoom(clean_parts, zoom_levels, concat_path, target_w, target_h, fps)
+    _concat_with_zoom(
+        clean_parts, zoom_levels, concat_path, target_w, target_h, fps,
+        zoom_entries_per_seg=zoom_entries_per_seg,
+        seg_durations=seg_durations,
+    )
     print(f"[AUDIO] Concat+zoom complete: {concat_path}")
 
     # Verify AV sync immediately after concat; capture audio duration for trim.
