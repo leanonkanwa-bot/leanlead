@@ -18,6 +18,7 @@ COPY backend/ ./
 ARG RAILWAY_GIT_COMMIT_SHA=""
 RUN if [ -n "$RAILWAY_GIT_COMMIT_SHA" ]; then echo "$RAILWAY_GIT_COMMIT_SHA" > COMMIT_HASH; fi
 RUN cd app/engine && npm ci --omit=dev 2>/dev/null || npm install --omit=dev 2>/dev/null || true
+RUN cd app/engine/remotion && npm ci --omit=dev 2>/dev/null || npm install --omit=dev 2>/dev/null || true
 COPY editor_frontend/ /app/editor_frontend/
 COPY frontend/ /app/frontend/
 EXPOSE 8000
