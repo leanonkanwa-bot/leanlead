@@ -1,4 +1,4 @@
-import { AbsoluteFill, OffthreadVideo, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, OffthreadVideo, useCurrentFrame, useVideoConfig, staticFile } from "remotion";
 
 export type ZoomEntry = {
   start: number;
@@ -51,7 +51,7 @@ export const ZoomSegment: React.FC<Props> = ({ videoSrc, zoomEntries, defaultZoo
         }}
       >
         <OffthreadVideo
-          src={videoSrc}
+          src={staticFile(videoSrc)}
           style={{ width: "100%", height: "100%" }}
         />
       </div>

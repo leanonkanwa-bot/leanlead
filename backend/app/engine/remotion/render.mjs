@@ -6,14 +6,15 @@
  * The manifest JSON contains everything needed:
  *   { videoSrc, zoomEntries, defaultZoom, durationFrames, fps, width, height }
  *
- * videoSrc must be an absolute filesystem path. This script converts it
- * to a file:// URL for Remotion's OffthreadVideo component.
+ * videoSrc must be an absolute filesystem path. This script copies the
+ * file into the Webpack bundle's public/ directory so Remotion's
+ * OffthreadVideo can access it via staticFile().
  */
 import { bundle } from "@remotion/bundler";
 import { renderMedia, selectComposition, ensureBrowser } from "@remotion/renderer";
-import { readFileSync, existsSync } from "fs";
-import { resolve, dirname, isAbsolute } from "path";
-import { fileURLToPath, pathToFileURL } from "url";
+import { readFileSync, existsSync, copyFileSync, mkdirSync } from "fs";
+import { resolve, dirname, basename, isAbsolute } from "path";
+import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -34,13 +35,7 @@ let {
   height = 1080,
 } = manifest;
 
-// Convert filesystem path to file:// URL for OffthreadVideo
-if (isAbsolute(videoSrc) && !videoSrc.startsWith("file://")) {
-  videoSrc = pathToFileURL(resolve(videoSrc)).href;
-}
-console.log(`[REMOTION] videoSrc: ${videoSrc}`);
-
-// Prefer system Chromium (already in Docker image) over downloading a new one.
+// Prefer system Chromium (already in Docker image) over downloading.
 const CHROMIUM_PATHS = [
   "/usr/bin/chromium",
   "/usr/bin/chromium-browser",
@@ -59,8 +54,25 @@ const bundleLocation = await bundle({
   entryPoint: resolve(__dirname, "src/index.ts"),
   webpackOverride: (config) => config,
 });
+console.log(`[REMOTION] Bundle at: ${bundleLocation}`);
 
-const inputProps = { videoSrc, zoomEntries, defaultZoom };
+// Copy the video file INTO the bundle's public/ directory so
+// OffthreadVideo can load it via the bundle's HTTP server.
+// Remotion docs: "you can add assets to the public folder that is
+// inside the bundle after the fact" when using SSR APIs.
+const videoFileName = basename(videoSrc);
+const bundlePublic = resolve(bundleLocation, "public");
+mkdirSync(bundlePublic, { recursive: true });
+const videoDest = resolve(bundlePublic, videoFileName);
+console.log(`[REMOTION] Copying video into bundle: ${videoSrc} -> ${videoDest}`);
+copyFileSync(resolve(videoSrc), videoDest);
+
+// The component receives the staticFile-style path (just the filename,
+// served from the bundle's public/ root).
+const videoUrl = videoFileName;
+console.log(`[REMOTION] Video URL for composition: ${videoUrl}`);
+
+const inputProps = { videoSrc: videoUrl, zoomEntries, defaultZoom };
 
 const chromiumOpts = {
   disableWebSecurity: true,
