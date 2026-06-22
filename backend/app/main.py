@@ -1316,8 +1316,8 @@ async def test_remotion():
     results["steps"]["remotion_render"] = {
         "ok": r.returncode == 0,
         "time_s": render_time,
-        "stdout": r.stdout[-500:],
-        "err": r.stderr[-500:] if r.returncode != 0 else "",
+        "stdout": r.stdout[-2000:],
+        "stderr": r.stderr[-3000:],
     }
 
     if output_path.exists():
