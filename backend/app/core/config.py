@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     # Toggle via Railway env var to instantly roll back without a deploy.
     motion_graphics_mode: str = "generated"
 
+    # Zoom renderer for animated zoom per segment.
+    # "ffmpeg" = FFmpeg scale+crop expressions (original, default fallback).
+    # "remotion" = Remotion composition with CSS transforms (smoother, proven).
+    # Toggle via ZOOM_RENDERER env var on Railway for instant rollback.
+    zoom_renderer: str = "ffmpeg"
+
     @property
     def uploads_dir(self) -> Path:
         return (BACKEND_DIR / self.storage_uploads).resolve()

@@ -905,6 +905,49 @@ def _zoom_filter_for_level(zoom_level: int, target_w: int, target_h: int) -> str
     )
 
 
+def _apply_remotion_zoom(
+    src: Path, dst: Path,
+    zoom_entries: list[dict],
+    target_w: int, target_h: int,
+    fps: int, duration: float,
+    default_zoom: float = 1.3,
+) -> bool:
+    """Apply animated zoom via Remotion composition."""
+    import json as _json
+    import tempfile as _tf
+
+    remotion_dir = Path(__file__).resolve().parent / "remotion"
+    render_script = remotion_dir / "render.mjs"
+    if not render_script.exists():
+        print(f"[REMOTION] render.mjs not found at {render_script}")
+        return False
+
+    manifest = {
+        "videoSrc": str(src.resolve()),
+        "zoomEntries": zoom_entries,
+        "defaultZoom": default_zoom,
+        "durationFrames": max(1, round(duration * fps)),
+        "fps": fps,
+        "width": target_w,
+        "height": target_h,
+    }
+    manifest_path = Path(_tf.gettempdir()) / f"remotion_manifest_{src.stem}.json"
+    manifest_path.write_text(_json.dumps(manifest))
+
+    import os as _os
+    env = {**_os.environ, "DISPLAY": _os.environ.get("DISPLAY", ":99")}
+    proc = subprocess.run(
+        ["node", str(render_script), str(manifest_path), str(dst)],
+        capture_output=True, text=True, timeout=300, env=env,
+    )
+    manifest_path.unlink(missing_ok=True)
+
+    if proc.returncode != 0:
+        print(f"[REMOTION] Render failed: {proc.stderr[-500:]}")
+        return False
+    return dst.exists()
+
+
 def _concat_with_zoom(
     parts: list[Path],
     zoom_levels: list[int],
@@ -934,12 +977,26 @@ def _concat_with_zoom(
 
         if has_animation:
             zoomed = Path(_tf.gettempdir()) / f"zoom_seg_{i}_{parts[i].stem}.mp4"
-            ok = _apply_animated_zoom(
-                parts[i], zoomed, entries, seg_offset=0.0,
-                target_w=target_w, target_h=target_h,
-                fps=fps, duration=dur,
-                default_zoom=zoom_levels[i] / 100.0,
-            )
+            _dz = zoom_levels[i] / 100.0
+
+            ok = False
+            if settings.zoom_renderer == "remotion":
+                print(f"[ZOOM] Segment {i}: using Remotion renderer")
+                ok = _apply_remotion_zoom(
+                    parts[i], zoomed, entries,
+                    target_w=target_w, target_h=target_h,
+                    fps=fps, duration=dur, default_zoom=_dz,
+                )
+                if not ok:
+                    print(f"[ZOOM] Segment {i}: Remotion failed, falling back to FFmpeg")
+
+            if not ok:
+                ok = _apply_animated_zoom(
+                    parts[i], zoomed, entries, seg_offset=0.0,
+                    target_w=target_w, target_h=target_h,
+                    fps=fps, duration=dur, default_zoom=_dz,
+                )
+
             if ok and zoomed.exists():
                 zoomed_parts.append(zoomed)
                 _tmp_zoomed.append(zoomed)

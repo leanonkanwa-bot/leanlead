@@ -1400,6 +1400,111 @@ Zoom: 1.0 &rarr; 1.3 drift over 3s (testsrc2 pattern)</p>
     return Response(content=html, media_type="text/html")
 
 
+@app.get("/api/test-remotion/compare", include_in_schema=False)
+async def test_remotion_compare():
+    """Render one segment with both FFmpeg and Remotion zoom, show frames side by side."""
+    import subprocess as _sp
+    import json as _json
+    import time as _time
+    import base64 as _b64
+    from app.engine.transcribe import FFMPEG_PATH, FFPROBE_PATH
+    from app.engine.render import _apply_animated_zoom, _apply_remotion_zoom
+
+    work = Path("/tmp/remotion_compare")
+    work.mkdir(parents=True, exist_ok=True)
+    results: dict = {}
+
+    # Create a 5s testsrc2 pattern video (visible grid for zoom tracking)
+    test_src = work / "source.mp4"
+    _sp.run([
+        FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-f", "lavfi", "-i", "testsrc2=s=1920x1080:d=5:r=30",
+        "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
+        "-t", "5", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
+        str(test_src),
+    ], capture_output=True, text=True)
+
+    zoom_entries = [
+        {"start": 0.0, "end": 5.0, "from": 1.0, "to": 1.3, "kind": "drift"},
+    ]
+    frame_times = [0.3, 1.0, 2.0, 3.0, 4.0, 4.7]
+
+    def _render_and_extract(label, render_fn):
+        out = work / f"{label}.mp4"
+        t0 = _time.time()
+        ok = render_fn(out)
+        elapsed = round(_time.time() - t0, 2)
+
+        info = {"ok": ok, "time_s": elapsed, "frames": []}
+        if ok and out.exists():
+            info["size_mb"] = round(out.stat().st_size / 1024 / 1024, 2)
+            p = _sp.run([
+                FFPROBE_PATH, "-v", "error",
+                "-select_streams", "v:0",
+                "-show_entries", "stream=duration,width,height",
+                "-of", "json", str(out),
+            ], capture_output=True, text=True)
+            if p.returncode == 0:
+                info["probe"] = _json.loads(p.stdout)
+
+            for ft in frame_times:
+                fp = work / f"{label}_{ft:.1f}.jpg"
+                _sp.run([
+                    FFMPEG_PATH, "-y", "-loglevel", "error",
+                    "-ss", f"{ft:.3f}", "-i", str(out),
+                    "-frames:v", "1", "-q:v", "3", str(fp),
+                ], capture_output=True, text=True)
+                if fp.exists():
+                    info["frames"].append({
+                        "t": ft,
+                        "data": _b64.b64encode(fp.read_bytes()).decode("ascii"),
+                    })
+                    fp.unlink(missing_ok=True)
+            out.unlink(missing_ok=True)
+        return info
+
+    results["ffmpeg"] = _render_and_extract("ffmpeg", lambda out: _apply_animated_zoom(
+        test_src, out, zoom_entries, seg_offset=0.0,
+        target_w=1920, target_h=1080, fps=30, duration=5.0, default_zoom=1.3,
+    ))
+    results["remotion"] = _render_and_extract("remotion", lambda out: _apply_remotion_zoom(
+        test_src, out, zoom_entries,
+        target_w=1920, target_h=1080, fps=30, duration=5.0, default_zoom=1.3,
+    ))
+    test_src.unlink(missing_ok=True)
+
+    # Build HTML comparison
+    rows = ""
+    for ft in frame_times:
+        ff_frame = next((f for f in results["ffmpeg"]["frames"] if f["t"] == ft), None)
+        rm_frame = next((f for f in results["remotion"]["frames"] if f["t"] == ft), None)
+        ff_img = f'<img src="data:image/jpeg;base64,{ff_frame["data"]}" style="width:100%">' if ff_frame else '<div style="color:red">MISSING</div>'
+        rm_img = f'<img src="data:image/jpeg;base64,{rm_frame["data"]}" style="width:100%">' if rm_frame else '<div style="color:red">MISSING</div>'
+        rows += f"""<tr>
+<td style="text-align:center;padding:8px;font-size:18px;font-weight:bold">{ft:.1f}s</td>
+<td style="padding:4px">{ff_img}</td>
+<td style="padding:4px">{rm_img}</td>
+</tr>"""
+
+    ff_info = results["ffmpeg"]
+    rm_info = results["remotion"]
+    html = f"""<!DOCTYPE html>
+<html><head><title>FFmpeg vs Remotion Zoom Compare</title></head>
+<body style="background:#111;color:#fff;font-family:system-ui;padding:24px">
+<h2>Zoom Comparison: FFmpeg vs Remotion</h2>
+<p>Zoom: 1.0 &rarr; 1.3 drift over 5s &nbsp;|&nbsp;
+FFmpeg: {ff_info.get('time_s','?')}s ({ff_info.get('size_mb','?')} MB) &nbsp;|&nbsp;
+Remotion: {rm_info.get('time_s','?')}s ({rm_info.get('size_mb','?')} MB)</p>
+<table style="border-collapse:collapse;width:100%">
+<tr><th style="width:60px">Time</th>
+<th style="text-align:center;padding:8px;color:#6cf">FFmpeg</th>
+<th style="text-align:center;padding:8px;color:#fc6">Remotion</th></tr>
+{rows}
+</table>
+</body></html>"""
+    return Response(content=html, media_type="text/html")
+
+
 editor_dir = Path(__file__).resolve().parents[2] / "editor_frontend"
 if not editor_dir.exists():
     # fallback for local dev where files live in frontend/
