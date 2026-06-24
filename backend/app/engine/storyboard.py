@@ -31,55 +31,48 @@ def _segment_captions(
     emphasis_words: list[str],
     word_categories: dict[str, str],
 ) -> list[dict]:
-    """Build caption cards from remapped words using segment-aware grouping.
+    """Build caption cards from remapped words using pause-based grouping.
+
+    Uses remapped_words directly (already in the output timeline via
+    pretrim.py's proven direct-offset math). Does NOT re-remap from
+    source timestamps — that caused word loss when source_to_output()
+    filtered words at segment boundaries.
 
     Algorithm:
-      1. Map each word to its Whisper segment (sentence boundary)
-      2. Within each segment, break at pause gaps >= 0.25s or max 7 words
-      3. Merge orphans (<=2 words) forward into next group, or backward
-         if forward isn't possible — never across segment boundaries
-      4. Attach emphasis/category flags per word
+      1. Convert remapped_words to dicts with emphasis/category flags
+      2. Group by pause gaps >= 0.25s or max 7 words
+      3. Merge orphans (<=2 words) forward or backward
     """
-    # Build per-segment word lists in the trimmed timeline
-    seg_word_groups: list[list[dict]] = []
-    for seg in transcript_segments:
-        seg_words = seg.get("words", [])
-        remapped_seg: list[dict] = []
-        for w in seg_words:
-            src_start = float(w.get("start", 0))
-            out_start = timing_map.source_to_output(src_start)
-            out_end = timing_map.source_to_output(float(w.get("end", src_start)))
-            if out_end <= out_start:
-                continue
-            if out_start > timing_map.output_duration:
-                continue
-            text = w.get("text", "").strip()
-            if not text:
-                continue
-            text_lower = text.lower().strip(".,!?;:'\"")
-            remapped_seg.append({
-                "text": text,
-                "start": round(out_start, 4),
-                "end": round(out_end, 4),
-                "emphasis": text_lower in [ew.lower() for ew in emphasis_words],
-                "category": word_categories.get(text_lower, ""),
-            })
-        if remapped_seg:
-            seg_word_groups.append(remapped_seg)
+    emphasis_set = {ew.lower() for ew in emphasis_words}
 
-    # Step 1: segment-aware grouping
+    all_words: list[dict] = []
+    for w in remapped_words:
+        text = w.text.strip()
+        if not text:
+            continue
+        if w.end <= w.start:
+            continue
+        text_lower = text.lower().strip(".,!?;:'\"")
+        all_words.append({
+            "text": text,
+            "start": round(w.start, 4),
+            "end": round(w.end, 4),
+            "emphasis": text_lower in emphasis_set,
+            "category": word_categories.get(text_lower, ""),
+        })
+
+    # Step 1: group by pause gaps and word count
     raw_groups: list[list[dict]] = []
-    for seg_words in seg_word_groups:
-        current: list[dict] = []
-        for w in seg_words:
-            if current:
-                gap = w["start"] - current[-1]["end"]
-                if gap >= _PAUSE_GAP or len(current) >= _MAX_WORDS:
-                    raw_groups.append(current)
-                    current = []
-            current.append(w)
+    current: list[dict] = []
+    for w in all_words:
         if current:
-            raw_groups.append(current)
+            gap = w["start"] - current[-1]["end"]
+            if gap >= _PAUSE_GAP or len(current) >= _MAX_WORDS:
+                raw_groups.append(current)
+                current = []
+        current.append(w)
+    if current:
+        raw_groups.append(current)
 
     # Step 2: merge orphans
     merged: list[list[dict]] = []
