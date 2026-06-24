@@ -1530,10 +1530,17 @@ def _render_hyperframes(
     _health_check(src)
     print("[RENDER] Using HyperFrames pipeline")
 
+    # Dump plan diagnostics for debugging
+    _n_keep = len(plan.keep_segments or [])
+    _n_zoom = len(plan.zoom_plan or [])
+    _n_words_src = sum(len(s.get("words", [])) for s in transcript.get("segments", []))
+    print(f"[HF] Plan: {_n_keep} keep_segments, {_n_zoom} zoom_plan entries, {_n_words_src} source words")
+
     # Stage 1: Pre-trim
     print("[HF] Stage 1: Pre-trimming source video...")
     trimmed, timing_map = pretrim(src, transcript, plan, work_dir)
     print(f"[HF] Trimmed: {timing_map.output_duration:.1f}s, {len(timing_map.remapped_words)} words")
+    print(f"[HF] Source intervals: {len(timing_map.source_intervals)}, compressed: {timing_map.compressed_intervals is not None}")
 
     # Remap zoom_plan entries to trimmed timeline
     remapped_zoom = []
