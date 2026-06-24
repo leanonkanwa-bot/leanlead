@@ -1243,6 +1243,177 @@ async def test_broll():
         return {"error": str(e), "key_set": bool(key)}
 
 
+@app.get("/api/test-hyperframes")
+async def test_hyperframes():
+    """Render a 3s GSAP animation via the official HyperFrames CLI and return frames."""
+    import subprocess as _sp
+    import time as _time
+    import base64 as _b64
+    from app.engine.transcribe import FFMPEG_PATH, FFPROBE_PATH
+
+    work = Path("/tmp/hf_test")
+    work.mkdir(parents=True, exist_ok=True)
+    comp_dir = work / "project"
+    comp_dir.mkdir(parents=True, exist_ok=True)
+    results: dict = {"steps": {}}
+
+    # Write a minimal HyperFrames composition with GSAP animation
+    (comp_dir / "index.html").write_text("""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1920px; height: 1080px; background: #111; overflow: hidden; }
+  .grid { position: absolute; inset: 0; display: grid;
+          grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(4, 1fr); gap: 4px; padding: 40px; }
+  .cell { border: 2px solid #333; border-radius: 8px; display: flex;
+          align-items: center; justify-content: center; font: bold 24px system-ui; color: #666; }
+  .box { position: absolute; width: 300px; height: 300px; background: #00C3FF;
+         border-radius: 20px; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.3);
+         display: flex; align-items: center; justify-content: center;
+         font: bold 48px system-ui; color: #fff; }
+  .label { position: absolute; bottom: 40px; left: 0; right: 0; text-align: center;
+           font: bold 36px system-ui; color: #555; opacity: 0; }
+</style>
+</head>
+<body data-duration="3" data-fps="30">
+  <div class="grid"></div>
+  <div class="box" id="box">ZOOM</div>
+  <div class="label" id="label">HyperFrames Deterministic Render Test</div>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<script>
+  // Fill grid
+  const grid = document.querySelector('.grid');
+  for (let i = 0; i < 32; i++) {
+    const c = document.createElement('div');
+    c.className = 'cell';
+    c.textContent = String(i + 1).padStart(2, '0');
+    grid.appendChild(c);
+  }
+
+  const tl = gsap.timeline();
+  tl.to('#box', { scale: 1.0, x: '-50%', y: '-50%', duration: 1.0, ease: 'power2.out' }, 0);
+  tl.to('#box', { rotation: 360, duration: 2.0, ease: 'none' }, 0.5);
+  tl.to('#box', { scale: 1.5, duration: 1.0, ease: 'power2.inOut' }, 1.5);
+  tl.to('#label', { opacity: 1, y: -20, duration: 0.5, ease: 'power2.out' }, 0.3);
+  tl.to('#label', { opacity: 0, duration: 0.3 }, 2.5);
+</script>
+</body>
+</html>""", encoding="utf-8")
+
+    # Render via official HyperFrames CLI
+    output_path = work / "output.mp4"
+    t0 = _time.time()
+    try:
+        r = _sp.run(
+            [
+                "npx", "hyperframes", "render",
+                str(comp_dir),
+                "-o", str(output_path),
+                "--fps", "30",
+                "--quality", "draft",
+                "--no-page-side-compositing",
+            ],
+            capture_output=True, text=True, timeout=180,
+            env={**__import__("os").environ, "DISPLAY": ":99"},
+        )
+    except Exception as e:
+        results["error"] = str(e)
+        return results
+
+    render_time = round(_time.time() - t0, 2)
+    results["steps"]["render"] = {
+        "ok": r.returncode == 0,
+        "time_s": render_time,
+        "stdout": r.stdout[-2000:],
+        "stderr": r.stderr[-3000:],
+    }
+
+    render_ok = r.returncode == 0 and output_path.exists()
+    frames_b64: list[dict] = []
+
+    if output_path.exists():
+        results["output_size_mb"] = round(output_path.stat().st_size / 1024 / 1024, 2)
+        p = _sp.run([
+            FFPROBE_PATH,
+            "-v", "error", "-show_entries", "stream=codec_name,width,height,duration",
+            "-of", "json", str(output_path),
+        ], capture_output=True, text=True)
+        if p.returncode == 0:
+            import json as _json
+            results["output_probe"] = _json.loads(p.stdout)
+
+        for ft in [0.1, 0.5, 1.0, 1.5, 2.0, 2.5, 2.9]:
+            fp = work / f"frame_{ft:.1f}.jpg"
+            _sp.run([
+                FFMPEG_PATH, "-y", "-loglevel", "error",
+                "-ss", f"{ft:.3f}", "-i", str(output_path),
+                "-frames:v", "1", "-q:v", "3", str(fp),
+            ], capture_output=True, text=True)
+            if fp.exists():
+                frames_b64.append({
+                    "t": ft,
+                    "data": _b64.b64encode(fp.read_bytes()).decode("ascii"),
+                })
+                fp.unlink(missing_ok=True)
+
+    results["frames"] = frames_b64
+
+    # Cleanup
+    for f in [output_path, comp_dir / "index.html"]:
+        try:
+            f.unlink(missing_ok=True)
+        except Exception:
+            pass
+    try:
+        comp_dir.rmdir()
+    except Exception:
+        pass
+
+    results["verdict"] = "PASS" if render_ok else "FAIL"
+    return results
+
+
+@app.get("/api/test-hyperframes/view", include_in_schema=False)
+async def test_hyperframes_view():
+    """Run the HyperFrames test and show frames in an HTML page."""
+    result = await test_hyperframes()
+    frames = result.get("frames", [])
+    verdict = result.get("verdict", "UNKNOWN")
+    render_time = result.get("steps", {}).get("render", {}).get("time_s", "?")
+    size_mb = result.get("output_size_mb", "?")
+
+    imgs = ""
+    for f in frames:
+        imgs += (
+            f'<div style="text-align:center">'
+            f'<img src="data:image/jpeg;base64,{f["data"]}" '
+            f'style="width:420px;border:1px solid #333;border-radius:4px">'
+            f'<div style="margin-top:4px;font-size:14px;color:#ccc">t = {f["t"]:.1f}s</div>'
+            f'</div>'
+        )
+
+    err_detail = ""
+    render_step = result.get("steps", {}).get("render", {})
+    if not render_step.get("ok"):
+        err_detail = f"""<details open style="margin-top:16px"><summary style="color:#f66">Render Error</summary>
+<pre style="background:#220000;padding:12px;border-radius:4px;overflow-x:auto;font-size:11px;max-height:400px;color:#faa">{render_step.get('stderr','')}</pre>
+<pre style="background:#222;padding:12px;border-radius:4px;overflow-x:auto;font-size:11px;max-height:400px">{render_step.get('stdout','')}</pre>
+</details>"""
+
+    html = f"""<!DOCTYPE html>
+<html><head><title>HyperFrames Animation Test</title></head>
+<body style="background:#111;color:#fff;font-family:system-ui;padding:24px">
+<h2>HyperFrames Official CLI Test -- {verdict}</h2>
+<p>Render: {render_time}s | Output: {size_mb} MB |
+GSAP animation: scale 0.3-1.5, rotation 360deg, label fade</p>
+{err_detail}
+<div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:16px">{imgs}</div>
+</body></html>"""
+    return Response(content=html, media_type="text/html")
+
+
 editor_dir = Path(__file__).resolve().parents[2] / "editor_frontend"
 if not editor_dir.exists():
     # fallback for local dev where files live in frontend/
