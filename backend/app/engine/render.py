@@ -1510,6 +1510,117 @@ def _health_check(src: Path) -> None:
     print(f"[HEALTH] src={src.name}  size={size_mb:.1f}MB  est_render_time=~{est_min}min")
 
 
+def _render_hyperframes(
+    src: Path,
+    transcript: dict[str, Any],
+    plan: EditPlan,
+    work_dir: Path,
+    output_path: Path,
+    *,
+    brand_color: str = "#FF7751",
+    content_type: str = "coaching",
+    editing_style: str = "viral",
+) -> dict[str, Any]:
+    """Full HyperFrames pipeline: pre-trim -> storyboard -> compose -> render."""
+    from app.engine.pretrim import pretrim
+    from app.engine.storyboard import generate_storyboard
+    from app.engine.compose import compose
+    from app.engine.hyperframes_engine import _render_with_hyperframes_cli
+
+    _health_check(src)
+    print("[RENDER] Using HyperFrames pipeline")
+
+    # Stage 1: Pre-trim
+    print("[HF] Stage 1: Pre-trimming source video...")
+    trimmed, timing_map = pretrim(src, transcript, plan, work_dir)
+    print(f"[HF] Trimmed: {timing_map.output_duration:.1f}s, {len(timing_map.remapped_words)} words")
+
+    # Remap zoom_plan entries to trimmed timeline
+    remapped_zoom = []
+    for zp in plan.zoom_plan:
+        zs = float(zp.get("start", 0))
+        ze = float(zp.get("end", zs))
+        out_s = timing_map.source_to_output(zs)
+        out_e = timing_map.source_to_output(ze)
+        if out_e > out_s:
+            remapped_zoom.append({
+                **zp,
+                "start": round(out_s, 4),
+                "end": round(out_e, 4),
+            })
+    print(f"[HF] Remapped {len(remapped_zoom)} zoom entries to trimmed timeline")
+
+    # Stage 2: Storyboard
+    print("[HF] Stage 2: Generating storyboard...")
+    storyboard = generate_storyboard(
+        trimmed_duration=timing_map.output_duration,
+        remapped_words=timing_map.remapped_words,
+        transcript_segments=transcript.get("segments", []),
+        script_structure=plan.script_structure or [],
+        keep_segments=plan.keep_segments or [],
+        key_lines=plan.key_lines or [],
+        caption_emphasis_words=plan.caption_emphasis_words or [],
+        word_categories=plan.word_categories or {},
+        brand_color=brand_color,
+        content_type=content_type,
+        editing_style=editing_style,
+        format_hint=plan.format,
+        timing_map=timing_map,
+    )
+    n_graphic = sum(1 for c in storyboard.get("cards", []) if c.get("type") != "caption")
+    n_caption = sum(1 for c in storyboard.get("cards", []) if c.get("type") == "caption")
+    print(f"[HF] Storyboard: {n_graphic} graphic + {n_caption} caption cards")
+
+    # Stage 3: Compose
+    print("[HF] Stage 3: Assembling HyperFrames composition...")
+    project_dir = compose(
+        storyboard=storyboard,
+        trimmed_video=trimmed,
+        work_dir=work_dir,
+        zoom_entries=remapped_zoom,
+    )
+
+    # Stage 4: Render via HyperFrames CLI
+    print("[HF] Stage 4: Rendering via HyperFrames CLI...")
+    import os as _os
+    env = _os.environ.copy()
+    env["DISPLAY"] = env.get("DISPLAY", ":99")
+    fps = storyboard["composition"]["fps"]
+    public_dir = project_dir / "public"
+
+    proc = subprocess.run(
+        [
+            "npx", "hyperframes", "render",
+            str(public_dir),
+            "-o", str(output_path),
+            "--fps", str(fps),
+            "--quality", "standard",
+        ],
+        capture_output=True, text=True,
+        timeout=max(300, int(timing_map.output_duration * 30)),
+        env=env,
+    )
+    if proc.returncode != 0 or not output_path.exists():
+        print(f"[HF] Render failed (rc={proc.returncode}): {proc.stderr[-500:]}")
+        raise RuntimeError("HyperFrames CLI render failed")
+
+    print(f"[HF] Done: {output_path}")
+    _probe_av_durations(output_path, "hyperframes_output")
+
+    return {
+        "output": str(output_path),
+        "duration": timing_map.output_duration,
+        "format": plan.format,
+        "packaging": plan.packaging,
+        "plan": plan.raw,
+        "key_lines": plan.key_lines,
+        "hyperframes_rendered": n_graphic,
+        "broll_pauses": 0,
+        "graphics_rendered": ["hyperframes"],
+        "vignette_moments": 0,
+    }
+
+
 def render(
     src: Path,
     transcript: dict[str, Any],
@@ -1529,6 +1640,21 @@ def render(
     editing_style: str = "viral",
 ) -> dict[str, Any]:
     work_dir.mkdir(parents=True, exist_ok=True)
+
+    # ── HyperFrames pipeline (feature-flagged) ───────────────────────
+    if settings.render_engine == "hyperframes":
+        try:
+            return _render_hyperframes(
+                src, transcript, plan, work_dir, output_path,
+                brand_color=brand_color or "#FF7751",
+                content_type=content_type,
+                editing_style=editing_style,
+            )
+        except Exception as _hf_err:
+            print(f"[RENDER] HyperFrames pipeline failed: {_hf_err}")
+            print("[RENDER] Falling back to FFmpeg pipeline")
+
+    # ── FFmpeg pipeline (default / fallback) ──────────────────────────
     _health_check(src)
 
     print(f"[RENDER] plan.format={plan.format!r} plan.raw.get('format')={plan.raw.get('format')!r} | short_form will be {plan.format == 'short'!r}")
