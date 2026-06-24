@@ -60,6 +60,50 @@ class TimingMap:
         return concat_t
 
 
+def _pretrim_passthrough(
+    src: Path,
+    transcript: dict[str, Any],
+    all_words: list[dict],
+    src_duration: float,
+    work_dir: Path,
+) -> tuple[Path, TimingMap]:
+    """No-cut passthrough: re-encode source with dense keyframes, 1:1 timing."""
+    fps = 30
+    final_path = work_dir / "trimmed.mp4"
+    _run([
+        FFMPEG_PATH, "-y", "-loglevel", "error",
+        "-i", str(src),
+        "-c:v", "libx264", "-preset", "fast", "-crf", "18",
+        "-g", str(fps), "-keyint_min", str(fps),
+        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+        "-c:a", "aac", "-b:a", "192k",
+        str(final_path),
+    ])
+
+    output_duration = _probe_duration(final_path)
+
+    # 1:1 timing map — every source word maps to the same output time
+    remapped_words = [
+        WordTiming(
+            text=w.get("text", "").strip(),
+            start=float(w.get("start", 0)),
+            end=float(w.get("end", 0)),
+        )
+        for w in all_words
+        if w.get("text", "").strip()
+    ]
+
+    timing_map = TimingMap(
+        source_intervals=[(0.0, src_duration)],
+        compressed_intervals=None,
+        output_duration=output_duration,
+        remapped_words=remapped_words,
+    )
+
+    print(f"[PRETRIM] Passthrough: {output_duration:.1f}s, {len(remapped_words)} words (no cuts)")
+    return final_path, timing_map
+
+
 def pretrim(
     src: Path,
     transcript: dict[str, Any],
@@ -70,6 +114,8 @@ def pretrim(
 
     Returns (trimmed_path, timing_map).
     """
+    from app.core.config import settings as _cfg
+
     work_dir.mkdir(parents=True, exist_ok=True)
     short_form = plan.format == "short"
     pad = SHORT_PAD_S if short_form else LONG_PAD_S
@@ -80,6 +126,11 @@ def pretrim(
     ]
     words = _flat_words(transcript)
     src_duration = float(transcript.get("duration", 0.0)) or _probe_duration(src)
+
+    # ── DISABLE_CUTS bypass: use full source as one segment ──────────
+    if _cfg.disable_cuts:
+        print("[PRETRIM] DISABLE_CUTS=true — skipping all segment cutting")
+        return _pretrim_passthrough(src, transcript, all_words, src_duration, work_dir)
 
     # ── Segment preparation (same logic as render.py) ────────────────
     keep = plan.keep_segments or [

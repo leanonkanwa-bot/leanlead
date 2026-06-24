@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     # env var on Railway for instant rollback.
     render_engine: str = "ffmpeg"
 
+    # Testing: bypass segment cutting entirely. The full source video
+    # is treated as one kept segment. Planner still runs (zoom, captions,
+    # beat structure) but keep_segments/drop_segments are ignored.
+    disable_cuts: bool = False
+
     @property
     def uploads_dir(self) -> Path:
         return (BACKEND_DIR / self.storage_uploads).resolve()
