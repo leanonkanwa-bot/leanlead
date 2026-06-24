@@ -139,6 +139,7 @@ def _generate_graphic_cards(
     to design cards that reinforce the emotional arc.
     """
     from anthropic import Anthropic
+    from app.core.config import settings
 
     # Compute card density per graphic-overlays formula
     if trimmed_duration < 60:
@@ -242,7 +243,7 @@ Design {target_cards} graphic overlay cards for this video."""
     client = Anthropic()
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model=settings.anthropic_model,
             max_tokens=4096,
             system=system_prompt,
             messages=[{"role": "user", "content": user_msg}],
