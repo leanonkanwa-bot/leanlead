@@ -162,13 +162,42 @@ def _build_caption_card_html(card: dict) -> str:
     )
 
 
-def _build_timeline_js(cards: list[dict]) -> str:
-    """Build the master GSAP timeline script."""
+def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None) -> str:
+    """Build the master GSAP timeline script including zoom/pan on the video wrapper."""
     lines = [
         "(function () {",
         '  const tl = window.gsap.timeline({ paused: true });',
         "",
     ]
+
+    # ── Zoom/pan: CSS transform on #video-wrap ──────────────────────────
+    # Each zoom entry becomes a tween that scales the video wrapper from
+    # `from` to `to` over the entry's time range, using the same easing
+    # curves proven mathematically identical to the FFmpeg expressions
+    # (cosine for drift, quadratic for punch_in — verified 0.00 delta).
+    if zoom_entries:
+        lines.append("  // ── Zoom/pan on video wrapper ──")
+        for ze in zoom_entries:
+            zs = float(ze.get("start", 0))
+            ze_end = float(ze.get("end", zs + 1))
+            zfrom = float(ze.get("from", 1.0))
+            zto = float(ze.get("to", zfrom))
+            kind = ze.get("kind", "drift")
+            zdur = max(0.001, ze_end - zs)
+
+            if kind == "punch_in" or kind == "pull_out":
+                ease = '"power2.in"'
+            else:
+                ease = '"sine.inOut"'
+
+            lines.append(
+                f'  tl.fromTo("#video-wrap", '
+                f'{{ scale: {zfrom:.4f} }}, '
+                f'{{ scale: {zto:.4f}, duration: {zdur:.4f}, ease: {ease}, '
+                f'transformOrigin: "center center" }}, '
+                f'{zs:.4f});'
+            )
+        lines.append("")
 
     for card in cards:
         card_id = card["id"]
@@ -249,8 +278,13 @@ def compose(
     storyboard: dict,
     trimmed_video: Path,
     work_dir: Path,
+    zoom_entries: list[dict] | None = None,
 ) -> Path:
     """Assemble a HyperFrames project directory from a storyboard.
+
+    zoom_entries: list of {start, end, from, to, kind} in the trimmed
+    video's timeline. These become CSS transform: scale() tweens on the
+    video wrapper, replacing FFmpeg's scale+crop zoom pipeline.
 
     Returns the project directory path (containing public/index.html).
     """
@@ -308,7 +342,7 @@ def compose(
         card_hosts.append(_build_card_host(c, layout, track_index=3))
 
     # Build master timeline
-    timeline_js = _build_timeline_js(all_cards)
+    timeline_js = _build_timeline_js(all_cards, zoom_entries=zoom_entries)
 
     # CSS custom properties from theme
     accent_vars = "\n".join(
@@ -336,8 +370,10 @@ def compose(
     position: absolute; left: 0; top: 0;
     width: {width}px; height: {height}px;
     overflow: hidden; border-radius: 0; box-shadow: none;
+    transform-origin: center center;
   }}
   .video-wrapper video {{ width: 100%; height: 100%; object-fit: cover; }}
+  #stage {{ overflow: hidden; }}
   .video-wrapper.framed {{
     border-radius: 16px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.35);
