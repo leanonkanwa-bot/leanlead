@@ -1264,27 +1264,30 @@ async def test_hyperframes():
 <meta charset="utf-8">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { width: 1920px; height: 1080px; background: #111; overflow: hidden; }
+  body { background: #111; overflow: hidden; }
+  [data-composition-id="root"] { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
   .grid { position: absolute; inset: 0; display: grid;
           grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(4, 1fr); gap: 4px; padding: 40px; }
   .cell { border: 2px solid #333; border-radius: 8px; display: flex;
           align-items: center; justify-content: center; font: bold 24px system-ui; color: #666; }
   .box { position: absolute; width: 300px; height: 300px; background: #00C3FF;
-         border-radius: 20px; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.3);
+         border-radius: 20px; top: 50%; left: 50%;
          display: flex; align-items: center; justify-content: center;
          font: bold 48px system-ui; color: #fff; }
-  .label { position: absolute; bottom: 40px; left: 0; right: 0; text-align: center;
-           font: bold 36px system-ui; color: #555; opacity: 0; }
+  .label { position: absolute; bottom: 120px; left: 0; right: 0; text-align: center;
+           font: bold 36px system-ui; color: #aaa; }
 </style>
 </head>
-<body data-duration="3" data-fps="30">
-  <div class="grid"></div>
-  <div class="box" id="box">ZOOM</div>
-  <div class="label" id="label">HyperFrames Deterministic Render Test</div>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+<body>
+  <div data-composition-id="root" data-start="0" data-duration="3" data-width="1920" data-height="1080">
+    <div class="grid" id="grid"></div>
+    <div class="box" id="box">ZOOM</div>
+    <div class="label" id="label">HyperFrames Deterministic Render Test</div>
+  </div>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
 <script>
-  // Fill grid
-  const grid = document.querySelector('.grid');
+  // Fill grid with numbered cells as visual landmarks
+  const grid = document.getElementById('grid');
   for (let i = 0; i < 32; i++) {
     const c = document.createElement('div');
     c.className = 'cell';
@@ -1292,12 +1295,25 @@ async def test_hyperframes():
     grid.appendChild(c);
   }
 
-  const tl = gsap.timeline();
-  tl.to('#box', { scale: 1.0, x: '-50%', y: '-50%', duration: 1.0, ease: 'power2.out' }, 0);
+  // Timeline contract: paused:true, registered to window.__timelines
+  window.__timelines = window.__timelines || {};
+  const tl = gsap.timeline({ paused: true });
+
+  // Entrance: box scales from 0.3 to 1.0 and centers
+  tl.fromTo('#box',
+    { scale: 0.3, xPercent: -50, yPercent: -50 },
+    { scale: 1.0, xPercent: -50, yPercent: -50, duration: 0.8, ease: 'back.out(1.7)' },
+    0.1);
+  // Rotation
   tl.to('#box', { rotation: 360, duration: 2.0, ease: 'none' }, 0.5);
+  // Scale up past 1.0
   tl.to('#box', { scale: 1.5, duration: 1.0, ease: 'power2.inOut' }, 1.5);
-  tl.to('#label', { opacity: 1, y: -20, duration: 0.5, ease: 'power2.out' }, 0.3);
-  tl.to('#label', { opacity: 0, duration: 0.3 }, 2.5);
+  // Label entrance
+  tl.from('#label', { opacity: 0, y: 30, duration: 0.5, ease: 'power3.out' }, 0.3);
+  // Label exit (final scene only per SKILL.md rules)
+  tl.to('#label', { opacity: 0, duration: 0.3, ease: 'power2.in' }, 2.5);
+
+  window.__timelines["root"] = tl;
 </script>
 </body>
 </html>""", encoding="utf-8")
