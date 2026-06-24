@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # Toggle via Railway env var to instantly roll back without a deploy.
     motion_graphics_mode: str = "generated"
 
+    # Render engine: "ffmpeg" (current pipeline) or "hyperframes" (new
+    # pre-trim + HyperFrames composition pipeline). Toggle via RENDER_ENGINE
+    # env var on Railway for instant rollback.
+    render_engine: str = "ffmpeg"
+
     @property
     def uploads_dir(self) -> Path:
         return (BACKEND_DIR / self.storage_uploads).resolve()
