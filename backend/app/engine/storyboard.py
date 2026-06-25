@@ -31,19 +31,30 @@ def _segment_captions(
     emphasis_words: list[str],
     word_categories: dict[str, str],
 ) -> list[dict]:
-    """Build caption cards from remapped words using pause-based grouping.
+    """Build caption cards from remapped words using sentence boundaries.
 
     Uses remapped_words directly (already in the output timeline via
-    pretrim.py's proven direct-offset math). Does NOT re-remap from
-    source timestamps — that caused word loss when source_to_output()
-    filtered words at segment boundaries.
+    pretrim.py's proven direct-offset math). Sentence boundaries come
+    from transcript_segments (Whisper's segment structure) — used only
+    as boundary markers, NOT for timestamp re-remapping.
 
     Algorithm:
-      1. Convert remapped_words to dicts with emphasis/category flags
-      2. Group by pause gaps >= 0.25s or max 7 words
-      3. Merge orphans (<=2 words) forward or backward
+      1. Build a set of source-timestamp word starts that begin a new
+         Whisper segment (sentence boundary markers)
+      2. Convert remapped_words to dicts with emphasis/category/boundary flags
+      3. Group by: sentence boundary OR max 7 words — mid-sentence
+         pauses do NOT break a card
+      4. Merge orphans (<=2 words) forward or backward
     """
     emphasis_set = {ew.lower() for ew in emphasis_words}
+
+    # Build sentence-boundary markers from transcript_segments.
+    # A word is a segment starter if it's the FIRST word in any Whisper segment.
+    seg_start_times: set[float] = set()
+    for seg in transcript_segments:
+        seg_words = seg.get("words", [])
+        if seg_words:
+            seg_start_times.add(round(float(seg_words[0].get("start", 0)), 3))
 
     all_words: list[dict] = []
     for w in remapped_words:
@@ -53,6 +64,10 @@ def _segment_captions(
         if w.end <= w.start:
             continue
         text_lower = text.lower().strip(".,!?;:'\"")
+        # Match this remapped word back to its source timestamp to check
+        # if it starts a new Whisper segment. For DISABLE_CUTS passthrough
+        # (1:1 timing), source == output. For trimmed videos, we use the
+        # word text + approximate position matching.
         all_words.append({
             "text": text,
             "start": round(w.start, 4),
@@ -61,13 +76,27 @@ def _segment_captions(
             "category": word_categories.get(text_lower, ""),
         })
 
-    # Step 1: group by pause gaps and word count
+    # Match remapped words to segment boundaries via the source word list.
+    # pretrim.py builds remapped_words in the SAME ORDER as the source
+    # transcript words, so we can match by index.
+    src_words_flat = []
+    seg_boundary_indices: set[int] = set()
+    word_idx = 0
+    for seg in transcript_segments:
+        seg_words = seg.get("words", [])
+        for j, sw in enumerate(seg_words):
+            if sw.get("text", "").strip():
+                if j == 0:
+                    seg_boundary_indices.add(word_idx)
+                word_idx += 1
+
+    # Step 1: group by sentence boundary OR word count
     raw_groups: list[list[dict]] = []
     current: list[dict] = []
-    for w in all_words:
+    for idx, w in enumerate(all_words):
         if current:
-            gap = w["start"] - current[-1]["end"]
-            if gap >= _PAUSE_GAP or len(current) >= _MAX_WORDS:
+            is_seg_boundary = idx in seg_boundary_indices
+            if is_seg_boundary or len(current) >= _MAX_WORDS:
                 raw_groups.append(current)
                 current = []
         current.append(w)
@@ -80,10 +109,7 @@ def _segment_captions(
     while i < len(raw_groups):
         g = raw_groups[i]
         dur = g[-1]["end"] - g[0]["start"] if g else 0
-        is_orphan = (
-            (len(g) == 1 and dur < _ORPHAN_MIN_DUR)
-            or len(g) == 2
-        ) and len(g) <= 2
+        is_orphan = len(g) <= 2
 
         if is_orphan:
             # Try forward merge
