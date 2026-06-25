@@ -1658,7 +1658,9 @@ def render(
                 editing_style=editing_style,
             )
         except Exception as _hf_err:
+            import traceback as _tb
             print(f"[RENDER] HyperFrames pipeline failed: {_hf_err}")
+            print(f"[RENDER] Traceback:\n{_tb.format_exc()}")
             print("[RENDER] Falling back to FFmpeg pipeline")
 
     # ── FFmpeg pipeline (default / fallback) ──────────────────────────
