@@ -1557,6 +1557,25 @@ def _render_hyperframes(
     print(f"[HF] Trimmed: {timing_map.output_duration:.1f}s, {len(timing_map.remapped_words)} words")
     print(f"[HF] Source intervals: {len(timing_map.source_intervals)}, compressed: {timing_map.compressed_intervals is not None}")
 
+    # Dump diagnostic data for coverage audit
+    import json as _json
+    _diag = {
+        "source_words": [
+            {"text": w.get("text", ""), "start": w.get("start", 0), "end": w.get("end", 0)}
+            for seg in transcript.get("segments", [])
+            for w in seg.get("words", [])
+        ],
+        "remapped_words": [
+            {"text": w.text, "start": round(w.start, 4), "end": round(w.end, 4)}
+            for w in timing_map.remapped_words
+        ],
+        "source_word_count": _n_words_src,
+        "remapped_word_count": len(timing_map.remapped_words),
+    }
+    _diag_path = Path("/tmp/caption_audit.json")
+    _diag_path.write_text(_json.dumps(_diag, indent=2))
+    print(f"[HF] Diagnostic dump: {_diag_path} ({len(_diag['source_words'])} src, {len(_diag['remapped_words'])} remapped)")
+
     # Remap zoom_plan entries to trimmed timeline
     remapped_zoom = []
     for zp in plan.zoom_plan:

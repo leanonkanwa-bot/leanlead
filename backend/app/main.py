@@ -1243,6 +1243,47 @@ async def test_broll():
         return {"error": str(e), "key_set": bool(key)}
 
 
+@app.get("/api/caption-audit")
+async def caption_audit():
+    """Return the last job's caption coverage audit data."""
+    audit_path = Path("/tmp/caption_audit.json")
+    if not audit_path.exists():
+        return {"error": "No audit data yet — run a job with RENDER_ENGINE=hyperframes first"}
+    import json as _json
+    data = _json.loads(audit_path.read_text())
+
+    # Run the same coverage comparison the storyboard does
+    src = data.get("source_words", [])
+    remapped = data.get("remapped_words", [])
+
+    # Find words in source but not in remapped (lost in pretrim)
+    src_texts = [w["text"].strip() for w in src if w["text"].strip()]
+    rem_texts = [w["text"].strip() for w in remapped if w["text"].strip()]
+
+    lost_in_pretrim = []
+    j = 0
+    for i, word in enumerate(src_texts):
+        if j < len(rem_texts) and rem_texts[j] == word:
+            j += 1
+        else:
+            ctx = " ".join(src_texts[max(0,i-3):i]) + f" >>>{word}<<< " + " ".join(src_texts[i+1:i+4])
+            lost_in_pretrim.append({"word": word, "index": i, "context": ctx,
+                                     "start": src[i].get("start"), "end": src[i].get("end")})
+
+    # Find zero-duration words in remapped
+    zero_dur = [{"text": w["text"], "start": w["start"], "end": w["end"]}
+                for w in remapped if w["end"] <= w["start"] and w["text"].strip()]
+
+    return {
+        "source_word_count": len(src_texts),
+        "remapped_word_count": len(rem_texts),
+        "lost_in_pretrim": lost_in_pretrim,
+        "lost_count": len(lost_in_pretrim),
+        "zero_duration_words": zero_dur,
+        "zero_dur_count": len(zero_dur),
+    }
+
+
 @app.get("/api/test-hyperframes")
 async def test_hyperframes():
     """Render a 3s GSAP animation via the official HyperFrames CLI and return frames."""

@@ -57,11 +57,15 @@ def _segment_captions(
             seg_start_times.add(round(float(seg_words[0].get("start", 0)), 3))
 
     all_words: list[dict] = []
+    _skipped_empty = 0
+    _skipped_zero_dur = []
     for w in remapped_words:
         text = w.text.strip()
         if not text:
+            _skipped_empty += 1
             continue
         if w.end <= w.start:
+            _skipped_zero_dur.append(f"\"{text}\" at {w.start:.2f}s")
             continue
         text_lower = text.lower().strip(".,!?;:'\"")
         # Match this remapped word back to its source timestamp to check
@@ -75,6 +79,24 @@ def _segment_captions(
             "emphasis": text_lower in emphasis_set,
             "category": word_categories.get(text_lower, ""),
         })
+
+    # Log what was filtered
+    print(f"[CAPTION AUDIT] remapped_words: {len(remapped_words)} total, "
+          f"{len(all_words)} valid, {_skipped_empty} empty, "
+          f"{len(_skipped_zero_dur)} zero-duration")
+    if _skipped_zero_dur:
+        print(f"[CAPTION AUDIT] Zero-dur words dropped: {_skipped_zero_dur[:10]}")
+
+    # Also count source transcript words for upstream comparison
+    _src_word_count = sum(
+        1 for seg in transcript_segments
+        for w in seg.get("words", [])
+        if w.get("text", "").strip()
+    )
+    if _src_word_count != len(remapped_words):
+        print(f"[CAPTION AUDIT] WARNING: source transcript has {_src_word_count} words "
+              f"but remapped_words has {len(remapped_words)} — "
+              f"{_src_word_count - len(remapped_words)} lost upstream in pretrim")
 
     # Match remapped words to segment boundaries via the source word list.
     # pretrim.py builds remapped_words in the SAME ORDER as the source
@@ -146,6 +168,42 @@ def _segment_captions(
             "zone": "lower-third",
             "words": group,
         })
+
+    # ── COVERAGE AUDIT — log every discrepancy ──────────────────────────
+    input_texts = [w["text"] for w in all_words]
+    output_texts = []
+    for c in cards:
+        output_texts.extend(w["text"] for w in c["words"])
+
+    if input_texts != output_texts:
+        missing = []
+        extra = []
+        inp_set = list(enumerate(input_texts))
+        out_set = list(enumerate(output_texts))
+
+        # Find words in input but not in output (missing)
+        j = 0
+        for i, word in enumerate(input_texts):
+            if j < len(output_texts) and output_texts[j] == word:
+                j += 1
+            else:
+                ctx_before = " ".join(input_texts[max(0, i-2):i])
+                ctx_after = " ".join(input_texts[i+1:i+3])
+                w_data = all_words[i]
+                missing.append(
+                    f"  [{i}] \"{word}\" at {w_data['start']:.2f}s "
+                    f"(context: ...{ctx_before} >>>{word}<<< {ctx_after}...)"
+                )
+
+        print(f"[CAPTION AUDIT] MISMATCH: {len(input_texts)} input words, {len(output_texts)} output words")
+        if missing:
+            print(f"[CAPTION AUDIT] MISSING {len(missing)} word(s):")
+            for m in missing[:20]:
+                print(m)
+        if len(output_texts) > len(input_texts):
+            print(f"[CAPTION AUDIT] EXTRA {len(output_texts) - len(input_texts)} word(s) in output")
+    else:
+        print(f"[CAPTION AUDIT] PASS: {len(input_texts)}/{len(input_texts)} words, 0 missing")
 
     return cards
 
