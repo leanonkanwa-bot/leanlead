@@ -56,36 +56,35 @@ def _segment_captions(
         if seg_words:
             seg_start_times.add(round(float(seg_words[0].get("start", 0)), 3))
 
+    _MIN_WORD_DUR = 0.1  # clamp zero-duration words to this minimum
     all_words: list[dict] = []
     _skipped_empty = 0
-    _skipped_zero_dur = []
+    _clamped_zero_dur = []
     for w in remapped_words:
         text = w.text.strip()
         if not text:
             _skipped_empty += 1
             continue
-        if w.end <= w.start:
-            _skipped_zero_dur.append(f"\"{text}\" at {w.start:.2f}s")
-            continue
+        w_start = w.start
+        w_end = w.end
+        if w_end <= w_start:
+            w_end = w_start + _MIN_WORD_DUR
+            _clamped_zero_dur.append(f"\"{text}\" at {w_start:.2f}s")
         text_lower = text.lower().strip(".,!?;:'\"")
-        # Match this remapped word back to its source timestamp to check
-        # if it starts a new Whisper segment. For DISABLE_CUTS passthrough
-        # (1:1 timing), source == output. For trimmed videos, we use the
-        # word text + approximate position matching.
         all_words.append({
             "text": text,
-            "start": round(w.start, 4),
-            "end": round(w.end, 4),
+            "start": round(w_start, 4),
+            "end": round(w_end, 4),
             "emphasis": text_lower in emphasis_set,
             "category": word_categories.get(text_lower, ""),
         })
 
-    # Log what was filtered
+    # Log what was filtered/clamped
     print(f"[CAPTION AUDIT] remapped_words: {len(remapped_words)} total, "
-          f"{len(all_words)} valid, {_skipped_empty} empty, "
-          f"{len(_skipped_zero_dur)} zero-duration")
-    if _skipped_zero_dur:
-        print(f"[CAPTION AUDIT] Zero-dur words dropped: {_skipped_zero_dur[:10]}")
+          f"{len(all_words)} kept, {_skipped_empty} empty, "
+          f"{len(_clamped_zero_dur)} zero-dur clamped to {_MIN_WORD_DUR}s")
+    if _clamped_zero_dur:
+        print(f"[CAPTION AUDIT] Clamped zero-dur words: {_clamped_zero_dur[:10]}")
 
     # Also count source transcript words for upstream comparison
     _src_word_count = sum(
@@ -100,9 +99,9 @@ def _segment_captions(
 
     # Match remapped words to segment boundaries via the source word list.
     # pretrim.py builds remapped_words in the SAME ORDER as the source
-    # transcript words, so we can match by index. Apply the SAME filters
-    # as all_words (skip empty text, skip zero-duration) to keep indices
-    # in sync — otherwise a filtered-out word shifts all subsequent indices.
+    # transcript words, so we can match by index. Apply the SAME filter
+    # as all_words: skip empty text only (zero-duration words are now
+    # KEPT with clamped duration, so they must be counted here too).
     seg_boundary_indices: set[int] = set()
     word_idx = 0
     for seg in transcript_segments:
@@ -111,10 +110,6 @@ def _segment_captions(
         for sw in seg_words:
             text = sw.get("text", "").strip()
             if not text:
-                continue
-            sw_start = float(sw.get("start", 0))
-            sw_end = float(sw.get("end", sw_start))
-            if sw_end <= sw_start:
                 continue
             if first_valid_in_seg:
                 seg_boundary_indices.add(word_idx)
