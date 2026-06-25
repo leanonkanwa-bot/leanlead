@@ -209,9 +209,9 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
         is_caption = card.get("type") == "caption"
 
         if is_caption:
-            # Captions: near-instant appearance (no cinematic fade)
-            fade_in_dur = 0.05
-            fade_out_dur = 0.05
+            # Captions: short deliberate fade, all words appear together
+            fade_in_dur = 0.18
+            fade_out_dur = 0.15
         else:
             fade_in_dur = min(0.4, dur * 0.15)
             fade_out_dur = min(0.35, dur * 0.12)

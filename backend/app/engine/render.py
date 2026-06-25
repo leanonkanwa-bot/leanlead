@@ -1620,7 +1620,7 @@ def _render_hyperframes(
             str(public_dir),
             "-o", str(output_path),
             "--fps", str(fps),
-            "--quality", "draft",
+            "--quality", "standard",
             "--workers", "1",
             "--protocol-timeout", "600000",
             "--low-memory-mode",
