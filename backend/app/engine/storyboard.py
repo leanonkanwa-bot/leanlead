@@ -78,17 +78,26 @@ def _segment_captions(
 
     # Match remapped words to segment boundaries via the source word list.
     # pretrim.py builds remapped_words in the SAME ORDER as the source
-    # transcript words, so we can match by index.
-    src_words_flat = []
+    # transcript words, so we can match by index. Apply the SAME filters
+    # as all_words (skip empty text, skip zero-duration) to keep indices
+    # in sync — otherwise a filtered-out word shifts all subsequent indices.
     seg_boundary_indices: set[int] = set()
     word_idx = 0
     for seg in transcript_segments:
         seg_words = seg.get("words", [])
-        for j, sw in enumerate(seg_words):
-            if sw.get("text", "").strip():
-                if j == 0:
-                    seg_boundary_indices.add(word_idx)
-                word_idx += 1
+        first_valid_in_seg = True
+        for sw in seg_words:
+            text = sw.get("text", "").strip()
+            if not text:
+                continue
+            sw_start = float(sw.get("start", 0))
+            sw_end = float(sw.get("end", sw_start))
+            if sw_end <= sw_start:
+                continue
+            if first_valid_in_seg:
+                seg_boundary_indices.add(word_idx)
+                first_valid_in_seg = False
+            word_idx += 1
 
     # Step 1: group by sentence boundary OR word count
     raw_groups: list[list[dict]] = []
