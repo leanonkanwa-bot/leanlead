@@ -1631,11 +1631,19 @@ def _render_hyperframes(
     public_dir = project_dir / "public"
     _timeout = max(600, int(timing_map.output_duration * 45))
 
+    # Use the LOCAL hyperframes CLI binary (not npx/global) so the
+    # manifest.json sibling resolution works correctly.
+    _hf_cli = Path(__file__).resolve().parent / "node_modules" / ".bin" / "hyperframes"
+    if not _hf_cli.exists():
+        _hf_cli = Path(__file__).resolve().parent / "node_modules" / "hyperframes" / "dist" / "cli.js"
+    _hf_cmd = ["node", str(_hf_cli)] if _hf_cli.suffix == ".js" else [str(_hf_cli)]
+    print(f"[HF] CLI path: {_hf_cli} (exists={_hf_cli.exists()})")
+
     # Launch in its own process group so we can kill the entire tree
     # (npx + Chrome children) on timeout, preventing orphaned processes.
     proc = subprocess.Popen(
         [
-            "npx", "hyperframes", "render",
+            *_hf_cmd, "render",
             str(public_dir),
             "-o", str(output_path),
             "--fps", str(fps),
