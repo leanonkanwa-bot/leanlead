@@ -19,7 +19,7 @@ from app.engine.captions import WordTiming
 from app.engine.pretrim import TimingMap
 
 # ── Caption segmentation constants ────────────────────────────────────
-_PAUSE_GAP = 0.25       # Seconds gap between words to trigger a caption break
+_PAUSE_GAP = 0.15       # Seconds gap between words to trigger a caption break
 _MAX_WORDS = 7           # Maximum words per caption card
 _ORPHAN_MIN_DUR = 0.25   # 1-word groups shorter than this merge into neighbors
 
