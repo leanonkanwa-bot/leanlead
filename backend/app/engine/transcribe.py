@@ -191,29 +191,31 @@ def transcribe(video_path: Path) -> Transcript:
             language=None,                  # auto-detect: French, English, Spanish, Arabic
         )
 
-        # Minimum word duration: shorter than 30ms is almost always an artifact.
-        _MIN_WORD_DUR = 0.03
-        # Minimum word probability: below 0.5 the transcription is likely wrong.
-        _MIN_WORD_PROB = 0.5
+        _MIN_WORD_DUR = 0.01   # 10ms — catches true artifacts but keeps quick function words
+        _MIN_WORD_PROB = 0.3   # 30% — short words often score low even when correct
 
         segments: list[Segment] = []
         last_end = 0.0
+        _dropped_words: list[str] = []
         for seg in seg_iter:
-            words = [
-                Word(
-                    text=(w.word or "").strip(),
-                    start=float(w.start),
-                    end=float(w.end),
-                )
-                for w in (seg.words or [])
-                if (
-                    w.start is not None
-                    and w.end is not None
-                    and (w.end - w.start) >= _MIN_WORD_DUR   # drop sub-30ms artifacts
-                    and getattr(w, "probability", 1.0) >= _MIN_WORD_PROB  # drop low-conf words
-                    and (w.word or "").strip()               # drop blank tokens
-                )
-            ]
+            words: list[Word] = []
+            for w in (seg.words or []):
+                if w.start is None or w.end is None:
+                    continue
+                text = (w.word or "").strip()
+                if not text:
+                    continue
+                dur = float(w.end) - float(w.start)
+                prob = getattr(w, "probability", 1.0)
+                if dur < _MIN_WORD_DUR:
+                    _dropped_words.append(
+                        f"\"{text}\" dur={dur:.3f}s prob={prob:.2f} at {w.start:.2f}s (too short)")
+                    continue
+                if prob < _MIN_WORD_PROB:
+                    _dropped_words.append(
+                        f"\"{text}\" dur={dur:.3f}s prob={prob:.2f} at {w.start:.2f}s (low conf)")
+                    continue
+                words.append(Word(text=text, start=float(w.start), end=float(w.end)))
             segments.append(
                 Segment(
                     start=float(seg.start),
@@ -223,6 +225,14 @@ def transcribe(video_path: Path) -> Transcript:
                 )
             )
             last_end = max(last_end, float(seg.end))
+
+        _total_words = sum(len(s.words) for s in segments)
+        if _dropped_words:
+            print(f"[WHISPER] Dropped {len(_dropped_words)} words (kept {_total_words}):")
+            for dw in _dropped_words[:20]:
+                print(f"  {dw}")
+        else:
+            print(f"[WHISPER] Kept all {_total_words} words (0 dropped)")
 
         full_text = " ".join(s.text for s in segments).strip()
         detected_lang = getattr(info, "language", None) or "en"
