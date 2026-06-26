@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     # beat structure) but keep_segments/drop_segments are ignored.
     disable_cuts: bool = False
 
+    # Style pack for graphic cards and captions.
+    # "lean_glass" = dark glass panels with cyan glow (LeanGlass).
+    style_pack: str = "lean_glass"
+
     @property
     def uploads_dir(self) -> Path:
         return (BACKEND_DIR / self.storage_uploads).resolve()

@@ -85,118 +85,110 @@ def _build_card_host(card: dict, layout: str, track_index: int) -> str:
     )
 
 
-_STYLE_CSS = {
-    "minimal": {
-        "bg": "rgba(0,0,0,0.85)", "text": "#FFFFFF", "accent": "var(--accent-0)",
-        "font": '"Inter", ui-sans-serif, sans-serif', "title_size": "72px",
-        "border": "none", "radius": "0",
-    },
-    "spotlight": {
-        "bg": "linear-gradient(135deg, rgba(20,0,40,0.92), rgba(40,10,60,0.88))",
-        "text": "#FFFFFF", "accent": "var(--accent-0)",
-        "font": '"Inter", ui-sans-serif, sans-serif', "title_size": "64px",
-        "border": "1px solid rgba(255,255,255,0.1)", "radius": "20px",
-    },
-    "editorial": {
-        "bg": "rgba(255,245,235,0.92)", "text": "#1e1e1e", "accent": "#e05050",
-        "font": '"Georgia", "Playfair Display", serif', "title_size": "56px",
-        "border": "none", "radius": "16px",
-    },
-    "geom": {
-        "bg": "rgba(0,0,0,0.9)", "text": "#FFFFFF", "accent": "#c8ff00",
-        "font": '"Inter", ui-sans-serif, sans-serif', "title_size": "68px",
-        "border": "3px solid #c8ff00", "radius": "0",
-    },
-    "swiss": {
-        "bg": "rgba(255,255,255,0.93)", "text": "#111111", "accent": "#e03131",
-        "font": '"Inter", "Helvetica Neue", sans-serif', "title_size": "60px",
-        "border": "none", "radius": "8px",
-    },
-    "terminal": {
-        "bg": "rgba(10,10,10,0.95)", "text": "#4ade80", "accent": "#4ade80",
-        "font": '"Courier New", "JetBrains Mono", monospace', "title_size": "48px",
-        "border": "1px solid #4ade80", "radius": "4px",
-    },
-    "academic": {
-        "bg": "rgba(255,249,227,0.9)", "text": "#1e1e1e", "accent": "#1971c2",
-        "font": '"Georgia", serif', "title_size": "52px",
-        "border": "2px solid rgba(25,113,194,0.3)", "radius": "12px",
-    },
-    "whiteboard": {
-        "bg": "rgba(255,255,255,0.88)", "text": "#333333", "accent": "#e8590c",
-        "font": '"Caveat", "Comic Sans MS", cursive', "title_size": "56px",
-        "border": "2px dashed #999", "radius": "16px",
-    },
-    "audit": {
-        "bg": "rgba(246,239,225,0.92)", "text": "#2d2d2d", "accent": "#bf5700",
-        "font": '"Georgia", serif', "title_size": "48px",
-        "border": "1px solid #c4b8a4", "radius": "8px",
-    },
-    "xhs": {
-        "bg": "rgba(255,245,240,0.9)", "text": "#1e1e1e", "accent": "#ff2d55",
-        "font": '"Inter", ui-sans-serif, sans-serif', "title_size": "52px",
-        "border": "none", "radius": "20px",
-    },
+# ── LeanGlass Style Pack ─────────────────────────────────────────────
+# Dark glass panels with volumetric cyan glow, backdrop blur, subtle
+# grain texture. One consistent visual identity across every card.
+
+_LEAN_GLASS = {
+    "bg": "linear-gradient(160deg, rgba(18,18,28,0.85), rgba(8,8,16,0.92))",
+    "text": "#F1F1F1",
+    "text_secondary": "rgba(255,255,255,0.6)",
+    "accent": "#4cc9f0",
+    "font": '"Inter", ui-sans-serif, system-ui, sans-serif',
+    "title_size": "64px",
+    "number_size": "96px",
+    "kicker_size": "22px",
+    "detail_size": "26px",
+    "border": "1px solid rgba(76,201,240,0.12)",
+    "radius": "20px",
+    "shadow": "0 0 60px rgba(76,201,240,0.15), 0 8px 32px rgba(0,0,0,0.4)",
+    "shadow_inset": "inset 0 1px 0 rgba(255,255,255,0.06)",
+    "blur": "blur(16px) saturate(1.4)",
+    "title_glow": "0 0 40px rgba(76,201,240,0.25)",
 }
+
+# Inline SVG grain texture (deterministic, no external asset)
+_GRAIN_SVG = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E"
+    "%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' "
+    "numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E"
+    "%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.04'/%3E%3C/svg%3E"
+)
 
 
 def _build_graphic_card_html(card: dict) -> str:
-    """Build inner HTML for a graphic overlay card with style-aware CSS."""
+    """Build inner HTML for a LeanGlass graphic overlay card."""
     card_id = card["id"]
     hints = card.get("contentHints", {})
     kicker = hints.get("kicker", "")
     title = hints.get("title", "")
     detail = hints.get("detail", "")
     number = hints.get("number", "")
-    vis_style = card.get("visualStyle", "minimal")
-    s = _STYLE_CSS.get(vis_style, _STYLE_CSS["minimal"])
+    p = _LEAN_GLASS
 
     display_text = number if number else title
-    title_size = "96px" if number else s["title_size"]
+    title_size = p["number_size"] if number else p["title_size"]
 
     parts = [f'<div class="card" data-card-id="{card_id}">']
-    parts.append(f'<style>')
+    parts.append('<style>')
     parts.append(f'.card[data-card-id="{card_id}"] .root {{')
-    parts.append(f'  width: 100%; height: 100%; display: flex; flex-direction: column;')
-    parts.append(f'  justify-content: center; align-items: center;')
-    parts.append(f'  padding: 48px; gap: 16px;')
-    parts.append(f'}}')
+    parts.append('  width: 100%; height: 100%; display: flex; flex-direction: column;')
+    parts.append('  justify-content: center; align-items: center;')
+    parts.append('  padding: 48px; gap: 16px;')
+    parts.append('}')
     parts.append(f'.card[data-card-id="{card_id}"] .card-panel {{')
-    parts.append(f'  background: {s["bg"]}; border-radius: {s["radius"]};')
-    parts.append(f'  border: {s["border"]}; padding: 40px 48px;')
+    parts.append(f'  background: {p["bg"]};')
+    parts.append(f'  border-radius: {p["radius"]};')
+    parts.append(f'  border: {p["border"]};')
+    parts.append(f'  padding: 44px 52px;')
     parts.append(f'  display: flex; flex-direction: column; align-items: center;')
-    parts.append(f'  gap: 12px; max-width: 85%;')
-    parts.append(f'  box-shadow: 0 8px 32px rgba(0,0,0,0.3);')
-    parts.append(f'  backdrop-filter: blur(8px);')
-    parts.append(f'}}')
+    parts.append(f'  gap: 14px; max-width: 85%; position: relative;')
+    parts.append(f'  box-shadow: {p["shadow"]}, {p["shadow_inset"]};')
+    parts.append(f'  backdrop-filter: {p["blur"]};')
+    parts.append(f'  -webkit-backdrop-filter: {p["blur"]};')
+    parts.append('}')
+    # Grain texture overlay
+    parts.append(f'.card[data-card-id="{card_id}"] .card-panel::after {{')
+    parts.append(f'  content: ""; position: absolute; inset: 0;')
+    parts.append(f'  border-radius: {p["radius"]};')
+    parts.append(f'  background-image: url("{_GRAIN_SVG}");')
+    parts.append(f'  background-repeat: repeat; pointer-events: none;')
+    parts.append('}')
     if kicker:
         parts.append(f'.card[data-card-id="{card_id}"] .kicker {{')
-        parts.append(f'  font-family: {s["font"]}; font-size: 22px; font-weight: 700;')
-        parts.append(f'  letter-spacing: 0.15em; text-transform: uppercase;')
-        parts.append(f'  color: {s["accent"]}; opacity: 0.9;')
-        parts.append(f'}}')
+        parts.append(f'  font-family: {p["font"]}; font-size: {p["kicker_size"]};')
+        parts.append(f'  font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;')
+        parts.append(f'  color: {p["accent"]};')
+        parts.append('}')
     parts.append(f'.card[data-card-id="{card_id}"] .title {{')
-    parts.append(f'  font-family: {s["font"]}; font-size: {title_size};')
+    parts.append(f'  font-family: {p["font"]}; font-size: {title_size};')
     parts.append(f'  font-weight: 800; line-height: 1.15; text-align: center;')
-    parts.append(f'  color: {s["text"]}; max-width: 100%;')
-    parts.append(f'}}')
+    parts.append(f'  color: {p["text"]}; max-width: 100%;')
+    parts.append(f'  text-shadow: {p["title_glow"]};')
+    parts.append('}')
     if detail:
         parts.append(f'.card[data-card-id="{card_id}"] .detail {{')
-        parts.append(f'  font-family: {s["font"]}; font-size: 26px;')
-        parts.append(f'  font-weight: 400; opacity: 0.7; text-align: center;')
-        parts.append(f'  color: {s["text"]}; max-width: 90%;')
-        parts.append(f'}}')
-    parts.append(f'</style>')
-    parts.append(f'<div class="root">')
-    parts.append(f'  <div class="card-panel">')
+        parts.append(f'  font-family: {p["font"]}; font-size: {p["detail_size"]};')
+        parts.append(f'  font-weight: 400; text-align: center;')
+        parts.append(f'  color: {p["text_secondary"]}; max-width: 90%;')
+        parts.append('}')
+    # Accent underline element (animated via grow-x in timeline)
+    parts.append(f'.card[data-card-id="{card_id}"] .accent-line {{')
+    parts.append(f'  width: 0; height: 3px; background: {p["accent"]};')
+    parts.append(f'  border-radius: 2px; box-shadow: 0 0 12px {p["accent"]};')
+    parts.append('}')
+    parts.append('</style>')
+    parts.append('<div class="root">')
+    parts.append('  <div class="card-panel">')
     if kicker:
         parts.append(f'    <div class="kicker" id="{card_id}-kicker">{_esc(kicker)}</div>')
     parts.append(f'    <div class="title" id="{card_id}-title">{_esc(display_text)}</div>')
     if detail:
         parts.append(f'    <div class="detail" id="{card_id}-detail">{_esc(detail)}</div>')
-    parts.append(f'  </div>')
-    parts.append(f'</div>')
-    parts.append(f'</div>')
+    parts.append(f'    <div class="accent-line" id="{card_id}-line"></div>')
+    parts.append('  </div>')
+    parts.append('</div>')
+    parts.append('</div>')
     return "\n".join(parts)
 
 
@@ -218,13 +210,13 @@ def _build_caption_card_html(card: dict) -> str:
         f'.card[data-card-id="{card_id}"] .cap-line {{\n'
         f'  display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;\n'
         f'  gap: 0.3em; padding: 16px 24px;\n'
-        f'  font-family: "Inter", "Montserrat", ui-sans-serif, system-ui, sans-serif;\n'
+        f'  font-family: {_LEAN_GLASS["font"]};\n'
         f'  font-size: 48px; font-weight: 700; color: #FFFFFF;\n'
         f'  text-shadow: 0 2px 8px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.9);\n'
         f'  text-align: center; line-height: 1.3;\n'
         f'}}\n'
         f'.card[data-card-id="{card_id}"] .cap-emphasis {{\n'
-        f'  color: var(--accent-0); transform: scale(1.1);\n'
+        f'  color: {_LEAN_GLASS["accent"]}; transform: scale(1.08);\n'
         f'}}\n'
         f'</style>\n'
         f'<div class="cap-line" id="{card_id}-line">\n'
@@ -288,48 +280,118 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
             fade_in_dur = min(0.4, dur * 0.15)
             fade_out_dur = min(0.35, dur * 0.12)
 
-        # Enter: set visible + fade in
+        # Enter: set visible + fade/blur in
         lines.append(f'  tl.set(\'{sel}\', {{ visibility: "visible" }}, {start:.4f});')
-        lines.append(
-            f'  tl.fromTo(\'{sel}\', '
-            f'{{ opacity: 0 }}, '
-            f'{{ opacity: 1, duration: {fade_in_dur:.3f}, ease: "power2.out" }}, '
-            f'{start:.4f});'
-        )
 
-        # Caption cards: all words appear together (no stagger delay)
         if is_caption:
+            # Captions: 180ms fade, all words instantly visible
+            lines.append(
+                f'  tl.fromTo(\'{sel}\', '
+                f'{{ opacity: 0 }}, '
+                f'{{ opacity: 1, duration: {fade_in_dur:.3f}, ease: "power2.out" }}, '
+                f'{start:.4f});'
+            )
             word_sel = f'.card[data-card-id="{card_id}"] .cap-word'
             word_count = len(card.get("words", []))
             if word_count > 0:
                 lines.append(
                     f'  tl.set(\'{word_sel}\', {{ opacity: 1, y: 0 }}, {start:.4f});'
                 )
-
-        # Graphic cards: scale-pop entrance on title
         else:
-            title_sel = f'.card[data-card-id="{card_id}"] #{card_id}-title'
+            # LeanGlass panel entrance: blur-in materialization
+            panel_sel = f'.card[data-card-id="{card_id}"] .card-panel'
             lines.append(
-                f'  tl.fromTo(\'{title_sel}\', '
-                f'{{ opacity: 0, scale: 0.85, y: 20 }}, '
-                f'{{ opacity: 1, scale: 1, y: 0, duration: 0.5, ease: "back.out(1.4)" }}, '
-                f'{start + fade_in_dur * 0.5:.4f});'
+                f'  tl.fromTo(\'{sel}\', '
+                f'{{ opacity: 0 }}, '
+                f'{{ opacity: 1, duration: 0.300, ease: "power2.out" }}, '
+                f'{start:.4f});'
             )
+            lines.append(
+                f'  tl.fromTo(\'{panel_sel}\', '
+                f'{{ filter: "blur(12px)", scale: 1.02 }}, '
+                f'{{ filter: "blur(0px)", scale: 1, duration: 0.350, ease: "power2.out" }}, '
+                f'{start:.4f});'
+            )
+
+            # Content-type-specific animation
+            content_style = card.get("contentHints", {}).get("style", "key_phrase")
+            title_sel = f'.card[data-card-id="{card_id}"] #{card_id}-title'
             kicker_sel = f'.card[data-card-id="{card_id}"] #{card_id}-kicker'
+            line_sel = f'.card[data-card-id="{card_id}"] #{card_id}-line'
+            t_in = start + 0.15
+
+            if content_style == "stat" and card.get("contentHints", {}).get("number"):
+                # COUNT-UP: number animates from 0 to value
+                num_str = card["contentHints"]["number"]
+                lines.append(
+                    f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_str.replace(",","").replace("%","").replace("$","").strip() or "0"}, '
+                    f'duration: 1.0, ease: "power2.out", onUpdate: function(){{ '
+                    f'var el=document.querySelector(\'{title_sel}\'); '
+                    f'if(el) el.textContent=Math.round(o.v)+"{num_str[-1] if num_str[-1] in "%$" else ""}"; '
+                    f'}}}}, {t_in:.4f}); }})();'
+                )
+            elif content_style == "key_phrase":
+                # MASK-REVEAL: horizontal clip wipe
+                lines.append(
+                    f'  tl.fromTo(\'{title_sel}\', '
+                    f'{{ clipPath: "inset(0 100% 0 0)" }}, '
+                    f'{{ clipPath: "inset(0 0% 0 0)", duration: 0.500, ease: "power2.inOut" }}, '
+                    f'{t_in:.4f});'
+                )
+            elif content_style == "quote":
+                # SLIDE-IN: float up from below
+                lines.append(
+                    f'  tl.fromTo(\'{title_sel}\', '
+                    f'{{ opacity: 0, y: 40 }}, '
+                    f'{{ opacity: 1, y: 0, duration: 0.500, ease: "power3.out" }}, '
+                    f'{t_in:.4f});'
+                )
+            else:
+                # BLUR-IN: for callouts and comparisons
+                lines.append(
+                    f'  tl.fromTo(\'{title_sel}\', '
+                    f'{{ opacity: 0, filter: "blur(8px)" }}, '
+                    f'{{ opacity: 1, filter: "blur(0px)", duration: 0.400, ease: "power2.out" }}, '
+                    f'{t_in:.4f});'
+                )
+
+            # Kicker fade-in (all types)
             lines.append(
                 f'  tl.fromTo(\'{kicker_sel}\', '
-                f'{{ opacity: 0, y: -10 }}, '
-                f'{{ opacity: 0.9, y: 0, duration: 0.3, ease: "power2.out" }}, '
-                f'{start + fade_in_dur * 0.3:.4f});'
+                f'{{ opacity: 0, y: -8 }}, '
+                f'{{ opacity: 1, y: 0, duration: 0.250, ease: "power2.out" }}, '
+                f'{start + 0.10:.4f});'
+            )
+            # Accent underline grow-x (all types)
+            lines.append(
+                f'  tl.fromTo(\'{line_sel}\', '
+                f'{{ width: 0 }}, '
+                f'{{ width: 120, duration: 0.400, ease: "power2.out" }}, '
+                f'{t_in + 0.30:.4f});'
             )
 
-        # Exit: fade out + set hidden
-        exit_start = end - fade_out_dur
-        lines.append(
-            f'  tl.to(\'{sel}\', '
-            f'{{ opacity: 0, duration: {fade_out_dur:.3f}, ease: "power2.in" }}, '
-            f'{exit_start:.4f});'
-        )
+        # Exit
+        if is_caption:
+            exit_start = end - fade_out_dur
+            lines.append(
+                f'  tl.to(\'{sel}\', '
+                f'{{ opacity: 0, duration: {fade_out_dur:.3f}, ease: "power2.in" }}, '
+                f'{exit_start:.4f});'
+            )
+        else:
+            # LeanGlass exit: fade + slight shrink (recedes into depth)
+            exit_start = end - 0.30
+            panel_sel = f'.card[data-card-id="{card_id}"] .card-panel'
+            lines.append(
+                f'  tl.to(\'{sel}\', '
+                f'{{ opacity: 0, duration: 0.300, ease: "power2.in" }}, '
+                f'{exit_start:.4f});'
+            )
+            lines.append(
+                f'  tl.to(\'{panel_sel}\', '
+                f'{{ scale: 0.97, duration: 0.300, ease: "power2.in" }}, '
+                f'{exit_start:.4f});'
+            )
         lines.append(f'  tl.set(\'{sel}\', {{ visibility: "hidden" }}, {end:.4f});')
         lines.append("")
 

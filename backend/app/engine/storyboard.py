@@ -298,7 +298,6 @@ OUTPUT: a JSON array of card objects. Each card:
   "endSec": <seconds>,
   "accentIndex": <0-4>,
   "zone": "fullscreen"|"side-panel"|"video-overlay",
-  "visualStyle": "<one of the 10 styles below>",
   "contentHints": {{
     "kicker": "<optional short label>",
     "title": "<main text>",
@@ -307,18 +306,6 @@ OUTPUT: a JSON array of card objects. Each card:
     "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"
   }}
 }}
-
-VISUAL STYLES — pick the best fit for each card's content:
-  minimal    — pure black/white, huge bold type, maximum impact
-  spotlight  — dark gradient background with accent glow, cinematic feel
-  editorial  — warm coral block + cream, serif-style elegance
-  geom       — bold geometric shapes, chartreuse + hot pink on black
-  swiss      — clean white canvas, red accent, precise grid alignment
-  terminal   — monospace font, ASCII border, green-on-black hacker style
-  academic   — blue grid on warm paper, scholarly feel
-  whiteboard — hand-drawn Caveat font, sketched borders, casual
-  audit      — manila paper, justified serif, formal report style
-  xhs        — cream + hot pink, social chips, hashtag-friendly
 
 ZONES — where the card sits on screen:
   fullscreen    — covers whole canvas (hero moments, big statements)
@@ -331,10 +318,7 @@ RULES:
 - Card startSec/endSec must be within [0, {trimmed_duration:.1f}]
 - Cards should NOT overlap each other in time
 - Each card should last 3-8 seconds
-- Match visualStyle to content: spotlight for emotional peaks, minimal
-  for key phrases, terminal for technical data, swiss for clean stats,
-  editorial for quotes. Vary styles across cards for visual rhythm.
-- Vary accentIndex (0-4) across cards
+- Vary accentIndex (0-4) across cards for visual rhythm
 - Content must come from what the speaker actually says
 - Place cards at NARRATIVELY IMPORTANT moments — not evenly spaced
 
