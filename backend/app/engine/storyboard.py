@@ -303,12 +303,19 @@ OUTPUT: a JSON array of card objects. Each card:
     "title": "<main text>",
     "detail": "<optional supporting text>",
     "number": "<if a stat/number is featured>",
-    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question",
+    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote",
     "left_label": "<comparison: left side label>",
     "left_value": "<comparison: left side value>",
     "right_label": "<comparison: right side label>",
     "right_value": "<comparison: right side value>",
-    "items": ["<list: item 1>", "<list: item 2>", ...]
+    "items": ["<list: item 1>", "<list: item 2>", ...],
+    "steps": ["<timeline: step 1>", "<timeline: step 2>", ...],
+    "line_a": "<dialogue: first speaker's line>",
+    "line_b": "<dialogue: second speaker's line>",
+    "speaker_a": "<dialogue: optional first speaker label>",
+    "speaker_b": "<dialogue: optional second speaker label>",
+    "trend_direction": "up"|"down",
+    "attribution": "<attributed_quote: who said it>"
   }}
 }}
 
@@ -326,6 +333,10 @@ RULES:
 - "question" cards may last up to 15s (they stay while the speaker answers)
 - Vary accentIndex (0-4) across cards for visual rhythm
 - Content must come from what the speaker actually says
+- "timeline" is for sequential/temporal progressions (steps along a path);
+  "list" is for flat enumerations (bulleted items) — pick the right one
+- "attributed_quote" includes an attribution line (who said it);
+  plain "quote" is for unattributed statements
 - TIMING: startSec should match when the speaker BEGINS saying the
   words the card references — synchronous with speech, like captions.
 - Place cards at NARRATIVELY IMPORTANT moments — not evenly spaced

@@ -255,6 +255,78 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         if p["title_glow"]:
             parts.append(f'  box-shadow: {p["accent_line_glow"]};')
         parts.append('}')
+    # Timeline: horizontal track with step dots
+    if content_style == "timeline":
+        steps = hints.get("steps", [])
+        n_steps = min(len(steps), 6)
+        parts.append(f'.card[data-card-id="{card_id}"] .tl-track {{')
+        parts.append(f'  display: flex; align-items: center; gap: 0; width: 100%;')
+        parts.append(f'  position: relative; padding: 24px 0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .tl-line {{')
+        parts.append(f'  position: absolute; top: 50%; left: 0; height: 2px; width: 0;')
+        parts.append(f'  background: {p["accent"]};')
+        if is_paper := (p["id"] == "lean_paper"):
+            parts.append(f'  border-top: 2px dashed {p["accent"]};')
+            parts.append(f'  background: transparent; height: 0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .tl-step {{')
+        parts.append(f'  display: flex; flex-direction: column; align-items: center;')
+        parts.append(f'  gap: 8px; flex: 1; z-index: 1;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .tl-dot {{')
+        parts.append(f'  width: 16px; height: 16px; border-radius: 50%;')
+        parts.append(f'  background: {p["text_secondary"]}; flex-shrink: 0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .tl-label {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: 18px;')
+        parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
+        parts.append(f'  text-align: center; max-width: 140px;')
+        parts.append('}')
+    # Dialogue: two-block exchange
+    if content_style == "dialogue":
+        parts.append(f'.card[data-card-id="{card_id}"] .dlg-exchange {{')
+        parts.append(f'  display: flex; flex-direction: column; gap: 16px; width: 100%;')
+        parts.append('}')
+        is_paper = p["id"] == "lean_paper"
+        for side in ("a", "b"):
+            align = "flex-start" if side == "a" else "flex-end"
+            if is_paper:
+                parts.append(f'.card[data-card-id="{card_id}"] .dlg-{side} {{')
+                parts.append(f'  align-self: {align}; max-width: 80%;')
+                parts.append(f'  border-left: 3px solid {p["accent"]}; padding-left: 16px;')
+                parts.append(f'  font-family: {p["font"]}; font-size: 24px; color: {p["text"]};')
+                parts.append('}')
+            else:
+                parts.append(f'.card[data-card-id="{card_id}"] .dlg-{side} {{')
+                parts.append(f'  align-self: {align}; max-width: 80%;')
+                parts.append(f'  background: rgba(255,255,255,0.04); border-radius: 16px;')
+                parts.append(f'  border: 1px solid {p["accent"]}20; padding: 16px 20px;')
+                parts.append(f'  font-family: {p["font"]}; font-size: 24px; color: {p["text"]};')
+                if p["title_glow"]:
+                    parts.append(f'  box-shadow: 0 0 20px {p["accent"]}15;')
+                parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .dlg-speaker {{')
+        parts.append(f'  font-size: {p["kicker_size"]}; font-weight: 700;')
+        parts.append(f'  color: {p["accent"]}; margin-bottom: 4px;')
+        parts.append('}')
+    # Trend: simple SVG line
+    if content_style == "trend":
+        parts.append(f'.card[data-card-id="{card_id}"] .trend-wrap {{')
+        parts.append(f'  position: relative; width: 100%; height: 120px;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .trend-label {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: {p["title_size"]};')
+        parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
+        parts.append(f'  text-align: center; margin-bottom: 12px;')
+        parts.append('}')
+    # Attributed quote: quote + attribution line
+    if content_style == "attributed_quote":
+        parts.append(f'.card[data-card-id="{card_id}"] .attr-line {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: 20px;')
+        parts.append(f'  font-weight: 500; font-style: italic;')
+        parts.append(f'  color: {p["accent"]}; margin-top: 8px;')
+        parts.append('}')
     # List: item rows
     if content_style == "list":
         parts.append(f'.card[data-card-id="{card_id}"] .list-items {{')
@@ -301,6 +373,53 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
             parts.append(f'        <span>{_esc(str(item))}</span>')
             parts.append(f'      </div>')
         parts.append(f'    </div>')
+    elif content_style == "timeline":
+        steps = hints.get("steps", [])
+        parts.append(f'    <div class="tl-track">')
+        parts.append(f'      <div class="tl-line" id="{card_id}-tl-line"></div>')
+        for i, step in enumerate(steps[:6]):
+            parts.append(f'      <div class="tl-step" id="{card_id}-step-{i}">')
+            parts.append(f'        <div class="tl-dot" id="{card_id}-dot-{i}"></div>')
+            parts.append(f'        <div class="tl-label">{_esc(str(step))}</div>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "dialogue":
+        line_a = hints.get("line_a", "")
+        line_b = hints.get("line_b", "")
+        spk_a = hints.get("speaker_a", "")
+        spk_b = hints.get("speaker_b", "")
+        parts.append(f'    <div class="dlg-exchange">')
+        parts.append(f'      <div class="dlg-a" id="{card_id}-dlg-a">')
+        if spk_a:
+            parts.append(f'        <div class="dlg-speaker">{_esc(spk_a)}</div>')
+        parts.append(f'        <div>{_esc(line_a)}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'      <div class="dlg-b" id="{card_id}-dlg-b">')
+        if spk_b:
+            parts.append(f'        <div class="dlg-speaker">{_esc(spk_b)}</div>')
+        parts.append(f'        <div>{_esc(line_b)}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "trend":
+        direction = hints.get("trend_direction", "up")
+        y1, y2 = ("100", "10") if direction == "up" else ("10", "100")
+        parts.append(f'    <div class="trend-label" id="{card_id}-title">{_esc(display_text)}</div>')
+        parts.append(f'    <div class="trend-wrap">')
+        parts.append(f'      <svg viewBox="0 0 400 120" width="100%" height="120" id="{card_id}-trend-svg">')
+        parts.append(f'        <path d="M 10 {y1} C 130 {y1}, 270 {y2}, 390 {y2}" '
+                     f'stroke="{p["accent"]}" stroke-width="3" fill="none" '
+                     f'stroke-dasharray="600" stroke-dashoffset="600" id="{card_id}-trend-path" />')
+        parts.append(f'        <circle cx="390" cy="{y2}" r="6" fill="{p["accent"]}" '
+                     f'opacity="0" id="{card_id}-trend-dot" />')
+        parts.append(f'      </svg>')
+        parts.append(f'    </div>')
+    elif content_style == "attributed_quote":
+        attribution = hints.get("attribution", "")
+        parts.append(f'    <div class="title" id="{card_id}-title">{_esc(display_text)}</div>')
+        if attribution:
+            parts.append(f'    <div class="attr-line" id="{card_id}-attr">{_esc(attribution)}</div>')
+        if detail:
+            parts.append(f'    <div class="detail" id="{card_id}-detail">{_esc(detail)}</div>')
     else:
         parts.append(f'    <div class="title" id="{card_id}-title">{_esc(display_text)}</div>')
         if detail:
@@ -624,7 +743,6 @@ def _build_timeline_js(
                             f'{t_in + stagger - 0.05:.4f});'
                         )
             elif content_style == "question":
-                # Reuse key_phrase entrance per pack
                 if is_paper:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
@@ -639,6 +757,99 @@ def _build_timeline_js(
                         f'{{ clipPath: "inset(0 0% 0 0)", duration: 0.500, ease: "power2.inOut" }}, '
                         f'{t_in:.4f});'
                     )
+            elif content_style == "timeline":
+                steps = card.get("contentHints", {}).get("steps", [])
+                n_steps = min(len(steps), 6)
+                tl_line_sel = f'.card[data-card-id="{card_id}"] #{card_id}-tl-line'
+                line_dur = min(1.5, max(0.4, n_steps * 0.25))
+                lines.append(
+                    f'  tl.to(\'{tl_line_sel}\', '
+                    f'{{ width: "100%", duration: {line_dur:.3f}, ease: "power2.inOut" }}, '
+                    f'{t_in:.4f});'
+                )
+                for si in range(n_steps):
+                    dot_sel = f'.card[data-card-id="{card_id}"] #{card_id}-dot-{si}'
+                    dot_t = t_in + (si + 1) * (line_dur / max(n_steps, 1))
+                    if is_paper:
+                        lines.append(
+                            f'  tl.to(\'{dot_sel}\', '
+                            f'{{ background: "{p["accent"]}", duration: 0.200, ease: _eIn }}, '
+                            f'{dot_t:.4f});'
+                        )
+                    else:
+                        lines.append(
+                            f'  tl.to(\'{dot_sel}\', '
+                            f'{{ background: "{p["accent"]}", scale: 1.3, '
+                            f'boxShadow: "0 0 14px {p["accent"]}", '
+                            f'duration: 0.200, ease: _eIn }}, {dot_t:.4f});'
+                        )
+                        lines.append(
+                            f'  tl.to(\'{dot_sel}\', '
+                            f'{{ scale: 1, duration: 0.150, ease: _eOut }}, '
+                            f'{dot_t + 0.20:.4f});'
+                        )
+            elif content_style == "dialogue":
+                dlg_a_sel = f'.card[data-card-id="{card_id}"] #{card_id}-dlg-a'
+                dlg_b_sel = f'.card[data-card-id="{card_id}"] #{card_id}-dlg-b'
+                lines.append(
+                    f'  tl.fromTo(\'{dlg_a_sel}\', '
+                    f'{{ opacity: 0, x: -30 }}, '
+                    f'{{ opacity: 1, x: 0, duration: 0.400, ease: _eIn }}, '
+                    f'{t_in:.4f});'
+                )
+                lines.append(
+                    f'  tl.fromTo(\'{dlg_b_sel}\', '
+                    f'{{ opacity: 0, x: 30 }}, '
+                    f'{{ opacity: 1, x: 0, duration: 0.400, ease: _eIn }}, '
+                    f'{t_in + 0.25:.4f});'
+                )
+            elif content_style == "trend":
+                path_sel = f'.card[data-card-id="{card_id}"] #{card_id}-trend-path'
+                dot_sel = f'.card[data-card-id="{card_id}"] #{card_id}-trend-dot'
+                lines.append(
+                    f'  tl.fromTo(\'{title_sel}\', '
+                    f'{{ opacity: 0 }}, '
+                    f'{{ opacity: 1, duration: 0.300, ease: _eIn }}, '
+                    f'{t_in:.4f});'
+                )
+                lines.append(
+                    f'  tl.to(\'{path_sel}\', '
+                    f'{{ attr: {{ "stroke-dashoffset": 0 }}, '
+                    f'duration: 1.2, ease: "power2.inOut" }}, '
+                    f'{t_in + 0.15:.4f});'
+                )
+                if is_paper:
+                    lines.append(
+                        f'  tl.to(\'{dot_sel}\', '
+                        f'{{ opacity: 1, duration: 0.300, ease: _eIn }}, '
+                        f'{t_in + 1.35:.4f});'
+                    )
+                else:
+                    lines.append(
+                        f'  tl.to(\'{dot_sel}\', '
+                        f'{{ opacity: 1, scale: 1.4, '
+                        f'filter: "drop-shadow(0 0 8px {p["accent"]})", '
+                        f'duration: 0.200, ease: _eIn }}, {t_in + 1.20:.4f});'
+                    )
+                    lines.append(
+                        f'  tl.to(\'{dot_sel}\', '
+                        f'{{ scale: 1, duration: 0.200, ease: _eOut }}, '
+                        f'{t_in + 1.40:.4f});'
+                    )
+            elif content_style == "attributed_quote":
+                lines.append(
+                    f'  tl.fromTo(\'{title_sel}\', '
+                    f'{{ opacity: 0, y: 40 }}, '
+                    f'{{ opacity: 1, y: 0, duration: 0.500, ease: _eIn }}, '
+                    f'{t_in:.4f});'
+                )
+                attr_sel = f'.card[data-card-id="{card_id}"] #{card_id}-attr'
+                lines.append(
+                    f'  tl.fromTo(\'{attr_sel}\', '
+                    f'{{ opacity: 0 }}, '
+                    f'{{ opacity: 1, duration: 0.300, ease: _eIn }}, '
+                    f'{t_in + 0.20:.4f});'
+                )
             else:
                 if is_paper:
                     lines.append(
