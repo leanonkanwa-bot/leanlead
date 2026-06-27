@@ -251,7 +251,8 @@ def _build_timeline_js(
     ]
 
     # Face-aware transform origin for zoom (Phase D)
-    if subject_position:
+    has_face_data = subject_position is not None
+    if has_face_data:
         fl = float(subject_position.get("face_left_pct", 25.0))
         fr = float(subject_position.get("face_right_pct", 75.0))
         ft = float(subject_position.get("face_top_pct", 15.0))
@@ -335,6 +336,23 @@ def _build_timeline_js(
                 f'{{ filter: "blur(0px)", scale: 1, duration: 0.350, ease: "power2.out" }}, '
                 f'{start:.4f});'
             )
+
+            # Dimmed backdrop: when a center-zone card conflicts with the
+            # speaker's face, dim the video so the card is the sole focus.
+            card_zone = card.get("zone", "")
+            center_zone = card_zone in ("fullscreen", "video-overlay")
+            face_centered = has_face_data and 30.0 <= face_cx <= 70.0
+            if center_zone and face_centered:
+                lines.append(
+                    f'  tl.to("#video-wrap", '
+                    f'{{ filter: "brightness(0.25) blur(4px)", '
+                    f'duration: 0.30, ease: "power2.in" }}, {start:.4f});'
+                )
+                lines.append(
+                    f'  tl.to("#video-wrap", '
+                    f'{{ filter: "brightness(1) blur(0px)", '
+                    f'duration: 0.30, ease: "power2.out" }}, {end - 0.30:.4f});'
+                )
 
             content_style = card.get("contentHints", {}).get("style", "key_phrase")
             title_sel = f'.card[data-card-id="{card_id}"] #{card_id}-title'
