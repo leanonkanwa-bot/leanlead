@@ -147,7 +147,6 @@ def _build_graphic_card_html(card: dict) -> str:
     parts.append(f'  backdrop-filter: {p["blur"]};')
     parts.append(f'  -webkit-backdrop-filter: {p["blur"]};')
     parts.append('}')
-    # Grain texture overlay
     parts.append(f'.card[data-card-id="{card_id}"] .card-panel::after {{')
     parts.append(f'  content: ""; position: absolute; inset: 0;')
     parts.append(f'  border-radius: {p["radius"]};')
@@ -165,6 +164,7 @@ def _build_graphic_card_html(card: dict) -> str:
     parts.append(f'  font-weight: 800; line-height: 1.15; text-align: center;')
     parts.append(f'  color: {p["text"]}; max-width: 100%;')
     parts.append(f'  text-shadow: {p["title_glow"]};')
+    parts.append(f'  font-variant-numeric: tabular-nums;')
     parts.append('}')
     if detail:
         parts.append(f'.card[data-card-id="{card_id}"] .detail {{')
@@ -172,10 +172,21 @@ def _build_graphic_card_html(card: dict) -> str:
         parts.append(f'  font-weight: 400; text-align: center;')
         parts.append(f'  color: {p["text_secondary"]}; max-width: 90%;')
         parts.append('}')
-    # Accent underline element (animated via grow-x in timeline)
     parts.append(f'.card[data-card-id="{card_id}"] .accent-line {{')
     parts.append(f'  width: 0; height: 3px; background: {p["accent"]};')
     parts.append(f'  border-radius: 2px; box-shadow: 0 0 12px {p["accent"]};')
+    parts.append('}')
+    # Shimmer sweep (registry component: shimmer-sweep)
+    parts.append(f'.card[data-card-id="{card_id}"] .card-panel .shimmer-mask {{')
+    parts.append(f'  position: absolute; top: 0; left: 0; width: 100%; height: 100%;')
+    parts.append(f'  pointer-events: none; border-radius: {p["radius"]};')
+    parts.append(f'  background: linear-gradient(120deg,')
+    parts.append(f'    transparent 0%,')
+    parts.append(f'    transparent calc(var(--shimmer-pos, -20%) - 10%),')
+    parts.append(f'    rgba(76,201,240,0.15) var(--shimmer-pos, -20%),')
+    parts.append(f'    transparent calc(var(--shimmer-pos, -20%) + 10%),')
+    parts.append(f'    transparent 100%);')
+    parts.append(f'  mix-blend-mode: overlay; z-index: 2;')
     parts.append('}')
     parts.append('</style>')
     parts.append('<div class="root">')
@@ -186,6 +197,7 @@ def _build_graphic_card_html(card: dict) -> str:
     if detail:
         parts.append(f'    <div class="detail" id="{card_id}-detail">{_esc(detail)}</div>')
     parts.append(f'    <div class="accent-line" id="{card_id}-line"></div>')
+    parts.append(f'    <div class="shimmer-mask" id="{card_id}-shimmer"></div>')
     parts.append('  </div>')
     parts.append('</div>')
     parts.append('</div>')
@@ -226,7 +238,11 @@ def _build_caption_card_html(card: dict) -> str:
     )
 
 
-def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None) -> str:
+def _build_timeline_js(
+    cards: list[dict],
+    zoom_entries: list[dict] | None = None,
+    subject_position: dict | None = None,
+) -> str:
     """Build the master GSAP timeline script including zoom/pan on the video wrapper."""
     lines = [
         "(function () {",
@@ -234,11 +250,18 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
         "",
     ]
 
-    # ── Zoom/pan: CSS transform on #video-wrap ──────────────────────────
-    # Each zoom entry becomes a tween that scales the video wrapper from
-    # `from` to `to` over the entry's time range, using the same easing
-    # curves proven mathematically identical to the FFmpeg expressions
-    # (cosine for drift, quadratic for punch_in — verified 0.00 delta).
+    # Face-aware transform origin for zoom (Phase D)
+    if subject_position:
+        fl = float(subject_position.get("face_left_pct", 25.0))
+        fr = float(subject_position.get("face_right_pct", 75.0))
+        ft = float(subject_position.get("face_top_pct", 15.0))
+        fb = float(subject_position.get("face_bottom_pct", 65.0))
+        face_cx = max(20.0, min(80.0, (fl + fr) / 2))
+        face_cy = max(20.0, min(80.0, (ft + fb) / 2))
+    else:
+        face_cx, face_cy = 50.0, 50.0
+    transform_origin = f"{face_cx:.1f}% {face_cy:.1f}%"
+
     if zoom_entries:
         lines.append("  // ── Zoom/pan on video wrapper ──")
         for ze in zoom_entries:
@@ -258,7 +281,7 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
                 f'  tl.fromTo("#video-wrap", '
                 f'{{ scale: {zfrom:.4f} }}, '
                 f'{{ scale: {zto:.4f}, duration: {zdur:.4f}, ease: {ease}, '
-                f'transformOrigin: "center center" }}, '
+                f'transformOrigin: "{transform_origin}" }}, '
                 f'{zs:.4f});'
             )
         lines.append("")
@@ -322,15 +345,41 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
             if content_style == "stat" and card.get("contentHints", {}).get("number"):
                 num_val, num_suffix = _safe_number(card["contentHints"]["number"])
                 if num_val is not None:
+                    # Count-up with color flash + scale pulse (apple-money-count pattern)
+                    count_dur = min(1.5, max(0.6, dur * 0.25))
+                    count_end = t_in + count_dur
                     lines.append(
                         f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_val}, '
-                        f'duration: 1.0, ease: "power2.out", onUpdate: function(){{ '
+                        f'duration: {count_dur:.3f}, ease: "power2.out", onUpdate: function(){{ '
                         f'var el=document.querySelector(\'{title_sel}\'); '
-                        f'if(el) el.textContent=Math.round(o.v)+\'{_esc_js(num_suffix)}\'; '
+                        f'if(el) el.textContent=Math.round(o.v).toLocaleString()+\'{_esc_js(num_suffix)}\'; '
                         f'}}}}, {t_in:.4f}); }})();'
                     )
+                    # Scale pulse on count completion
+                    lines.append(
+                        f'  tl.to(\'{title_sel}\', '
+                        f'{{ scale: 1.08, duration: 0.12, ease: "back.out(2)" }}, '
+                        f'{count_end:.4f});'
+                    )
+                    lines.append(
+                        f'  tl.to(\'{title_sel}\', '
+                        f'{{ scale: 1, duration: 0.20, ease: "power2.out" }}, '
+                        f'{count_end + 0.12:.4f});'
+                    )
+                    # Accent color flash on count completion
+                    lines.append(
+                        f'  tl.to(\'{title_sel}\', '
+                        f'{{ color: "{_LEAN_GLASS["accent"]}", '
+                        f'textShadow: "0 0 48px rgba(76,201,240,0.4)", '
+                        f'duration: 0.15 }}, {count_end:.4f});'
+                    )
+                    lines.append(
+                        f'  tl.to(\'{title_sel}\', '
+                        f'{{ color: "{_LEAN_GLASS["text"]}", '
+                        f'textShadow: "{_esc_js(_LEAN_GLASS["title_glow"])}", '
+                        f'duration: 0.6 }}, {count_end + 0.15:.4f});'
+                    )
                 else:
-                    # Unparseable number — fall back to blur-in
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
                         f'{{ opacity: 0, filter: "blur(8px)" }}, '
@@ -370,6 +419,15 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
                 f'{{ width: 0 }}, '
                 f'{{ width: 120, duration: 0.400, ease: "power2.out" }}, '
                 f'{t_in + 0.30:.4f});'
+            )
+            # Shimmer sweep across glass panel after materialization
+            shimmer_sel = f'.card[data-card-id="{card_id}"] #{card_id}-shimmer'
+            shimmer_start = start + 0.50
+            lines.append(
+                f'  tl.fromTo(\'{shimmer_sel}\', '
+                f'{{ "--shimmer-pos": "-20%" }}, '
+                f'{{ "--shimmer-pos": "120%", duration: 0.9, ease: "power2.inOut" }}, '
+                f'{shimmer_start:.4f});'
             )
 
         # Exit
@@ -451,6 +509,7 @@ def compose(
     work_dir: Path,
     zoom_entries: list[dict] | None = None,
     style_pack: str = "lean_glass",
+    subject_position: dict | None = None,
 ) -> Path:
     """Assemble a HyperFrames project directory from a storyboard.
 
@@ -509,7 +568,7 @@ def compose(
         card_hosts.append(_build_card_host(c, layout, track_index=3))
 
     # Build master timeline
-    timeline_js = _build_timeline_js(all_cards, zoom_entries=zoom_entries)
+    timeline_js = _build_timeline_js(all_cards, zoom_entries=zoom_entries, subject_position=subject_position)
 
     # CSS custom properties from theme
     accent_vars = "\n".join(

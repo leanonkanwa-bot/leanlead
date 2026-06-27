@@ -1536,6 +1536,7 @@ def _render_hyperframes(
     content_type: str = "coaching",
     editing_style: str = "viral",
     style_pack: str = "lean_glass",
+    subject_position: dict | None = None,
 ) -> dict[str, Any]:
     """Full HyperFrames pipeline: pre-trim -> storyboard -> compose -> render."""
     from app.engine.pretrim import pretrim
@@ -1621,6 +1622,7 @@ def _render_hyperframes(
         work_dir=work_dir,
         zoom_entries=remapped_zoom,
         style_pack=style_pack,
+        subject_position=subject_position,
     )
 
     # Stage 4: Render via HyperFrames CLI
@@ -1722,6 +1724,7 @@ def render(
                 content_type=content_type,
                 editing_style=editing_style,
                 style_pack=style_pack,
+                subject_position=subject_position,
             )
         except Exception as _hf_err:
             import traceback as _tb
