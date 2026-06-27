@@ -53,7 +53,7 @@ def _zone_bounds(zone: str, layout: str) -> dict:
     return table.get(zone, table["lower-third"])
 
 
-def _build_card_host(card: dict, layout: str, track_index: int) -> str:
+def _build_card_host(card: dict, layout: str, track_index: int, pack: dict | None = None) -> str:
     """Build a card-host div with correct classes, data attributes, and inline bounds."""
     card_id = card["id"]
     start = float(card.get("startSec", 0))
@@ -62,16 +62,15 @@ def _build_card_host(card: dict, layout: str, track_index: int) -> str:
 
     is_caption = card.get("type") == "caption"
 
-    # Graphic cards must NEVER use lower-third (reserved for captions)
     if not is_caption and zone == "lower-third":
         zone = "video-overlay"
 
     bounds = _zone_bounds(zone, layout)
 
     if is_caption:
-        inner = _build_caption_card_html(card)
+        inner = _build_caption_card_html(card, pack=pack)
     else:
-        inner = _build_graphic_card_html(card)
+        inner = _build_graphic_card_html(card, pack=pack)
 
     return (
         f'<div class="card-host clip" data-card-id="{card_id}" '
@@ -85,16 +84,19 @@ def _build_card_host(card: dict, layout: str, track_index: int) -> str:
     )
 
 
-# ── LeanGlass Style Pack ─────────────────────────────────────────────
-# Dark glass panels with volumetric cyan glow, backdrop blur, subtle
-# grain texture. One consistent visual identity across every card.
+# ── Style Packs ──────────────────────────────────────────────────────
+# Cross-pack constants (brand signature, not pack-specific)
+_EASE_IN = "cubic-bezier(0.22, 0.68, 0.35, 1.03)"
+_EASE_OUT_FAST = "cubic-bezier(0.55, 0, 0.85, 0.36)"
 
 _LEAN_GLASS = {
+    "id": "lean_glass",
     "bg": "linear-gradient(160deg, rgba(18,18,28,0.85), rgba(8,8,16,0.92))",
     "text": "#F1F1F1",
     "text_secondary": "rgba(255,255,255,0.6)",
     "accent": "#4cc9f0",
     "font": '"Inter", ui-sans-serif, system-ui, sans-serif',
+    "font_weight": "800",
     "title_size": "64px",
     "number_size": "96px",
     "kicker_size": "22px",
@@ -103,15 +105,47 @@ _LEAN_GLASS = {
     "radius": "20px",
     "shadow": "0 0 60px rgba(76,201,240,0.15), 0 8px 32px rgba(0,0,0,0.4)",
     "shadow_inset": "inset 0 1px 0 rgba(255,255,255,0.06)",
-    "blur": "blur(16px) saturate(1.4)",
+    "panel_filter": "blur(16px) saturate(1.4)",
     "title_glow": "0 0 40px rgba(76,201,240,0.25)",
     "title_glow_intense": "0 0 56px rgba(76,201,240,0.45)",
-    # iOS-spring-inspired ease: subtle 3% overshoot then settle
-    "ease_in": "cubic-bezier(0.22, 0.68, 0.35, 1.03)",
-    "ease_out_fast": "cubic-bezier(0.55, 0, 0.85, 0.36)",
+    "has_grain": True,
+    "shimmer_color": "rgba(76,201,240,0.15)",
+    "accent_line_glow": "0 0 12px #4cc9f0",
+    "accent_line_glow_bright": "0 0 20px #4cc9f0",
+    "backdrop_dim": "brightness(0.25) blur(4px)",
+    "backdrop_restore": "brightness(1) blur(0px)",
 }
 
-# Inline SVG grain texture (deterministic, no external asset)
+_LEAN_PAPER = {
+    "id": "lean_paper",
+    "bg": "#FAFAF8",
+    "text": "#1A1A1A",
+    "text_secondary": "rgba(0,0,0,0.45)",
+    "accent": "#4F6BFF",
+    "font": '"Inter", ui-sans-serif, system-ui, sans-serif',
+    "font_weight": "600",
+    "title_size": "64px",
+    "number_size": "96px",
+    "kicker_size": "22px",
+    "detail_size": "26px",
+    "border": "1px solid rgba(0,0,0,0.06)",
+    "radius": "12px",
+    "shadow": "0 4px 24px rgba(0,0,0,0.06)",
+    "shadow_inset": "",
+    "panel_filter": "",
+    "title_glow": "",
+    "title_glow_intense": "",
+    "has_grain": False,
+    "shimmer_color": "rgba(79,107,255,0.10)",
+    "accent_line_glow": "0 0 8px rgba(79,107,255,0.3)",
+    "accent_line_glow_bright": "0 0 14px rgba(79,107,255,0.45)",
+    "backdrop_dim": "brightness(1.6) blur(6px) saturate(0.3)",
+    "backdrop_restore": "brightness(1) blur(0px) saturate(1)",
+}
+
+_PACKS = {"lean_glass": _LEAN_GLASS, "lean_paper": _LEAN_PAPER}
+
+# Inline SVG grain texture (LeanGlass only)
 _GRAIN_SVG = (
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E"
     "%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' "
@@ -120,19 +154,20 @@ _GRAIN_SVG = (
 )
 
 
-def _build_graphic_card_html(card: dict) -> str:
-    """Build inner HTML for a LeanGlass graphic overlay card."""
+def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
+    """Build inner HTML for a graphic overlay card using the given style pack."""
     card_id = card["id"]
     hints = card.get("contentHints", {})
     kicker = hints.get("kicker", "")
     title = hints.get("title", "")
     detail = hints.get("detail", "")
     number = hints.get("number", "")
-    p = _LEAN_GLASS
+    p = pack or _LEAN_GLASS
 
     display_text = number if number else title
     title_size = p["number_size"] if number else p["title_size"]
 
+    shadow_val = f'{p["shadow"]}, {p["shadow_inset"]}' if p["shadow_inset"] else p["shadow"]
     parts = [f'<div class="card" data-card-id="{card_id}">']
     parts.append('<style>')
     parts.append(f'.card[data-card-id="{card_id}"] .root {{')
@@ -147,27 +182,31 @@ def _build_graphic_card_html(card: dict) -> str:
     parts.append(f'  padding: 44px 52px;')
     parts.append(f'  display: flex; flex-direction: column; align-items: center;')
     parts.append(f'  gap: 14px; max-width: 85%; position: relative;')
-    parts.append(f'  box-shadow: {p["shadow"]}, {p["shadow_inset"]};')
-    parts.append(f'  backdrop-filter: {p["blur"]};')
-    parts.append(f'  -webkit-backdrop-filter: {p["blur"]};')
+    parts.append(f'  box-shadow: {shadow_val};')
+    if p["panel_filter"]:
+        parts.append(f'  backdrop-filter: {p["panel_filter"]};')
+        parts.append(f'  -webkit-backdrop-filter: {p["panel_filter"]};')
     parts.append('}')
-    parts.append(f'.card[data-card-id="{card_id}"] .card-panel::after {{')
-    parts.append(f'  content: ""; position: absolute; inset: 0;')
-    parts.append(f'  border-radius: {p["radius"]};')
-    parts.append(f'  background-image: url("{_GRAIN_SVG}");')
-    parts.append(f'  background-repeat: repeat; pointer-events: none;')
-    parts.append('}')
+    if p["has_grain"]:
+        parts.append(f'.card[data-card-id="{card_id}"] .card-panel::after {{')
+        parts.append(f'  content: ""; position: absolute; inset: 0;')
+        parts.append(f'  border-radius: {p["radius"]};')
+        parts.append(f'  background-image: url("{_GRAIN_SVG}");')
+        parts.append(f'  background-repeat: repeat; pointer-events: none;')
+        parts.append('}')
     if kicker:
         parts.append(f'.card[data-card-id="{card_id}"] .kicker {{')
         parts.append(f'  font-family: {p["font"]}; font-size: {p["kicker_size"]};')
         parts.append(f'  font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;')
         parts.append(f'  color: {p["accent"]};')
         parts.append('}')
+    glow_css = f'  text-shadow: {p["title_glow"]};' if p["title_glow"] else ''
     parts.append(f'.card[data-card-id="{card_id}"] .title {{')
     parts.append(f'  font-family: {p["font"]}; font-size: {title_size};')
-    parts.append(f'  font-weight: 800; line-height: 1.15; text-align: center;')
+    parts.append(f'  font-weight: {p["font_weight"]}; line-height: 1.15; text-align: center;')
     parts.append(f'  color: {p["text"]}; max-width: 100%;')
-    parts.append(f'  text-shadow: {p["title_glow"]};')
+    if glow_css:
+        parts.append(glow_css)
     parts.append(f'  font-variant-numeric: tabular-nums;')
     parts.append('}')
     if detail:
@@ -178,16 +217,15 @@ def _build_graphic_card_html(card: dict) -> str:
         parts.append('}')
     parts.append(f'.card[data-card-id="{card_id}"] .accent-line {{')
     parts.append(f'  width: 0; height: 3px; background: {p["accent"]};')
-    parts.append(f'  border-radius: 2px; box-shadow: 0 0 12px {p["accent"]};')
+    parts.append(f'  border-radius: 2px; box-shadow: {p["accent_line_glow"]};')
     parts.append('}')
-    # Shimmer sweep (registry component: shimmer-sweep)
     parts.append(f'.card[data-card-id="{card_id}"] .card-panel .shimmer-mask {{')
     parts.append(f'  position: absolute; top: 0; left: 0; width: 100%; height: 100%;')
     parts.append(f'  pointer-events: none; border-radius: {p["radius"]};')
     parts.append(f'  background: linear-gradient(120deg,')
     parts.append(f'    transparent 0%,')
     parts.append(f'    transparent calc(var(--shimmer-pos, -20%) - 10%),')
-    parts.append(f'    rgba(76,201,240,0.15) var(--shimmer-pos, -20%),')
+    parts.append(f'    {p["shimmer_color"]} var(--shimmer-pos, -20%),')
     parts.append(f'    transparent calc(var(--shimmer-pos, -20%) + 10%),')
     parts.append(f'    transparent 100%);')
     parts.append(f'  mix-blend-mode: overlay; z-index: 2;')
@@ -208,10 +246,11 @@ def _build_graphic_card_html(card: dict) -> str:
     return "\n".join(parts)
 
 
-def _build_caption_card_html(card: dict) -> str:
+def _build_caption_card_html(card: dict, pack: dict | None = None) -> str:
     """Build inner HTML for a caption card with per-word spans."""
     card_id = card["id"]
     words = card.get("words", [])
+    p = pack or _LEAN_GLASS
 
     word_spans = []
     for w in words:
@@ -226,13 +265,13 @@ def _build_caption_card_html(card: dict) -> str:
         f'.card[data-card-id="{card_id}"] .cap-line {{\n'
         f'  display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline;\n'
         f'  gap: 0.3em; padding: 16px 24px;\n'
-        f'  font-family: {_LEAN_GLASS["font"]};\n'
+        f'  font-family: {p["font"]};\n'
         f'  font-size: 48px; font-weight: 700; color: #FFFFFF;\n'
         f'  text-shadow: 0 2px 8px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.9);\n'
         f'  text-align: center; line-height: 1.3;\n'
         f'}}\n'
         f'.card[data-card-id="{card_id}"] .cap-emphasis {{\n'
-        f'  color: {_LEAN_GLASS["accent"]}; transform: scale(1.08);\n'
+        f'  color: {p["accent"]}; transform: scale(1.08);\n'
         f'}}\n'
         f'</style>\n'
         f'<div class="cap-line" id="{card_id}-line">\n'
@@ -246,16 +285,15 @@ def _build_timeline_js(
     cards: list[dict],
     zoom_entries: list[dict] | None = None,
     subject_position: dict | None = None,
+    pack: dict | None = None,
 ) -> str:
     """Build the master GSAP timeline script including zoom/pan on the video wrapper."""
-    p = _LEAN_GLASS
-    ease_in = p["ease_in"]
-    ease_out_fast = p["ease_out_fast"]
+    p = pack or _LEAN_GLASS
     lines = [
         "(function () {",
         '  const tl = window.gsap.timeline({ paused: true });',
-        f'  var _eIn = "{ease_in}";',
-        f'  var _eOut = "{ease_out_fast}";',
+        f'  var _eIn = "{_EASE_IN}";',
+        f'  var _eOut = "{_EASE_OUT_FAST}";',
         "",
     ]
 
@@ -354,12 +392,12 @@ def _build_timeline_js(
             if center_zone and face_centered:
                 lines.append(
                     f'  tl.to("#video-wrap", '
-                    f'{{ filter: "brightness(0.25) blur(4px)", '
+                    f'{{ filter: "{_esc_js(p["backdrop_dim"])}", '
                     f'duration: 0.30, ease: _eIn }}, {start:.4f});'
                 )
                 lines.append(
                     f'  tl.to("#video-wrap", '
-                    f'{{ filter: "brightness(1) blur(0px)", '
+                    f'{{ filter: "{_esc_js(p["backdrop_restore"])}", '
                     f'duration: 0.18, ease: _eOut }}, {end - 0.18:.4f});'
                 )
 
@@ -369,22 +407,35 @@ def _build_timeline_js(
             line_sel = f'.card[data-card-id="{card_id}"] #{card_id}-line'
             t_in = start + 0.15
 
+            is_paper = p["id"] == "lean_paper"
+
             if content_style == "stat" and card.get("contentHints", {}).get("number"):
                 num_val, num_suffix = _safe_number(card["contentHints"]["number"])
                 if num_val is not None:
                     count_dur = min(1.5, max(0.6, dur * 0.25))
                     count_end = t_in + count_dur
-                    # Count-up with dynamic shadow: glow intensifies during count
-                    lines.append(
-                        f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_val}, '
-                        f'duration: {count_dur:.3f}, ease: _eIn, onUpdate: function(){{ '
-                        f'var el=document.querySelector(\'{title_sel}\'); '
-                        f'if(el){{ el.textContent=Math.round(o.v).toLocaleString()+\'{_esc_js(num_suffix)}\'; '
-                        f'var p=o.v/{num_val}; '
-                        f'el.style.textShadow="0 0 "+(40+16*p)+"px rgba(76,201,240,"+(0.25+0.20*p)+")"; '
-                        f'}} }}}}, {t_in:.4f}); }})();'
-                    )
-                    # Scale pulse on completion
+                    if is_paper:
+                        # LeanPaper: shadow lightens during count (inverse of LeanGlass)
+                        lines.append(
+                            f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_val}, '
+                            f'duration: {count_dur:.3f}, ease: _eIn, onUpdate: function(){{ '
+                            f'var el=document.querySelector(\'{title_sel}\'); '
+                            f'if(el){{ el.textContent=Math.round(o.v).toLocaleString()+\'{_esc_js(num_suffix)}\'; '
+                            f'var r=1-o.v/{num_val}; '
+                            f'el.style.color="rgba(26,26,26,"+(0.3+0.7*r)+")"; '
+                            f'}} }}}}, {t_in:.4f}); }})();'
+                        )
+                    else:
+                        # LeanGlass: glow intensifies during count
+                        lines.append(
+                            f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_val}, '
+                            f'duration: {count_dur:.3f}, ease: _eIn, onUpdate: function(){{ '
+                            f'var el=document.querySelector(\'{title_sel}\'); '
+                            f'if(el){{ el.textContent=Math.round(o.v).toLocaleString()+\'{_esc_js(num_suffix)}\'; '
+                            f'var r=o.v/{num_val}; '
+                            f'el.style.textShadow="0 0 "+(40+16*r)+"px rgba(76,201,240,"+(0.25+0.20*r)+")"; '
+                            f'}} }}}}, {t_in:.4f}); }})();'
+                        )
                     lines.append(
                         f'  tl.to(\'{title_sel}\', '
                         f'{{ scale: 1.08, duration: 0.12, ease: _eIn }}, '
@@ -395,33 +446,49 @@ def _build_timeline_js(
                         f'{{ scale: 1, duration: 0.20, ease: _eOut }}, '
                         f'{count_end + 0.12:.4f});'
                     )
-                    # Color flash on completion
                     lines.append(
                         f'  tl.to(\'{title_sel}\', '
                         f'{{ color: "{p["accent"]}", '
-                        f'textShadow: "{_esc_js(p["title_glow_intense"])}", '
-                        f'duration: 0.15 }}, {count_end:.4f});'
+                        + (f'textShadow: "{_esc_js(p["title_glow_intense"])}", ' if p["title_glow_intense"] else '')
+                        + f'duration: 0.15 }}, {count_end:.4f});'
                     )
                     lines.append(
                         f'  tl.to(\'{title_sel}\', '
                         f'{{ color: "{p["text"]}", '
-                        f'textShadow: "{_esc_js(p["title_glow"])}", '
-                        f'duration: 0.6 }}, {count_end + 0.15:.4f});'
+                        + (f'textShadow: "{_esc_js(p["title_glow"])}", ' if p["title_glow"] else '')
+                        + f'duration: 0.6 }}, {count_end + 0.15:.4f});'
                     )
                 else:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
-                        f'{{ opacity: 0, filter: "blur(8px)" }}, '
-                        f'{{ opacity: 1, filter: "blur(0px)", duration: 0.400, ease: _eIn }}, '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.400, ease: _eIn }}, '
                         f'{t_in:.4f});'
                     )
             elif content_style == "key_phrase":
-                lines.append(
-                    f'  tl.fromTo(\'{title_sel}\', '
-                    f'{{ clipPath: "inset(0 100% 0 0)" }}, '
-                    f'{{ clipPath: "inset(0 0% 0 0)", duration: 0.500, ease: "power2.inOut" }}, '
-                    f'{t_in:.4f});'
-                )
+                if is_paper:
+                    # LeanPaper: text visible immediately, underline draws left-to-right
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.250, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
+                    ul_sel = f'.card[data-card-id="{card_id}"] #{card_id}-line'
+                    lines.append(
+                        f'  tl.fromTo(\'{ul_sel}\', '
+                        f'{{ width: 0, height: "2px" }}, '
+                        f'{{ width: 160, duration: 0.600, ease: "power2.inOut" }}, '
+                        f'{t_in + 0.15:.4f});'
+                    )
+                else:
+                    # LeanGlass: mask-reveal horizontal clip wipe
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ clipPath: "inset(0 100% 0 0)" }}, '
+                        f'{{ clipPath: "inset(0 0% 0 0)", duration: 0.500, ease: "power2.inOut" }}, '
+                        f'{t_in:.4f});'
+                    )
             elif content_style == "quote":
                 lines.append(
                     f'  tl.fromTo(\'{title_sel}\', '
@@ -430,12 +497,22 @@ def _build_timeline_js(
                     f'{t_in:.4f});'
                 )
             else:
-                lines.append(
-                    f'  tl.fromTo(\'{title_sel}\', '
-                    f'{{ opacity: 0, filter: "blur(8px)" }}, '
-                    f'{{ opacity: 1, filter: "blur(0px)", duration: 0.400, ease: _eIn }}, '
-                    f'{t_in:.4f});'
-                )
+                if is_paper:
+                    # LeanPaper callout: fade + scale-down-to-rest (settles, no blur)
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0, scale: 1.04 }}, '
+                        f'{{ opacity: 1, scale: 1, duration: 0.400, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
+                else:
+                    # LeanGlass: blur-in
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0, filter: "blur(8px)" }}, '
+                        f'{{ opacity: 1, filter: "blur(0px)", duration: 0.400, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
 
             lines.append(
                 f'  tl.fromTo(\'{kicker_sel}\', '
@@ -449,13 +526,13 @@ def _build_timeline_js(
                 f'{{ width: 120, duration: 0.400, ease: _eIn }}, '
                 f'{t_in + 0.30:.4f});'
             )
-            # Breathing underline: glow pulse for card's visible duration
+            # Breathing underline
             pulse_dur = max(0.5, dur - 1.0)
             pulse_repeats = max(1, int(pulse_dur / 2.5))
             lines.append(
                 f'  tl.fromTo(\'{line_sel}\', '
-                f'{{ boxShadow: "0 0 12px {p["accent"]}" }}, '
-                f'{{ boxShadow: "0 0 20px {p["accent"]}", '
+                f'{{ boxShadow: "{_esc_js(p["accent_line_glow"])}" }}, '
+                f'{{ boxShadow: "{_esc_js(p["accent_line_glow_bright"])}", '
                 f'duration: 1.25, ease: "sine.inOut", '
                 f'repeat: {pulse_repeats}, yoyo: true }}, '
                 f'{t_in + 0.70:.4f});'
@@ -622,6 +699,10 @@ def compose(
     print(f"[COMPOSE] Video copied: {video_dst} ({video_dst.stat().st_size // 1024}KB)")
     print(f"[COMPOSE] Storyboard duration: {duration:.3f}s")
 
+    # Resolve style pack
+    pack = _PACKS.get(style_pack, _LEAN_GLASS)
+    print(f"[COMPOSE] Style pack: {pack['id']}")
+
     # Separate cards by type for track assignment
     all_cards = storyboard.get("cards", [])
     graphic_cards = [c for c in all_cards if c.get("type") != "caption"]
@@ -630,12 +711,12 @@ def compose(
     # Build card host divs
     card_hosts = []
     for c in graphic_cards:
-        card_hosts.append(_build_card_host(c, layout, track_index=2))
+        card_hosts.append(_build_card_host(c, layout, track_index=2, pack=pack))
     for c in caption_cards:
-        card_hosts.append(_build_card_host(c, layout, track_index=3))
+        card_hosts.append(_build_card_host(c, layout, track_index=3, pack=pack))
 
     # Build master timeline
-    timeline_js = _build_timeline_js(all_cards, zoom_entries=zoom_entries, subject_position=subject_position)
+    timeline_js = _build_timeline_js(all_cards, zoom_entries=zoom_entries, subject_position=subject_position, pack=pack)
 
     # CSS custom properties from theme
     accent_vars = "\n".join(
