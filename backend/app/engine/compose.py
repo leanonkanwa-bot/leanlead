@@ -456,6 +456,33 @@ def _build_timeline_js(
         lines.append(f'  }} catch(_e) {{ console.warn("card {card_id} animation error:", _e); }}')
         lines.append("")
 
+    # Caption suppression: fade captions out while graphic cards are visible
+    graphic_windows = [
+        (float(c.get("startSec", 0)), float(c.get("endSec", 0)))
+        for c in cards if c.get("type") != "caption"
+    ]
+    caption_ids = [
+        _esc_js(str(c.get("id", "")))
+        for c in cards if c.get("type") == "caption"
+    ]
+    if graphic_windows and caption_ids:
+        lines.append("  // ── Caption suppression during graphic cards ──")
+        cap_sel = ", ".join(
+            f'.card-host[data-card-id="{cid}"]' for cid in caption_ids
+        )
+        for gs, ge in graphic_windows:
+            lines.append(
+                f'  tl.to(\'{cap_sel}\', '
+                f'{{ opacity: 0, duration: 0.15, ease: "power2.in" }}, '
+                f'{gs:.4f});'
+            )
+            lines.append(
+                f'  tl.to(\'{cap_sel}\', '
+                f'{{ opacity: 1, duration: 0.20, ease: "power2.out" }}, '
+                f'{ge:.4f});'
+            )
+        lines.append("")
+
     lines.append('  window.__timelines = window.__timelines || {};')
     lines.append(f'  window.__timelines["{_COMP_ID}"] = tl;')
     lines.append("})();")

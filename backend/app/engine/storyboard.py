@@ -320,6 +320,9 @@ RULES:
 - Each card should last 3-8 seconds
 - Vary accentIndex (0-4) across cards for visual rhythm
 - Content must come from what the speaker actually says
+- TIMING: startSec must be AFTER the speaker finishes saying the words
+  the card quotes — never show text before it is spoken. Place cards
+  0.3-1s after the referenced line ends, as a visual reinforcement.
 - Place cards at NARRATIVELY IMPORTANT moments — not evenly spaced
 
 BRAND: accent color {brand_color}, content type: {content_type}, style: {editing_style}
@@ -353,6 +356,26 @@ Design {target_cards} graphic overlay cards for this video."""
         cards = json.loads(raw)
         if not isinstance(cards, list):
             cards = cards.get("cards", [])
+        # Validate card timing: nudge cards that start before their
+        # beat segment ends (prevents showing text before it's spoken)
+        for card in cards:
+            card_start = float(card.get("startSec", 0))
+            card_beat = card.get("beat", "")
+            for seg in beat_summary:
+                if seg["beat"] == card_beat and card_start < seg["outEnd"]:
+                    nudged = round(seg["outEnd"] + 0.3, 2)
+                    if nudged != card_start:
+                        card_end = float(card.get("endSec", card_start + 4))
+                        card_dur = card_end - card_start
+                        card["startSec"] = nudged
+                        card["endSec"] = round(nudged + card_dur, 2)
+                        print(f"[STORYBOARD] Nudged {card.get('id','?')} start "
+                              f"{card_start:.1f}s -> {nudged:.1f}s (after beat '{card_beat}' ends)")
+                    break
+        # Clamp to video duration
+        for card in cards:
+            card["startSec"] = max(0, min(float(card.get("startSec", 0)), trimmed_duration - 1))
+            card["endSec"] = max(card["startSec"] + 1, min(float(card.get("endSec", 0)), trimmed_duration))
         print(f"[STORYBOARD] Generated {len(cards)} graphic cards")
         return cards
     except Exception as e:
