@@ -264,7 +264,7 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
         lines.append("")
 
     for card in cards:
-        card_id = card["id"]
+        card_id = _esc_js(str(card.get("id", f"unknown-{id(card)}")))
         start = float(card.get("startSec", 0))
         end = float(card.get("endSec", start + 3))
         dur = end - start
@@ -273,18 +273,19 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
         is_caption = card.get("type") == "caption"
 
         if is_caption:
-            # Captions: short deliberate fade, all words appear together
             fade_in_dur = 0.18
             fade_out_dur = 0.15
         else:
             fade_in_dur = min(0.4, dur * 0.15)
             fade_out_dur = min(0.35, dur * 0.12)
 
-        # Enter: set visible + fade/blur in
+        # Wrap each card's animations in try-catch so one bad card
+        # cannot crash the entire timeline registration.
+        lines.append(f'  try {{')
+
         lines.append(f'  tl.set(\'{sel}\', {{ visibility: "visible" }}, {start:.4f});')
 
         if is_caption:
-            # Captions: 180ms fade, all words instantly visible
             lines.append(
                 f'  tl.fromTo(\'{sel}\', '
                 f'{{ opacity: 0 }}, '
@@ -298,7 +299,6 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
                     f'  tl.set(\'{word_sel}\', {{ opacity: 1, y: 0 }}, {start:.4f});'
                 )
         else:
-            # LeanGlass panel entrance: blur-in materialization
             panel_sel = f'.card[data-card-id="{card_id}"] .card-panel'
             lines.append(
                 f'  tl.fromTo(\'{sel}\', '
@@ -313,7 +313,6 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
                 f'{start:.4f});'
             )
 
-            # Content-type-specific animation
             content_style = card.get("contentHints", {}).get("style", "key_phrase")
             title_sel = f'.card[data-card-id="{card_id}"] #{card_id}-title'
             kicker_sel = f'.card[data-card-id="{card_id}"] #{card_id}-kicker'
@@ -321,17 +320,24 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
             t_in = start + 0.15
 
             if content_style == "stat" and card.get("contentHints", {}).get("number"):
-                # COUNT-UP: number animates from 0 to value
-                num_str = card["contentHints"]["number"]
-                lines.append(
-                    f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_str.replace(",","").replace("%","").replace("$","").strip() or "0"}, '
-                    f'duration: 1.0, ease: "power2.out", onUpdate: function(){{ '
-                    f'var el=document.querySelector(\'{title_sel}\'); '
-                    f'if(el) el.textContent=Math.round(o.v)+"{num_str[-1] if num_str[-1] in "%$" else ""}"; '
-                    f'}}}}, {t_in:.4f}); }})();'
-                )
+                num_val, num_suffix = _safe_number(card["contentHints"]["number"])
+                if num_val is not None:
+                    lines.append(
+                        f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_val}, '
+                        f'duration: 1.0, ease: "power2.out", onUpdate: function(){{ '
+                        f'var el=document.querySelector(\'{title_sel}\'); '
+                        f'if(el) el.textContent=Math.round(o.v)+\'{_esc_js(num_suffix)}\'; '
+                        f'}}}}, {t_in:.4f}); }})();'
+                    )
+                else:
+                    # Unparseable number — fall back to blur-in
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0, filter: "blur(8px)" }}, '
+                        f'{{ opacity: 1, filter: "blur(0px)", duration: 0.400, ease: "power2.out" }}, '
+                        f'{t_in:.4f});'
+                    )
             elif content_style == "key_phrase":
-                # MASK-REVEAL: horizontal clip wipe
                 lines.append(
                     f'  tl.fromTo(\'{title_sel}\', '
                     f'{{ clipPath: "inset(0 100% 0 0)" }}, '
@@ -339,7 +345,6 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
                     f'{t_in:.4f});'
                 )
             elif content_style == "quote":
-                # SLIDE-IN: float up from below
                 lines.append(
                     f'  tl.fromTo(\'{title_sel}\', '
                     f'{{ opacity: 0, y: 40 }}, '
@@ -347,7 +352,6 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
                     f'{t_in:.4f});'
                 )
             else:
-                # BLUR-IN: for callouts and comparisons
                 lines.append(
                     f'  tl.fromTo(\'{title_sel}\', '
                     f'{{ opacity: 0, filter: "blur(8px)" }}, '
@@ -355,14 +359,12 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
                     f'{t_in:.4f});'
                 )
 
-            # Kicker fade-in (all types)
             lines.append(
                 f'  tl.fromTo(\'{kicker_sel}\', '
                 f'{{ opacity: 0, y: -8 }}, '
                 f'{{ opacity: 1, y: 0, duration: 0.250, ease: "power2.out" }}, '
                 f'{start + 0.10:.4f});'
             )
-            # Accent underline grow-x (all types)
             lines.append(
                 f'  tl.fromTo(\'{line_sel}\', '
                 f'{{ width: 0 }}, '
@@ -379,7 +381,6 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
                 f'{exit_start:.4f});'
             )
         else:
-            # LeanGlass exit: fade + slight shrink (recedes into depth)
             exit_start = end - 0.30
             panel_sel = f'.card[data-card-id="{card_id}"] .card-panel'
             lines.append(
@@ -393,6 +394,8 @@ def _build_timeline_js(cards: list[dict], zoom_entries: list[dict] | None = None
                 f'{exit_start:.4f});'
             )
         lines.append(f'  tl.set(\'{sel}\', {{ visibility: "hidden" }}, {end:.4f});')
+
+        lines.append(f'  }} catch(_e) {{ console.warn("card {card_id} animation error:", _e); }}')
         lines.append("")
 
     lines.append('  window.__timelines = window.__timelines || {};')
@@ -408,6 +411,38 @@ def _esc(text: str) -> str:
         .replace(">", "&gt;")
         .replace('"', "&quot;")
     )
+
+
+import re as _re
+
+_NUM_RE = _re.compile(r"[\d]+(?:[,.][\d]+)*")
+
+
+def _safe_number(raw: str) -> tuple[float | None, str]:
+    """Extract a clean numeric value and display suffix from a Claude-generated number string.
+
+    Returns (numeric_value, suffix) where suffix is '%', '$', or ''.
+    Returns (None, '') if no number can be extracted.
+    """
+    if not raw or not raw.strip():
+        return None, ""
+    suffix = ""
+    if "%" in raw:
+        suffix = "%"
+    elif "$" in raw:
+        suffix = "$"
+    m = _NUM_RE.search(raw)
+    if not m:
+        return None, suffix
+    try:
+        return float(m.group(0).replace(",", "")), suffix
+    except (ValueError, OverflowError):
+        return None, suffix
+
+
+def _esc_js(s: str) -> str:
+    """Escape a string for safe embedding inside a JS single-quoted string literal."""
+    return s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "")
 
 
 def compose(
