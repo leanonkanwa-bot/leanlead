@@ -230,14 +230,81 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
     parts.append(f'    transparent 100%);')
     parts.append(f'  mix-blend-mode: overlay; z-index: 2;')
     parts.append('}')
+    content_style = hints.get("style", "")
+    # Comparison: two-column layout
+    if content_style == "comparison":
+        parts.append(f'.card[data-card-id="{card_id}"] .cmp-row {{')
+        parts.append(f'  display: flex; gap: 24px; align-items: center; width: 100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .cmp-side {{')
+        parts.append(f'  flex: 1; text-align: center;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .cmp-label {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: {p["kicker_size"]};')
+        parts.append(f'  font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;')
+        parts.append(f'  color: {p["text_secondary"]}; margin-bottom: 8px;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .cmp-value {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: {p["title_size"]};')
+        parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
+        parts.append(f'  font-variant-numeric: tabular-nums;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .cmp-sep {{')
+        parts.append(f'  width: 2px; height: 0; background: {p["accent"]};')
+        parts.append(f'  border-radius: 1px; flex-shrink: 0;')
+        if p["title_glow"]:
+            parts.append(f'  box-shadow: {p["accent_line_glow"]};')
+        parts.append('}')
+    # List: item rows
+    if content_style == "list":
+        parts.append(f'.card[data-card-id="{card_id}"] .list-items {{')
+        parts.append(f'  display: flex; flex-direction: column; gap: 12px; width: 100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .list-item {{')
+        parts.append(f'  display: flex; align-items: center; gap: 14px;')
+        parts.append(f'  font-family: {p["font"]}; font-size: 28px;')
+        parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .list-bullet {{')
+        parts.append(f'  width: 28px; height: 28px; border-radius: 50%;')
+        parts.append(f'  background: {p["accent"]}; color: #fff;')
+        parts.append(f'  display: flex; align-items: center; justify-content: center;')
+        parts.append(f'  font-size: 14px; font-weight: 800; flex-shrink: 0;')
+        parts.append('}')
     parts.append('</style>')
     parts.append('<div class="root">')
     parts.append('  <div class="card-panel">')
     if kicker:
         parts.append(f'    <div class="kicker" id="{card_id}-kicker">{_esc(kicker)}</div>')
-    parts.append(f'    <div class="title" id="{card_id}-title">{_esc(display_text)}</div>')
-    if detail:
-        parts.append(f'    <div class="detail" id="{card_id}-detail">{_esc(detail)}</div>')
+    if content_style == "comparison":
+        ll = _esc(hints.get("left_label", ""))
+        lv = _esc(hints.get("left_value", ""))
+        rl = _esc(hints.get("right_label", ""))
+        rv = _esc(hints.get("right_value", ""))
+        parts.append(f'    <div class="cmp-row">')
+        parts.append(f'      <div class="cmp-side" id="{card_id}-left">')
+        parts.append(f'        <div class="cmp-label">{ll}</div>')
+        parts.append(f'        <div class="cmp-value">{lv}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'      <div class="cmp-sep" id="{card_id}-sep"></div>')
+        parts.append(f'      <div class="cmp-side" id="{card_id}-right">')
+        parts.append(f'        <div class="cmp-label">{rl}</div>')
+        parts.append(f'        <div class="cmp-value">{rv}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "list":
+        items = hints.get("items", [])
+        parts.append(f'    <div class="list-items">')
+        for i, item in enumerate(items[:8]):
+            parts.append(f'      <div class="list-item" id="{card_id}-item-{i}">')
+            parts.append(f'        <div class="list-bullet">{i + 1}</div>')
+            parts.append(f'        <span>{_esc(str(item))}</span>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    else:
+        parts.append(f'    <div class="title" id="{card_id}-title">{_esc(display_text)}</div>')
+        if detail:
+            parts.append(f'    <div class="detail" id="{card_id}-detail">{_esc(detail)}</div>')
     parts.append(f'    <div class="accent-line" id="{card_id}-line"></div>')
     parts.append(f'    <div class="shimmer-mask" id="{card_id}-shimmer"></div>')
     parts.append('  </div>')
@@ -496,9 +563,84 @@ def _build_timeline_js(
                     f'{{ opacity: 1, y: 0, duration: 0.500, ease: _eIn }}, '
                     f'{t_in:.4f});'
                 )
+            elif content_style == "comparison":
+                left_sel = f'.card[data-card-id="{card_id}"] #{card_id}-left'
+                right_sel = f'.card[data-card-id="{card_id}"] #{card_id}-right'
+                sep_sel = f'.card[data-card-id="{card_id}"] #{card_id}-sep'
+                # Both sides slide in from opposite edges
+                lines.append(
+                    f'  tl.fromTo(\'{left_sel}\', '
+                    f'{{ opacity: 0, x: -60 }}, '
+                    f'{{ opacity: 1, x: 0, duration: 0.450, ease: _eIn }}, '
+                    f'{t_in:.4f});'
+                )
+                lines.append(
+                    f'  tl.fromTo(\'{right_sel}\', '
+                    f'{{ opacity: 0, x: 60 }}, '
+                    f'{{ opacity: 1, x: 0, duration: 0.450, ease: _eIn }}, '
+                    f'{t_in + 0.15:.4f});'
+                )
+                # Separator draws top-to-bottom
+                lines.append(
+                    f'  tl.fromTo(\'{sep_sel}\', '
+                    f'{{ height: 0 }}, '
+                    f'{{ height: 80, duration: 0.400, ease: _eIn }}, '
+                    f'{t_in + 0.20:.4f});'
+                )
+            elif content_style == "list":
+                items = card.get("contentHints", {}).get("items", [])
+                n_items = min(len(items), 8)
+                cascade_limit = min(n_items, 4)
+                for i in range(n_items):
+                    item_sel = f'.card[data-card-id="{card_id}"] #{card_id}-item-{i}'
+                    bullet_sel = f'{item_sel} .list-bullet'
+                    stagger = i * 0.12 if i < cascade_limit else cascade_limit * 0.12
+                    if is_paper:
+                        # LeanPaper: pure fade, subdued bullet pop
+                        lines.append(
+                            f'  tl.fromTo(\'{item_sel}\', '
+                            f'{{ opacity: 0 }}, '
+                            f'{{ opacity: 1, duration: 0.300, ease: _eIn }}, '
+                            f'{t_in + stagger:.4f});'
+                        )
+                        lines.append(
+                            f'  tl.fromTo(\'{bullet_sel}\', '
+                            f'{{ scale: 0.6 }}, '
+                            f'{{ scale: 1, duration: 0.200, ease: _eIn }}, '
+                            f'{t_in + stagger:.4f});'
+                        )
+                    else:
+                        # LeanGlass: fade + 12px left-slide, spring bullet pop
+                        lines.append(
+                            f'  tl.fromTo(\'{item_sel}\', '
+                            f'{{ opacity: 0, x: -12 }}, '
+                            f'{{ opacity: 1, x: 0, duration: 0.300, ease: _eIn }}, '
+                            f'{t_in + stagger:.4f});'
+                        )
+                        lines.append(
+                            f'  tl.fromTo(\'{bullet_sel}\', '
+                            f'{{ scale: 0.3 }}, '
+                            f'{{ scale: 1, duration: 0.250, ease: _eIn }}, '
+                            f'{t_in + stagger - 0.05:.4f});'
+                        )
+            elif content_style == "question":
+                # Reuse key_phrase entrance per pack
+                if is_paper:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.250, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
+                else:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ clipPath: "inset(0 100% 0 0)" }}, '
+                        f'{{ clipPath: "inset(0 0% 0 0)", duration: 0.500, ease: "power2.inOut" }}, '
+                        f'{t_in:.4f});'
+                    )
             else:
                 if is_paper:
-                    # LeanPaper callout: fade + scale-down-to-rest (settles, no blur)
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
                         f'{{ opacity: 0, scale: 1.04 }}, '
@@ -506,7 +648,6 @@ def _build_timeline_js(
                         f'{t_in:.4f});'
                     )
                 else:
-                    # LeanGlass: blur-in
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
                         f'{{ opacity: 0, filter: "blur(8px)" }}, '
@@ -526,14 +667,15 @@ def _build_timeline_js(
                 f'{{ width: 120, duration: 0.400, ease: _eIn }}, '
                 f'{t_in + 0.30:.4f});'
             )
-            # Breathing underline
+            # Breathing underline — half speed for question cards
+            breath_period = 2.5 if content_style == "question" else 1.25
             pulse_dur = max(0.5, dur - 1.0)
-            pulse_repeats = max(1, int(pulse_dur / 2.5))
+            pulse_repeats = max(1, int(pulse_dur / (breath_period * 2)))
             lines.append(
                 f'  tl.fromTo(\'{line_sel}\', '
                 f'{{ boxShadow: "{_esc_js(p["accent_line_glow"])}" }}, '
                 f'{{ boxShadow: "{_esc_js(p["accent_line_glow_bright"])}", '
-                f'duration: 1.25, ease: "sine.inOut", '
+                f'duration: {breath_period:.2f}, ease: "sine.inOut", '
                 f'repeat: {pulse_repeats}, yoyo: true }}, '
                 f'{t_in + 0.70:.4f});'
             )

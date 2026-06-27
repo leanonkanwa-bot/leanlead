@@ -303,7 +303,12 @@ OUTPUT: a JSON array of card objects. Each card:
     "title": "<main text>",
     "detail": "<optional supporting text>",
     "number": "<if a stat/number is featured>",
-    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"
+    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question",
+    "left_label": "<comparison: left side label>",
+    "left_value": "<comparison: left side value>",
+    "right_label": "<comparison: right side label>",
+    "right_value": "<comparison: right side value>",
+    "items": ["<list: item 1>", "<list: item 2>", ...]
   }}
 }}
 
@@ -317,7 +322,8 @@ RULES:
 - Target {target_cards} cards for a {trimmed_duration:.0f}s video
 - Card startSec/endSec must be within [0, {trimmed_duration:.1f}]
 - Cards should NOT overlap each other in time
-- Each card should last 3-8 seconds
+- Most cards should last 3-8 seconds
+- "question" cards may last up to 15s (they stay while the speaker answers)
 - Vary accentIndex (0-4) across cards for visual rhythm
 - Content must come from what the speaker actually says
 - TIMING: startSec should match when the speaker BEGINS saying the
