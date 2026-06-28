@@ -322,19 +322,25 @@ OUTPUT: a JSON array of card objects. Each card:
     "title": "<main text>",
     "detail": "<optional supporting text>",
     "number": "<if a stat/number is featured>",
-    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote",
+    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote"|"carousel"|"definition"|"checklist"|"score"|"mindmap",
     "left_label": "<comparison: left side label>",
     "left_value": "<comparison: left side value>",
     "right_label": "<comparison: right side label>",
     "right_value": "<comparison: right side value>",
-    "items": ["<list: item 1>", "<list: item 2>", ...],
+    "items": ["<list/checklist: item 1>", "<list/checklist: item 2>", ...],
     "steps": ["<timeline: step 1>", "<timeline: step 2>", ...],
+    "slides": ["<carousel: slide 1>", "<carousel: slide 2>", ...],
     "line_a": "<dialogue: first speaker's line>",
     "line_b": "<dialogue: second speaker's line>",
     "speaker_a": "<dialogue: optional first speaker label>",
     "speaker_b": "<dialogue: optional second speaker label>",
     "trend_direction": "up"|"down",
-    "attribution": "<attributed_quote: who said it>"
+    "attribution": "<attributed_quote: who said it>",
+    "term": "<definition: the word/concept>",
+    "definition": "<definition: explanation text>",
+    "score_text": "<score: e.g. 3-1, Top 5>",
+    "center": "<mindmap: central concept>",
+    "branches": ["<mindmap: branch 1>", "<mindmap: branch 2>", ...]
   }}
 }}
 
@@ -368,6 +374,17 @@ RULES:
   "key_phrase" — a single impactful statement (not enumerated).
   "quote" — unattributed statement the speaker emphasizes.
   "attributed_quote" — quote with a named source ("X said...").
+  "carousel" — 2-4 short related statements that cycle within one
+    card window (e.g. multiple quick tips, rotating perspectives).
+  "definition" — speaker introduces a term/concept and explains it.
+    Provide "term" + "definition" fields.
+  "checklist" — completed/verified action items ("things I checked",
+    "requirements met"). Use checklist, not list, when items imply
+    done/verified status. Use "items" array.
+  "score" — a score, ranking, or rating (e.g. "3-1", "Top 5", "8/10").
+    NOT a stat (stat is for metrics that count up). Provide "score_text".
+  "mindmap" — a central concept with 2-3 branching related ideas.
+    Provide "center" + "branches" array.
   "callout" — supplementary context or aside (catch-all, use only
     when no other type fits).
   "dialogue" — speaker recounts an exchange between two people.

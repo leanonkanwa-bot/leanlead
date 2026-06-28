@@ -413,6 +413,83 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append(f'  display: flex; align-items: center; justify-content: center;')
         parts.append(f'  font-size: 14px; font-weight: 800; flex-shrink: 0;')
         parts.append('}')
+    # Carousel: cycling slides
+    if content_style == "carousel":
+        parts.append(f'.card[data-card-id="{card_id}"] .carousel-slide {{')
+        parts.append(f'  position: absolute; inset: 0; display: flex; align-items: center;')
+        parts.append(f'  justify-content: center; font-family: {p["font"]};')
+        parts.append(f'  font-size: 40px; font-weight: {p["font_weight"]};')
+        parts.append(f'  color: {p["text"]}; text-align: center; padding: 20px;')
+        parts.append(f'  opacity: 0;')
+        parts.append('}')
+    # Definition: term + explanation
+    if content_style == "definition":
+        parts.append(f'.card[data-card-id="{card_id}"] .def-term {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: {p["title_size"]};')
+        parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow: {p["title_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .def-text {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: {p["detail_size"]};')
+        parts.append(f'  font-weight: 400; color: {p["text_secondary"]};')
+        parts.append(f'  margin-top: 12px; text-align: center; max-width: 90%;')
+        parts.append(f'  line-height: 1.5;')
+        parts.append('}')
+    # Checklist: items with checkmarks
+    if content_style == "checklist":
+        parts.append(f'.card[data-card-id="{card_id}"] .chk-items {{')
+        parts.append(f'  display: flex; flex-direction: column; gap: 14px; width: 100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .chk-item {{')
+        parts.append(f'  display: flex; align-items: center; gap: 14px;')
+        parts.append(f'  font-family: {p["font"]}; font-size: 26px;')
+        parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .chk-mark {{')
+        parts.append(f'  width: 28px; height: 28px; flex-shrink: 0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .chk-mark path {{')
+        parts.append(f'  stroke: {p["accent"]}; stroke-width: 3; fill: none;')
+        parts.append(f'  stroke-dasharray: 30; stroke-dashoffset: 30;')
+        parts.append('}')
+    # Score: large impact score
+    if content_style == "score":
+        parts.append(f'.card[data-card-id="{card_id}"] .score-display {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: {p["number_size"]};')
+        parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
+        parts.append(f'  text-align: center; font-variant-numeric: tabular-nums;')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow: {p["title_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .score-label {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: {p["detail_size"]};')
+        parts.append(f'  color: {p["text_secondary"]}; margin-top: 8px; text-align: center;')
+        parts.append('}')
+    # Mindmap: center + branches
+    if content_style == "mindmap":
+        parts.append(f'.card[data-card-id="{card_id}"] .mm-wrap {{')
+        parts.append(f'  position: relative; width: 100%; min-height: 200px;')
+        parts.append(f'  display: flex; align-items: center; justify-content: center;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .mm-center {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: 36px;')
+        parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
+        parts.append(f'  text-align: center; z-index: 2; position: relative;')
+        parts.append(f'  padding: 16px 24px; background: {p["bg"]};')
+        parts.append(f'  border-radius: {p["radius"]}; border: {p["border"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .mm-branch {{')
+        parts.append(f'  position: absolute; display: flex; align-items: center;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .mm-branch-line {{')
+        parts.append(f'  width: 0; height: 2px; background: {p["accent"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .mm-branch-label {{')
+        parts.append(f'  font-family: {p["font"]}; font-size: 22px;')
+        parts.append(f'  font-weight: {p["font_weight"]}; color: {p["accent"]};')
+        parts.append(f'  white-space: nowrap; padding: 6px 12px;')
+        parts.append('}')
     parts.append('</style>')
     # Timeline: full-screen overlay, no card-panel wrapper
     if content_style == "timeline":
@@ -502,6 +579,51 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
             parts.append(f'    <div class="attr-line" id="{card_id}-attr">{_esc(attribution)}</div>')
         if detail:
             parts.append(f'    <div class="detail" id="{card_id}-detail">{_esc(detail)}</div>')
+    elif content_style == "carousel":
+        slides = hints.get("slides", [])
+        parts.append(f'    <div style="position:relative;width:100%;min-height:80px">')
+        for i, slide in enumerate(slides[:4]):
+            parts.append(f'      <div class="carousel-slide" id="{card_id}-slide-{i}">{_esc(str(slide))}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "definition":
+        term = hints.get("term", title)
+        defn = hints.get("definition", detail)
+        parts.append(f'    <div class="def-term" id="{card_id}-term">{_esc(term)}</div>')
+        if defn:
+            parts.append(f'    <div class="def-text" id="{card_id}-def">{_esc(defn)}</div>')
+    elif content_style == "checklist":
+        items = hints.get("items", [])
+        parts.append(f'    <div class="chk-items">')
+        for i, item in enumerate(items[:6]):
+            parts.append(f'      <div class="chk-item" id="{card_id}-chk-{i}">')
+            parts.append(f'        <svg class="chk-mark" viewBox="0 0 28 28" id="{card_id}-chk-svg-{i}"><path d="M6 14 L12 20 L22 8"/></svg>')
+            parts.append(f'        <span>{_esc(str(item))}</span>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "score":
+        score_text = hints.get("score_text", display_text)
+        score_label = hints.get("label", "")
+        parts.append(f'    <div class="score-display" id="{card_id}-score">{_esc(score_text)}</div>')
+        if score_label:
+            parts.append(f'    <div class="score-label" id="{card_id}-score-label">{_esc(score_label)}</div>')
+    elif content_style == "mindmap":
+        center_text = hints.get("center", title)
+        branches = hints.get("branches", [])
+        n_br = min(len(branches), 3)
+        positions = [
+            ("top: 10%; left: 50%; transform: translateX(-50%)", "flex-direction: column-reverse"),
+            ("bottom: 10%; left: 15%", "flex-direction: row"),
+            ("bottom: 10%; right: 15%", "flex-direction: row-reverse"),
+        ]
+        parts.append(f'    <div class="mm-wrap">')
+        parts.append(f'      <div class="mm-center" id="{card_id}-mm-center">{_esc(center_text)}</div>')
+        for i, br in enumerate(branches[:n_br]):
+            pos_style, flex_dir = positions[i % len(positions)]
+            parts.append(f'      <div class="mm-branch" id="{card_id}-br-{i}" style="{pos_style};{flex_dir}">')
+            parts.append(f'        <div class="mm-branch-line" id="{card_id}-br-line-{i}"></div>')
+            parts.append(f'        <div class="mm-branch-label" id="{card_id}-br-label-{i}">{_esc(str(br))}</div>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
     else:
         parts.append(f'    <div class="title" id="{card_id}-title">{_esc(display_text)}</div>')
         if detail:
@@ -1033,6 +1155,159 @@ def _build_timeline_js(
                         f'{{ opacity: 1, duration: 0.300, ease: _eIn }}, '
                         f'{t_in + 0.20:.4f});'
                     )
+            elif content_style == "carousel":
+                slides = card.get("contentHints", {}).get("slides", [])
+                n_slides = min(len(slides), 4)
+                if n_slides > 0:
+                    slide_dur = max(1.0, dur / n_slides)
+                    for si in range(n_slides):
+                        sl_sel = f'.card[data-card-id="{card_id}"] #{card_id}-slide-{si}'
+                        sl_in = start + si * slide_dur
+                        sl_out = sl_in + slide_dur - 0.3
+                        if is_paper:
+                            lines.append(
+                                f'  tl.to(\'{sl_sel}\', '
+                                f'{{ opacity: 1, duration: 0.300, ease: _eIn }}, '
+                                f'{sl_in:.4f});')
+                            lines.append(
+                                f'  tl.to(\'{sl_sel}\', '
+                                f'{{ opacity: 0, duration: 0.250, ease: _eOut }}, '
+                                f'{sl_out:.4f});')
+                        elif is_vibe:
+                            lines.append(
+                                f'  tl.fromTo(\'{sl_sel}\', '
+                                f'{{ opacity: 0, scale: 0.8 }}, '
+                                f'{{ opacity: 1, scale: 1, duration: 0.300, ease: _eIn }}, '
+                                f'{sl_in:.4f});')
+                            lines.append(
+                                f'  tl.to(\'{sl_sel}\', '
+                                f'{{ opacity: 0, scale: 1.1, duration: 0.200, ease: _eOut }}, '
+                                f'{sl_out:.4f});')
+                        else:
+                            lines.append(
+                                f'  tl.fromTo(\'{sl_sel}\', '
+                                f'{{ opacity: 0, filter: "blur(6px)" }}, '
+                                f'{{ opacity: 1, filter: "blur(0px)", duration: 0.300, ease: _eIn }}, '
+                                f'{sl_in:.4f});')
+                            lines.append(
+                                f'  tl.to(\'{sl_sel}\', '
+                                f'{{ opacity: 0, filter: "blur(6px)", duration: 0.250, ease: _eOut }}, '
+                                f'{sl_out:.4f});')
+            elif content_style == "definition":
+                term_sel = f'.card[data-card-id="{card_id}"] #{card_id}-term'
+                def_sel = f'.card[data-card-id="{card_id}"] #{card_id}-def'
+                if is_paper:
+                    lines.append(
+                        f'  tl.fromTo(\'{term_sel}\', '
+                        f'{{ opacity: 0 }}, {{ opacity: 1, duration: 0.300, ease: _eIn }}, '
+                        f'{t_in:.4f});')
+                elif is_vibe:
+                    lines.append(
+                        f'  tl.fromTo(\'{term_sel}\', '
+                        f'{{ opacity: 0, scale: 0.7 }}, '
+                        f'{{ opacity: 1, scale: 1.05, duration: 0.350, ease: _eIn }}, '
+                        f'{t_in:.4f});')
+                    lines.append(
+                        f'  tl.to(\'{term_sel}\', '
+                        f'{{ scale: 1, duration: 0.200, ease: _eOut }}, {t_in + 0.35:.4f});')
+                else:
+                    lines.append(
+                        f'  tl.fromTo(\'{term_sel}\', '
+                        f'{{ clipPath: "inset(0 100% 0 0)" }}, '
+                        f'{{ clipPath: "inset(0 0% 0 0)", duration: 0.500, ease: "power2.inOut" }}, '
+                        f'{t_in:.4f});')
+                lines.append(
+                    f'  tl.fromTo(\'{def_sel}\', '
+                    f'{{ opacity: 0 }}, {{ opacity: 1, duration: 0.300, ease: _eIn }}, '
+                    f'{t_in + 0.20:.4f});')
+            elif content_style == "checklist":
+                items = card.get("contentHints", {}).get("items", [])
+                n_items = min(len(items), 6)
+                cascade_limit = min(n_items, 4)
+                for i in range(n_items):
+                    item_sel = f'.card[data-card-id="{card_id}"] #{card_id}-chk-{i}'
+                    svg_sel = f'.card[data-card-id="{card_id}"] #{card_id}-chk-svg-{i} path'
+                    stagger = i * 0.12 if i < cascade_limit else cascade_limit * 0.12
+                    lines.append(
+                        f'  tl.fromTo(\'{item_sel}\', '
+                        f'{{ opacity: 0 }}, {{ opacity: 1, duration: 0.250, ease: _eIn }}, '
+                        f'{t_in + stagger:.4f});')
+                    lines.append(
+                        f'  tl.to(\'{svg_sel}\', '
+                        f'{{ strokeDashoffset: 0, duration: 0.300, ease: _eIn }}, '
+                        f'{t_in + stagger + 0.10:.4f});')
+                    if is_vibe:
+                        lines.append(
+                            f'  tl.fromTo(\'{svg_sel}\', '
+                            f'{{ scale: 1 }}, {{ scale: 1.3, duration: 0.150, ease: _eIn }}, '
+                            f'{t_in + stagger + 0.40:.4f});')
+                        lines.append(
+                            f'  tl.to(\'{svg_sel}\', '
+                            f'{{ scale: 1, duration: 0.120, ease: _eOut }}, '
+                            f'{t_in + stagger + 0.55:.4f});')
+            elif content_style == "score":
+                score_sel = f'.card[data-card-id="{card_id}"] #{card_id}-score'
+                label_sel = f'.card[data-card-id="{card_id}"] #{card_id}-score-label'
+                pop_scale = "1.15" if is_vibe else "1.08" if not is_paper else "1.04"
+                lines.append(
+                    f'  tl.fromTo(\'{score_sel}\', '
+                    f'{{ opacity: 0, scale: 0.5 }}, '
+                    f'{{ opacity: 1, scale: {pop_scale}, duration: 0.300, ease: _eIn }}, '
+                    f'{t_in:.4f});')
+                lines.append(
+                    f'  tl.to(\'{score_sel}\', '
+                    f'{{ scale: 1, duration: 0.200, ease: _eOut }}, '
+                    f'{t_in + 0.30:.4f});')
+                if not is_paper and p["title_glow"]:
+                    lines.append(
+                        f'  tl.to(\'{score_sel}\', '
+                        f'{{ color: "{p["accent"]}", '
+                        f'textShadow: "{_esc_js(p["title_glow_intense"])}", '
+                        f'duration: 0.15 }}, {t_in + 0.30:.4f});')
+                    lines.append(
+                        f'  tl.to(\'{score_sel}\', '
+                        f'{{ color: "{p["text"]}", '
+                        f'textShadow: "{_esc_js(p["title_glow"])}", '
+                        f'duration: 0.5 }}, {t_in + 0.45:.4f});')
+                lines.append(
+                    f'  tl.fromTo(\'{label_sel}\', '
+                    f'{{ opacity: 0 }}, {{ opacity: 1, duration: 0.250, ease: _eIn }}, '
+                    f'{t_in + 0.20:.4f});')
+            elif content_style == "mindmap":
+                center_sel = f'.card[data-card-id="{card_id}"] #{card_id}-mm-center'
+                lines.append(
+                    f'  tl.fromTo(\'{center_sel}\', '
+                    f'{{ opacity: 0, scale: 0.8 }}, '
+                    f'{{ opacity: 1, scale: 1, duration: 0.400, ease: _eIn }}, '
+                    f'{t_in:.4f});')
+                branches = card.get("contentHints", {}).get("branches", [])
+                n_br = min(len(branches), 3)
+                for bi in range(n_br):
+                    bl_sel = f'.card[data-card-id="{card_id}"] #{card_id}-br-line-{bi}'
+                    blbl_sel = f'.card[data-card-id="{card_id}"] #{card_id}-br-label-{bi}'
+                    br_t = t_in + 0.30 + bi * 0.20
+                    lines.append(
+                        f'  tl.to(\'{bl_sel}\', '
+                        f'{{ width: 100, duration: 0.400, ease: _eIn }}, '
+                        f'{br_t:.4f});')
+                    if is_vibe:
+                        lines.append(
+                            f'  tl.fromTo(\'{blbl_sel}\', '
+                            f'{{ opacity: 0, scale: 0.7 }}, '
+                            f'{{ opacity: 1, scale: 1, duration: 0.300, ease: _eIn }}, '
+                            f'{br_t + 0.30:.4f});')
+                    elif is_paper:
+                        lines.append(
+                            f'  tl.fromTo(\'{blbl_sel}\', '
+                            f'{{ opacity: 0 }}, '
+                            f'{{ opacity: 1, duration: 0.300, ease: _eIn }}, '
+                            f'{br_t + 0.35:.4f});')
+                    else:
+                        lines.append(
+                            f'  tl.fromTo(\'{blbl_sel}\', '
+                            f'{{ opacity: 0, filter: "blur(4px)" }}, '
+                            f'{{ opacity: 1, filter: "blur(0px)", duration: 0.300, ease: _eIn }}, '
+                            f'{br_t + 0.30:.4f});')
             else:
                 if is_paper:
                     lines.append(
