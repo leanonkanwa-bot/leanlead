@@ -90,6 +90,7 @@ _EASE_IN = "cubic-bezier(0.22, 0.68, 0.35, 1.03)"
 _EASE_OUT_FAST = "cubic-bezier(0.55, 0, 0.85, 0.36)"
 _EASE_VIBE_IN = "cubic-bezier(0.18, 0.89, 0.32, 1.12)"
 _EASE_LEDGER_IN = "cubic-bezier(0.25, 0.1, 0.25, 1.0)"
+_EASE_CRAFT_IN = "cubic-bezier(0.34, 0.80, 0.44, 0.98)"
 
 _LEAN_GLASS = {
     "id": "lean_glass",
@@ -201,7 +202,36 @@ _LEAN_LEDGER = {
     "backdrop_restore": "brightness(1) blur(0px)",
 }
 
-_PACKS = {"lean_glass": _LEAN_GLASS, "lean_paper": _LEAN_PAPER, "lean_vibe": _LEAN_VIBE, "lean_ledger": _LEAN_LEDGER}
+_LEAN_CRAFT = {
+    "id": "lean_craft",
+    "bg": "#E8D9C5",
+    "text": "#3D2B1F",
+    "text_secondary": "rgba(61,43,31,0.55)",
+    "accent": "#D97757",
+    "font": '"Caveat", "Kalam", cursive',
+    "font_detail": '"Inter", ui-sans-serif, system-ui, sans-serif',
+    "font_weight": "700",
+    "title_size": "62px",
+    "number_size": "88px",
+    "kicker_size": "20px",
+    "detail_size": "22px",
+    "border": "1.5px solid rgba(217,119,87,0.25)",
+    "radius": "12px 8px 10px 14px",
+    "shadow": "0 3px 16px rgba(61,43,31,0.1)",
+    "shadow_inset": "",
+    "panel_filter": "",
+    "title_glow": "",
+    "title_glow_intense": "",
+    "has_grain": True,
+    "grain_type": "paper",
+    "shimmer_color": "rgba(217,119,87,0.10)",
+    "accent_line_glow": "0 0 6px rgba(217,119,87,0.25)",
+    "accent_line_glow_bright": "0 0 10px rgba(217,119,87,0.35)",
+    "backdrop_dim": "brightness(0.3) blur(4px) sepia(0.2)",
+    "backdrop_restore": "brightness(1) blur(0px) sepia(0)",
+}
+
+_PACKS = {"lean_glass": _LEAN_GLASS, "lean_paper": _LEAN_PAPER, "lean_vibe": _LEAN_VIBE, "lean_ledger": _LEAN_LEDGER, "lean_craft": _LEAN_CRAFT}
 
 # Inline SVG textures
 _GRAIN_SVG = (
@@ -227,6 +257,12 @@ _GRID_SVG = (
     "%3Cline x1='0' y1='40' x2='40' y2='40' stroke='rgba(0,200,150,0.06)' stroke-width='1'/%3E"
     "%3Cline x1='40' y1='0' x2='40' y2='40' stroke='rgba(0,200,150,0.06)' stroke-width='1'/%3E"
     "%3C/svg%3E"
+)
+_PAPER_GRAIN_SVG = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E"
+    "%3Cfilter id='pg'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' "
+    "numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E"
+    "%3Crect width='100%25' height='100%25' filter='url(%23pg)' opacity='0.06'/%3E%3C/svg%3E"
 )
 
 
@@ -265,7 +301,7 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
     parts.append('}')
     if p["has_grain"]:
         gt = p.get("grain_type", "")
-        tex_svg = _CONFETTI_SVG if gt == "confetti" else _GRID_SVG if gt == "grid" else _GRAIN_SVG
+        tex_svg = {"confetti": _CONFETTI_SVG, "grid": _GRID_SVG, "paper": _PAPER_GRAIN_SVG}.get(gt, _GRAIN_SVG)
         parts.append(f'.card[data-card-id="{card_id}"] .card-panel::after {{')
         parts.append(f'  content: ""; position: absolute; inset: 0;')
         parts.append(f'  border-radius: {p["radius"]};')
@@ -287,9 +323,10 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append(glow_css)
     parts.append(f'  font-variant-numeric: tabular-nums;')
     parts.append('}')
+    detail_font = p.get("font_detail", p["font"])
     if detail:
         parts.append(f'.card[data-card-id="{card_id}"] .detail {{')
-        parts.append(f'  font-family: {p["font"]}; font-size: {p["detail_size"]};')
+        parts.append(f'  font-family: {detail_font}; font-size: {p["detail_size"]};')
         parts.append(f'  font-weight: 400; text-align: center;')
         parts.append(f'  color: {p["text_secondary"]}; max-width: 90%;')
         parts.append('}')
@@ -717,7 +754,9 @@ def _build_timeline_js(
     p = pack or _LEAN_GLASS
     is_vibe = p["id"] == "lean_vibe"
     is_ledger = p["id"] == "lean_ledger"
-    ease_in = _EASE_LEDGER_IN if is_ledger else _EASE_VIBE_IN if is_vibe else _EASE_IN
+    is_craft = p["id"] == "lean_craft"
+    ease_in = (_EASE_LEDGER_IN if is_ledger else _EASE_VIBE_IN if is_vibe
+               else _EASE_CRAFT_IN if is_craft else _EASE_IN)
     lines = [
         "(function () {",
         '  const tl = window.gsap.timeline({ paused: true });',
@@ -843,7 +882,17 @@ def _build_timeline_js(
                 if num_val is not None:
                     count_dur = min(1.5, max(0.6, dur * 0.25))
                     count_end = t_in + count_dur
-                    if is_ledger:
+                    if is_craft:
+                        # Settle from 1.2x overshoot down to final value
+                        overshoot_val = round(num_val * 1.2, 1)
+                        lines.append(
+                            f'  (function(){{ var o={{v:{overshoot_val}}}; tl.to(o, {{v:{num_val}, '
+                            f'duration: {count_dur:.3f}, ease: _eIn, onUpdate: function(){{ '
+                            f'var el=document.querySelector(\'{title_sel}\'); '
+                            f'if(el) el.textContent=Math.round(o.v).toLocaleString()+\'{_esc_js(num_suffix)}\'; '
+                            f'}}}}, {t_in:.4f}); }})();'
+                        )
+                    elif is_ledger:
                         lines.append(
                             f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_val}, '
                             f'duration: {count_dur:.3f}, ease: "none", onUpdate: function(){{ '
@@ -912,21 +961,14 @@ def _build_timeline_js(
                         f'{t_in:.4f});'
                     )
             elif content_style == "key_phrase":
-                if is_paper:
+                if is_craft:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
-                        f'{{ opacity: 0 }}, '
-                        f'{{ opacity: 1, duration: 0.250, ease: _eIn }}, '
+                        f'{{ opacity: 0, rotation: 2 }}, '
+                        f'{{ opacity: 1, rotation: 0, duration: 0.450, ease: _eIn }}, '
                         f'{t_in:.4f});'
                     )
-                    ul_sel = f'.card[data-card-id="{card_id}"] #{card_id}-line'
-                    lines.append(
-                        f'  tl.fromTo(\'{ul_sel}\', '
-                        f'{{ width: 0, height: "2px" }}, '
-                        f'{{ width: 160, duration: 0.600, ease: "power2.inOut" }}, '
-                        f'{t_in + 0.15:.4f});'
-                    )
-                elif is_vibe:
+                elif is_paper:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
                         f'{{ opacity: 0, scale: 0.7 }}, '
@@ -1370,7 +1412,14 @@ def _build_timeline_js(
                             f'{{ opacity: 1, filter: "blur(0px)", duration: 0.300, ease: _eIn }}, '
                             f'{br_t + 0.30:.4f});')
             else:
-                if is_ledger:
+                if is_craft:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.350, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
+                elif is_ledger:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
                         f'{{ opacity: 0 }}, '
