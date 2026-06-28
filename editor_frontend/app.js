@@ -31,14 +31,13 @@ function apiFetch(url, opts = {}) {
 
 // ── Section switching ─────────────────────────────────────────────────────────
 function switchSection(targetId) {
-  ["editorArea", "dashboardSection", "analyticsSection", "profileSection", "learnSection", "outilsSection"].forEach(id => {
+  ["editorArea", "dashboardSection", "profileSection", "learnSection", "outilsSection"].forEach(id => {
     const el = $(id);
     if (el) el.classList.toggle("active", id === targetId);
   });
   document.querySelectorAll(".nav-tab[data-target]").forEach(tab => {
     tab.classList.toggle("active", tab.dataset.target === targetId);
   });
-  if (targetId === "analyticsSection") loadAnalytics();
   if (targetId === "dashboardSection") { updateDashboardStats(); loadVideoLibrary(); updateStreak(); updateAchievements(); initReferral(); loadPerfTracker(); loadTeam(); loadApiKey(); }
   if (targetId === "profileSection") loadProfileSection();
   if (targetId === "editorArea") updateOnboardingProgress();
@@ -785,13 +784,35 @@ function _dropZoneAcceptFile(file) {
     dt.items.add(file);
     videoInput.files = dt.files;
   } catch (_) {}
-  // Update drop zone appearance
+  // Update drop zone with thumbnail + file info
   const mb = (file.size / (1024 * 1024)).toFixed(1);
+  drop?.classList.add("has-file");
+  if (drop) {
+    const thumbVideo = document.createElement("video");
+    thumbVideo.src = URL.createObjectURL(file);
+    thumbVideo.muted = true;
+    thumbVideo.playsInline = true;
+    thumbVideo.currentTime = 2;
+    thumbVideo.addEventListener("seeked", () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = thumbVideo.videoWidth;
+        canvas.height = thumbVideo.videoHeight;
+        canvas.getContext("2d").drawImage(thumbVideo, 0, 0);
+        const imgUrl = canvas.toDataURL("image/jpeg", 0.7);
+        drop.style.backgroundImage = `url(${imgUrl})`;
+        drop.style.backgroundSize = "cover";
+        drop.style.backgroundPosition = "center";
+        URL.revokeObjectURL(thumbVideo.src);
+      } catch (_) {}
+    }, { once: true });
+    thumbVideo.load();
+  }
   if (dropLabel) {
     dropLabel.textContent = `${file.name} — ${mb} MB`;
-    dropLabel.style.color = "";
+    dropLabel.style.color = "#fff";
+    dropLabel.style.textShadow = "0 1px 4px rgba(0,0,0,0.8)";
   }
-  drop?.classList.add("has-file");
 }
 
 

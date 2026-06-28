@@ -591,6 +591,28 @@ def download(
     return FileResponse(out, media_type="video/mp4", filename=f"edited-{job_id}.mp4")
 
 
+@app.get("/api/upload/preview/{upload_id}")
+def upload_preview(upload_id: str):
+    """Extract a representative frame from an uploaded source video."""
+    dest = assembled_path(upload_id)
+    if dest is None:
+        raise HTTPException(404, "No assembled file found")
+    thumb = settings.uploads_dir / f"{upload_id}_preview.jpg"
+    if not thumb.exists():
+        try:
+            from app.engine.transcribe import FFMPEG_PATH
+            subprocess.run([
+                FFMPEG_PATH, "-y", "-ss", "2", "-i", str(dest),
+                "-vf", "scale=480:-2",
+                "-frames:v", "1", "-q:v", "3",
+                str(thumb),
+            ], check=True, capture_output=True, timeout=15)
+        except Exception as e:
+            raise HTTPException(500, f"Preview extraction failed: {e}")
+    return FileResponse(thumb, media_type="image/jpeg",
+                        filename=f"preview-{upload_id}.jpg")
+
+
 @app.get("/api/thumbnail/{job_id}")
 def thumbnail(job_id: str, request: Request, _: None = Depends(_check_auth)):
     """Extract first frame as 1080×1080 square thumbnail."""

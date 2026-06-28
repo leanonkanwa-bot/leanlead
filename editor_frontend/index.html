@@ -360,27 +360,12 @@
       .action-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: var(--font); font-size: .72rem; padding: .25rem .6rem; border-radius: 6px; cursor: pointer; transition: color .15s, border-color .15s; text-decoration: none; display: inline-block; }
       .action-btn:hover { border-color: rgba(0,0,0,.2); }
 
-      /* ── ANALYTICS ───────────────────────────────────────────── */
-      #analyticsSection { padding-top: 1.5rem; }
-      .analytics-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .65rem; margin-bottom: 1.5rem; }
-      .analytics-stat { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; }
-      .analytics-stat .big { font-size: 1.6rem; font-weight: 700; letter-spacing: -.03em; color: var(--salmon); display: block; line-height: 1.1; margin-bottom: .2rem; }
-      .analytics-stat .sub { font-size: .72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .04em; }
-      .analytics-section-title { font-size: .72rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .75rem; display: block; }
 
-      .retention-chart-wrap { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem; }
-      .retention-chart-title { font-size: .72rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .75rem; }
-      .retention-svg { width: 100%; height: 80px; }
 
-      .video-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
-      .video-table th { text-align: left; color: var(--text-secondary); font-weight: 500; padding: .5rem .6rem; border-bottom: 1px solid var(--border); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
-      .video-table td { padding: .6rem .6rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
-      .video-table tr:last-child td { border-bottom: none; }
       .status-badge { display: inline-block; padding: .15rem .5rem; border-radius: 99px; font-size: .7rem; font-weight: 600; }
       .status-done { background: rgba(34,197,94,.12); color: #16a34a; }
       .status-processing { background: var(--salmon-dim); color: var(--salmon); }
       .retention-badge { display: inline-block; padding: .15rem .5rem; border-radius: 99px; font-size: .7rem; font-weight: 700; background: var(--salmon-dim); color: var(--salmon); border: 1px solid var(--salmon-border); }
-      .analytics-empty { text-align: center; padding: 2.5rem 1rem; color: var(--text-secondary); font-size: .875rem; }
 
       .perf-chart { display: flex; flex-direction: column; gap: .5rem; }
       .chart-row { display: flex; align-items: center; gap: .75rem; font-size: .78rem; }
@@ -623,7 +608,6 @@
         .nav-tab { font-size: .78rem; padding: 0 .6rem; }
         .preview-stats { grid-template-columns: 1fr 1fr; }
         .video-library-grid { grid-template-columns: 1fr; }
-        .analytics-stats-grid { grid-template-columns: 1fr; }
         .btn-upgrade { display: none; }
       }
 
@@ -750,9 +734,9 @@
             <div class="onboarding-card-title">Démarrage rapide</div>
             <div class="onboarding-steps">
               <div class="ob-step" id="step-account"><div class="ob-icon"></div><span class="ob-label">Créer votre profil coach</span></div>
-              <div class="ob-step" id="step-first-video"><div class="ob-icon"></div><span class="ob-label">Éditer votre 1ère vidéo</span><span class="ob-unlock">Débloque l'analyse</span></div>
+              <div class="ob-step" id="step-first-video"><div class="ob-icon"></div><span class="ob-label">Éditer votre 1ère vidéo</span></div>
               <div class="ob-step" id="step-brand"><div class="ob-icon"></div><span class="ob-label">Configurer votre identité de marque</span></div>
-              <div class="ob-step" id="step-5videos"><div class="ob-icon"></div><span class="ob-label">Atteindre 5 vidéos éditées</span><span class="ob-unlock">Débloque Analytics</span></div>
+              <div class="ob-step" id="step-5videos"><div class="ob-icon"></div><span class="ob-label">Atteindre 5 vidéos éditées</span></div>
               <div class="ob-step" id="step-profile"><div class="ob-icon"></div><span class="ob-label">Compléter votre profil ICP</span></div>
             </div>
           </div>
@@ -1071,55 +1055,6 @@
           </svg>
           <p style="font-size:.875rem;color:var(--text-secondary)">Aucune vidéo éditée pour l'instant.<br>Déposez votre première vidéo dans l'éditeur.</p>
         </div>
-      </section>
-
-      <!-- ── ANALYTICS ──────────────────────────────────────────── -->
-      <section id="analyticsSection" class="app-section">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;padding-top:1.5rem">
-          <h2 style="font-size:1.1rem;font-weight:700">Analytics</h2>
-          <div style="display:flex;align-items:center;gap:.75rem">
-            <span id="analyticsUpdated" style="font-size:.72rem;color:var(--text-secondary)"></span>
-            <button class="action-btn" id="collectBtn">Rafraichir</button>
-          </div>
-        </div>
-
-        <div class="analytics-stats-grid">
-          <div class="analytics-stat"><span class="big" id="aVideos">0</span><span class="sub">Vidéos éditées</span></div>
-          <div class="analytics-stat"><span class="big" id="aRetention">—</span><span class="sub">Rétention moyenne</span></div>
-          <div class="analytics-stat"><span class="big" id="aTimeSaved">0h</span><span class="sub">Temps économisé</span></div>
-          <div class="analytics-stat"><span class="big" id="aViews">0</span><span class="sub">Vues estimées</span></div>
-        </div>
-
-        <div class="retention-chart-wrap">
-          <div class="retention-chart-title">Courbe de rétention moyenne</div>
-          <svg class="retention-svg" viewBox="0 0 400 80" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="retFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#FF7751" stop-opacity=".18"/>
-                <stop offset="100%" stop-color="#FF7751" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path id="retentionFill" fill="url(#retFill)" d=""/>
-            <path id="retentionLine" fill="none" stroke="#FF7751" stroke-width="2" stroke-linecap="round" d=""/>
-            <circle id="retDrop1" r="4" fill="#FF7751" opacity="0"/>
-          </svg>
-        </div>
-
-        <span class="analytics-section-title">Performance par vidéo</span>
-        <div class="perf-chart" id="perfChart" style="margin-bottom:1.5rem"></div>
-
-        <span class="analytics-section-title">Historique des vidéos</span>
-        <table class="video-table" id="videoTable" style="display:none">
-          <thead><tr>
-            <th>Titre</th>
-            <th>Format</th>
-            <th>Date</th>
-            <th>Score</th>
-            <th>Actions</th>
-          </tr></thead>
-          <tbody id="videoTableBody"></tbody>
-        </table>
-        <div class="analytics-empty" id="videoTableEmpty">Aucune donnée — éditez votre première vidéo.</div>
       </section>
 
       <!-- ── PROFILE ─────────────────────────────────────────────── -->
