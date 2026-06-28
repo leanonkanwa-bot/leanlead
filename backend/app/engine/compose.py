@@ -89,6 +89,7 @@ def _build_card_host(card: dict, layout: str, track_index: int, pack: dict | Non
 _EASE_IN = "cubic-bezier(0.22, 0.68, 0.35, 1.03)"
 _EASE_OUT_FAST = "cubic-bezier(0.55, 0, 0.85, 0.36)"
 _EASE_VIBE_IN = "cubic-bezier(0.18, 0.89, 0.32, 1.12)"
+_EASE_LEDGER_IN = "cubic-bezier(0.25, 0.1, 0.25, 1.0)"
 
 _LEAN_GLASS = {
     "id": "lean_glass",
@@ -172,7 +173,35 @@ _LEAN_VIBE = {
     "backdrop_restore": "brightness(1) blur(0px) saturate(1)",
 }
 
-_PACKS = {"lean_glass": _LEAN_GLASS, "lean_paper": _LEAN_PAPER, "lean_vibe": _LEAN_VIBE}
+_LEAN_LEDGER = {
+    "id": "lean_ledger",
+    "bg": "#0A1628",
+    "text": "#E8EBF0",
+    "text_secondary": "rgba(232,235,240,0.5)",
+    "accent": "#00C896",
+    "font": '"IBM Plex Mono", "JetBrains Mono", "Courier New", monospace',
+    "font_weight": "600",
+    "title_size": "60px",
+    "number_size": "88px",
+    "kicker_size": "18px",
+    "detail_size": "22px",
+    "border": "1px solid rgba(0,200,150,0.2)",
+    "radius": "4px",
+    "shadow": "0 2px 12px rgba(0,0,0,0.3)",
+    "shadow_inset": "",
+    "panel_filter": "",
+    "title_glow": "",
+    "title_glow_intense": "",
+    "has_grain": True,
+    "grain_type": "grid",
+    "shimmer_color": "rgba(0,200,150,0.08)",
+    "accent_line_glow": "0 0 8px rgba(0,200,150,0.2)",
+    "accent_line_glow_bright": "0 0 12px rgba(0,200,150,0.3)",
+    "backdrop_dim": "brightness(0.2) blur(3px)",
+    "backdrop_restore": "brightness(1) blur(0px)",
+}
+
+_PACKS = {"lean_glass": _LEAN_GLASS, "lean_paper": _LEAN_PAPER, "lean_vibe": _LEAN_VIBE, "lean_ledger": _LEAN_LEDGER}
 
 # Inline SVG textures
 _GRAIN_SVG = (
@@ -191,6 +220,12 @@ _CONFETTI_SVG = (
     "%3Ccircle cx='110' cy='170' r='1.5' fill='%23FFE66D' opacity='0.09'/%3E"
     "%3Ccircle cx='30' cy='180' r='2' fill='%23fff' opacity='0.05'/%3E"
     "%3Ccircle cx='160' cy='30' r='1.5' fill='%23fff' opacity='0.07'/%3E"
+    "%3C/svg%3E"
+)
+_GRID_SVG = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E"
+    "%3Cline x1='0' y1='40' x2='40' y2='40' stroke='rgba(0,200,150,0.06)' stroke-width='1'/%3E"
+    "%3Cline x1='40' y1='0' x2='40' y2='40' stroke='rgba(0,200,150,0.06)' stroke-width='1'/%3E"
     "%3C/svg%3E"
 )
 
@@ -229,7 +264,8 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append(f'  -webkit-backdrop-filter: {p["panel_filter"]};')
     parts.append('}')
     if p["has_grain"]:
-        tex_svg = _CONFETTI_SVG if p.get("grain_type") == "confetti" else _GRAIN_SVG
+        gt = p.get("grain_type", "")
+        tex_svg = _CONFETTI_SVG if gt == "confetti" else _GRID_SVG if gt == "grid" else _GRAIN_SVG
         parts.append(f'.card[data-card-id="{card_id}"] .card-panel::after {{')
         parts.append(f'  content: ""; position: absolute; inset: 0;')
         parts.append(f'  border-radius: {p["radius"]};')
@@ -680,7 +716,8 @@ def _build_timeline_js(
     """Build the master GSAP timeline script including zoom/pan on the video wrapper."""
     p = pack or _LEAN_GLASS
     is_vibe = p["id"] == "lean_vibe"
-    ease_in = _EASE_VIBE_IN if is_vibe else _EASE_IN
+    is_ledger = p["id"] == "lean_ledger"
+    ease_in = _EASE_LEDGER_IN if is_ledger else _EASE_VIBE_IN if is_vibe else _EASE_IN
     lines = [
         "(function () {",
         '  const tl = window.gsap.timeline({ paused: true });',
@@ -806,7 +843,15 @@ def _build_timeline_js(
                 if num_val is not None:
                     count_dur = min(1.5, max(0.6, dur * 0.25))
                     count_end = t_in + count_dur
-                    if is_paper:
+                    if is_ledger:
+                        lines.append(
+                            f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_val}, '
+                            f'duration: {count_dur:.3f}, ease: "none", onUpdate: function(){{ '
+                            f'var el=document.querySelector(\'{title_sel}\'); '
+                            f'if(el) el.textContent=Math.round(o.v).toLocaleString()+\'{_esc_js(num_suffix)}\'; '
+                            f'}}}}, {t_in:.4f}); }})();'
+                        )
+                    elif is_paper:
                         lines.append(
                             f'  (function(){{ var o={{v:0}}; tl.to(o, {{v:{num_val}, '
                             f'duration: {count_dur:.3f}, ease: _eIn, onUpdate: function(){{ '
@@ -835,17 +880,18 @@ def _build_timeline_js(
                             f'el.style.textShadow="0 0 "+(40+16*r)+"px rgba(76,201,240,"+(0.25+0.20*r)+")"; '
                             f'}} }}}}, {t_in:.4f}); }})();'
                         )
-                    pop_scale = "1.15" if is_vibe else "1.08"
-                    lines.append(
-                        f'  tl.to(\'{title_sel}\', '
-                        f'{{ scale: {pop_scale}, duration: 0.12, ease: _eIn }}, '
-                        f'{count_end:.4f});'
-                    )
-                    lines.append(
-                        f'  tl.to(\'{title_sel}\', '
-                        f'{{ scale: 1, duration: 0.20, ease: _eOut }}, '
-                        f'{count_end + 0.12:.4f});'
-                    )
+                    if not is_ledger:
+                        pop_scale = "1.15" if is_vibe else "1.08"
+                        lines.append(
+                            f'  tl.to(\'{title_sel}\', '
+                            f'{{ scale: {pop_scale}, duration: 0.12, ease: _eIn }}, '
+                            f'{count_end:.4f});'
+                        )
+                        lines.append(
+                            f'  tl.to(\'{title_sel}\', '
+                            f'{{ scale: 1, duration: 0.20, ease: _eOut }}, '
+                            f'{count_end + 0.12:.4f});'
+                        )
                     lines.append(
                         f'  tl.to(\'{title_sel}\', '
                         f'{{ color: "{p["accent"]}", '
@@ -892,6 +938,13 @@ def _build_timeline_js(
                         f'{{ scale: 1, duration: 0.200, ease: _eOut }}, '
                         f'{t_in + 0.35:.4f});'
                     )
+                elif is_ledger:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ clipPath: "inset(0 100% 0 0)" }}, '
+                        f'{{ clipPath: "inset(0 0% 0 0)", duration: 0.500, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
                 else:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
@@ -900,12 +953,20 @@ def _build_timeline_js(
                         f'{t_in:.4f});'
                     )
             elif content_style == "quote":
-                lines.append(
-                    f'  tl.fromTo(\'{title_sel}\', '
-                    f'{{ opacity: 0, y: 40 }}, '
-                    f'{{ opacity: 1, y: 0, duration: 0.500, ease: _eIn }}, '
-                    f'{t_in:.4f});'
-                )
+                if is_ledger:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.200, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
+                else:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0, y: 40 }}, '
+                        f'{{ opacity: 1, y: 0, duration: 0.500, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
             elif content_style == "comparison":
                 left_sel = f'.card[data-card-id="{card_id}"] #{card_id}-left'
                 right_sel = f'.card[data-card-id="{card_id}"] #{card_id}-right'
@@ -1309,7 +1370,14 @@ def _build_timeline_js(
                             f'{{ opacity: 1, filter: "blur(0px)", duration: 0.300, ease: _eIn }}, '
                             f'{br_t + 0.30:.4f});')
             else:
-                if is_paper:
+                if is_ledger:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.200, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
+                elif is_paper:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
                         f'{{ opacity: 0, scale: 1.04 }}, '
