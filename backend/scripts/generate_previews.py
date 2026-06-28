@@ -169,18 +169,23 @@ def _render_preview(pack_id: str, project_dir: Path, output_path: Path) -> bool:
         return False
 
     # Compress: re-encode with CRF 30, strip audio, target small file
-    from app.engine.transcribe import FFMPEG_PATH
-    compressed = output_path.with_suffix(".tmp.mp4")
-    subprocess.run([
-        FFMPEG_PATH, "-y", "-i", str(output_path),
-        "-an",
-        "-vf", "scale=360:640",
-        "-c:v", "libx264", "-crf", "30", "-preset", "fast",
-        "-movflags", "+faststart",
-        str(compressed),
-    ], capture_output=True, timeout=30)
-    if compressed.exists():
-        compressed.replace(output_path)
+    try:
+        from app.engine.transcribe import FFMPEG_PATH
+        compressed = output_path.with_suffix(".tmp.mp4")
+        subprocess.run([
+            FFMPEG_PATH, "-y", "-i", str(output_path),
+            "-an",
+            "-vf", "scale=360:640",
+            "-c:v", "libx264", "-crf", "30", "-preset", "fast",
+            "-movflags", "+faststart",
+            str(compressed),
+        ], capture_output=True, timeout=60)
+        if compressed.exists() and compressed.stat().st_size > 0:
+            compressed.replace(output_path)
+        elif compressed.exists():
+            compressed.unlink()
+    except Exception as e:
+        print(f"  [{pack_id}] Compression failed (keeping raw): {e}")
 
     size_kb = output_path.stat().st_size // 1024
     print(f"  [{pack_id}] Done: {output_path} ({size_kb} KB)")
