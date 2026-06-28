@@ -350,13 +350,29 @@ RULES:
 - Cards should NOT overlap each other in time
 - Most cards should last 3-8 seconds
 - "question" cards may last up to 15s (they stay while the speaker answers)
-- "timeline" cards should span the full narrated sequence (up to 20s)
+- "timeline" cards: set endSec to AFTER the speaker finishes narrating
+  the LAST step — use the beat spine timestamps to find when the final
+  step's words end, then set endSec = that timestamp + 1s. Up to 20s.
 - Vary accentIndex (0-4) across cards for visual rhythm
 - Content must come from what the speaker actually says
-- "timeline" is for sequential/temporal progressions (steps along a path);
-  "list" is for flat enumerations (bulleted items) — pick the right one
-- "attributed_quote" includes an attribution line (who said it);
-  plain "quote" is for unattributed statements
+- CONTENT STYLE RULES (follow strictly, do not improvise):
+  "list" — speaker names 3+ distinct items/reasons/steps/fears/goals
+    in sequence. ALWAYS use list for enumerated content, never collapse
+    multiple items into a single callout or quote card.
+  "timeline" — sequential/temporal progression (events along a path
+    with dates or temporal ordering). Use timeline, not list, when
+    items have a clear chronological sequence.
+  "comparison" — speaker contrasts two specific things (before/after,
+    old/new, us/them). Exactly 2 sides required.
+  "stat" — a specific number or metric is featured.
+  "key_phrase" — a single impactful statement (not enumerated).
+  "quote" — unattributed statement the speaker emphasizes.
+  "attributed_quote" — quote with a named source ("X said...").
+  "callout" — supplementary context or aside (catch-all, use only
+    when no other type fits).
+  "dialogue" — speaker recounts an exchange between two people.
+  "trend" — speaker describes a directional change (growth/decline).
+  "question" — speaker poses a question and then answers it.
 - TIMING: startSec should match when the speaker BEGINS saying the
   words the card references — synchronous with speech, like captions.
 - Place cards at NARRATIVELY IMPORTANT moments — not evenly spaced
