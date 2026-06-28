@@ -91,6 +91,7 @@ _EASE_OUT_FAST = "cubic-bezier(0.55, 0, 0.85, 0.36)"
 _EASE_VIBE_IN = "cubic-bezier(0.18, 0.89, 0.32, 1.12)"
 _EASE_LEDGER_IN = "cubic-bezier(0.25, 0.1, 0.25, 1.0)"
 _EASE_CRAFT_IN = "cubic-bezier(0.34, 0.80, 0.44, 0.98)"
+_EASE_CINEMA_IN = "cubic-bezier(0.16, 0.60, 0.40, 1.00)"
 
 _LEAN_GLASS = {
     "id": "lean_glass",
@@ -231,7 +232,37 @@ _LEAN_CRAFT = {
     "backdrop_restore": "brightness(1) blur(0px) sepia(0)",
 }
 
-_PACKS = {"lean_glass": _LEAN_GLASS, "lean_paper": _LEAN_PAPER, "lean_vibe": _LEAN_VIBE, "lean_ledger": _LEAN_LEDGER, "lean_craft": _LEAN_CRAFT}
+_LEAN_CINEMA = {
+    "id": "lean_cinema",
+    "bg": "#0D0D0D",
+    "text": "#F5F0E8",
+    "text_secondary": "rgba(245,240,232,0.5)",
+    "accent": "#C9A86A",
+    "font": '"Playfair Display", Georgia, serif',
+    "font_detail": '"Inter", ui-sans-serif, system-ui, sans-serif',
+    "font_weight": "700",
+    "title_size": "60px",
+    "number_size": "88px",
+    "kicker_size": "18px",
+    "detail_size": "22px",
+    "border": "none",
+    "radius": "0px",
+    "shadow": "0 4px 24px rgba(0,0,0,0.5)",
+    "shadow_inset": "",
+    "panel_filter": "",
+    "title_glow": "",
+    "title_glow_intense": "",
+    "has_grain": True,
+    "grain_type": "film",
+    "shimmer_color": "rgba(201,168,106,0.06)",
+    "accent_line_glow": "0 0 6px rgba(201,168,106,0.15)",
+    "accent_line_glow_bright": "0 0 10px rgba(201,168,106,0.25)",
+    "backdrop_dim": "brightness(0.15) blur(3px)",
+    "backdrop_restore": "brightness(1) blur(0px)",
+    "has_letterbox": True,
+}
+
+_PACKS = {"lean_glass": _LEAN_GLASS, "lean_paper": _LEAN_PAPER, "lean_vibe": _LEAN_VIBE, "lean_ledger": _LEAN_LEDGER, "lean_craft": _LEAN_CRAFT, "lean_cinema": _LEAN_CINEMA}
 
 # Inline SVG textures
 _GRAIN_SVG = (
@@ -263,6 +294,12 @@ _PAPER_GRAIN_SVG = (
     "%3Cfilter id='pg'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' "
     "numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E"
     "%3Crect width='100%25' height='100%25' filter='url(%23pg)' opacity='0.06'/%3E%3C/svg%3E"
+)
+_FILM_GRAIN_SVG = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E"
+    "%3Cfilter id='fg'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' "
+    "numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E"
+    "%3Crect width='100%25' height='100%25' filter='url(%23fg)' opacity='0.025'/%3E%3C/svg%3E"
 )
 
 
@@ -301,7 +338,7 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
     parts.append('}')
     if p["has_grain"]:
         gt = p.get("grain_type", "")
-        tex_svg = {"confetti": _CONFETTI_SVG, "grid": _GRID_SVG, "paper": _PAPER_GRAIN_SVG}.get(gt, _GRAIN_SVG)
+        tex_svg = {"confetti": _CONFETTI_SVG, "grid": _GRID_SVG, "paper": _PAPER_GRAIN_SVG, "film": _FILM_GRAIN_SVG}.get(gt, _GRAIN_SVG)
         parts.append(f'.card[data-card-id="{card_id}"] .card-panel::after {{')
         parts.append(f'  content: ""; position: absolute; inset: 0;')
         parts.append(f'  border-radius: {p["radius"]};')
@@ -587,6 +624,9 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append('</div>')
         return "\n".join(parts)
     parts.append('<div class="root">')
+    if p.get("has_letterbox"):
+        parts.append('  <div style="position:absolute;top:0;left:0;right:0;height:60px;background:#000;z-index:3"></div>')
+        parts.append('  <div style="position:absolute;bottom:0;left:0;right:0;height:60px;background:#000;z-index:3"></div>')
     parts.append('  <div class="card-panel">')
     if kicker:
         parts.append(f'    <div class="kicker" id="{card_id}-kicker">{_esc(kicker)}</div>')
@@ -755,8 +795,10 @@ def _build_timeline_js(
     is_vibe = p["id"] == "lean_vibe"
     is_ledger = p["id"] == "lean_ledger"
     is_craft = p["id"] == "lean_craft"
-    ease_in = (_EASE_LEDGER_IN if is_ledger else _EASE_VIBE_IN if is_vibe
-               else _EASE_CRAFT_IN if is_craft else _EASE_IN)
+    is_cinema = p["id"] == "lean_cinema"
+    ease_in = (_EASE_CINEMA_IN if is_cinema else _EASE_LEDGER_IN if is_ledger
+               else _EASE_VIBE_IN if is_vibe else _EASE_CRAFT_IN if is_craft
+               else _EASE_IN)
     lines = [
         "(function () {",
         '  const tl = window.gsap.timeline({ paused: true });',
@@ -839,19 +881,20 @@ def _build_timeline_js(
                 )
         else:
             panel_sel = f'.card[data-card-id="{card_id}"] .card-panel'
-            # Entrance: 0.32s with spring ease
+            ent_dur = 0.550 if is_cinema else 0.320
             lines.append(
                 f'  tl.fromTo(\'{sel}\', '
                 f'{{ opacity: 0 }}, '
-                f'{{ opacity: 1, duration: 0.320, ease: _eIn }}, '
+                f'{{ opacity: 1, duration: {ent_dur:.3f}, ease: _eIn }}, '
                 f'{start:.4f});'
             )
-            lines.append(
-                f'  tl.fromTo(\'{panel_sel}\', '
-                f'{{ filter: "blur(12px)", scale: 1.02 }}, '
-                f'{{ filter: "blur(0px)", scale: 1, duration: 0.350, ease: _eIn }}, '
-                f'{start:.4f});'
-            )
+            if not is_cinema:
+                lines.append(
+                    f'  tl.fromTo(\'{panel_sel}\', '
+                    f'{{ filter: "blur(12px)", scale: 1.02 }}, '
+                    f'{{ filter: "blur(0px)", scale: 1, duration: 0.350, ease: _eIn }}, '
+                    f'{start:.4f});'
+                )
 
             # Dimmed backdrop for center-zone cards conflicting with speaker
             card_zone = card.get("zone", "")
@@ -961,7 +1004,14 @@ def _build_timeline_js(
                         f'{t_in:.4f});'
                     )
             elif content_style == "key_phrase":
-                if is_craft:
+                if is_cinema:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.600, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
+                elif is_craft:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
                         f'{{ opacity: 0, rotation: 2 }}, '
@@ -995,7 +1045,14 @@ def _build_timeline_js(
                         f'{t_in:.4f});'
                     )
             elif content_style == "quote":
-                if is_ledger:
+                if is_cinema:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.600, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
+                elif is_ledger:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
                         f'{{ opacity: 0 }}, '
@@ -1412,7 +1469,14 @@ def _build_timeline_js(
                             f'{{ opacity: 1, filter: "blur(0px)", duration: 0.300, ease: _eIn }}, '
                             f'{br_t + 0.30:.4f});')
             else:
-                if is_craft:
+                if is_cinema:
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.600, ease: _eIn }}, '
+                        f'{t_in:.4f});'
+                    )
+                elif is_craft:
                     lines.append(
                         f'  tl.fromTo(\'{title_sel}\', '
                         f'{{ opacity: 0 }}, '
@@ -1491,11 +1555,13 @@ def _build_timeline_js(
                 f'{exit_start:.4f});'
             )
         else:
-            exit_start = end - 0.18
+            exit_dur = 0.500 if is_cinema else 0.180
+            exit_ease = "_eIn" if is_cinema else "_eOut"
+            exit_start = end - exit_dur
             panel_sel = f'.card[data-card-id="{card_id}"] .card-panel'
             lines.append(
                 f'  tl.to(\'{sel}\', '
-                f'{{ opacity: 0, duration: 0.180, ease: _eOut }}, '
+                f'{{ opacity: 0, duration: {exit_dur:.3f}, ease: {exit_ease} }}, '
                 f'{exit_start:.4f});'
             )
             lines.append(
