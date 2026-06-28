@@ -18,31 +18,20 @@
 
       :root {
         --salmon:        #FF7751;
-        --salmon-dim:    rgba(255,119,81,.08);
-        --salmon-border: rgba(255,119,81,.25);
-        --bg:            #FFFFFF;
-        --surface:       #FAFAFA;
-        --border:        #F0F0F0;
-        --text:          #1A1A1A;
-        --text-secondary:#666666;
-        --field-bg:      #F8F8F8;
-        --nav-bg:        rgba(255,255,255,.96);
-        --err:           #e53e3e;
-        --radius:        12px;
-        --font:          'Inter', system-ui, sans-serif;
-        --mono:          'Courier New', monospace;
-      }
-
-      [data-theme="dark"] {
-        --bg:            #0D0D0D;
-        --surface:       #161616;
+        --salmon-dim:    rgba(255,119,81,.1);
+        --salmon-border: rgba(255,119,81,.22);
+        --bg:            #0A0A0A;
+        --surface:       #141414;
         --border:        rgba(255,255,255,.08);
         --text:          #F5F5F6;
         --text-secondary:rgba(245,245,246,.5);
         --field-bg:      rgba(255,255,255,.04);
-        --nav-bg:        rgba(13,13,13,.92);
-        --salmon-dim:    rgba(255,119,81,.1);
-        --salmon-border: rgba(255,119,81,.22);
+        --nav-bg:        #0A0A0A;
+        --sidebar-bg:    #0E0E0E;
+        --err:           #e53e3e;
+        --radius:        12px;
+        --font:          'Inter', system-ui, sans-serif;
+        --mono:          'Courier New', monospace;
       }
 
       html { scroll-behavior: smooth; }
@@ -56,44 +45,32 @@
         -webkit-font-smoothing: antialiased;
       }
 
-      /* ── NAV ─────────────────────────────────────────────────── */
-      .nav {
-        position: sticky; top: 0; z-index: 100;
-        display: flex; align-items: center; justify-content: space-between;
-        padding: 0 1.5rem;
-        height: 56px;
-        border-bottom: 1px solid var(--border);
-        background: var(--nav-bg);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+      /* ── SIDEBAR ───────────────────────────────────────────── */
+      .app-shell { display: flex; min-height: 100vh; }
+      .sidebar {
+        position: fixed; top: 0; left: 0; bottom: 0;
+        width: 220px; background: var(--sidebar-bg);
+        border-right: 1px solid var(--border);
+        display: flex; flex-direction: column;
+        padding: 1.25rem 0; z-index: 100;
       }
-      .logo {
+      .sidebar .logo {
         text-decoration: none; color: var(--text);
-        font-size: .95rem; font-weight: 700; letter-spacing: -.01em;
-        flex-shrink: 0;
+        font-size: 1rem; font-weight: 700; letter-spacing: -.01em;
+        padding: 0 1.25rem; margin-bottom: 1.5rem;
       }
-      .logo span { color: var(--salmon); }
-
-      .nav-tabs { display: flex; align-items: center; gap: 0; }
+      .sidebar .logo span { color: var(--salmon); }
+      .sidebar-nav { display: flex; flex-direction: column; gap: .15rem; padding: 0 .75rem; flex: 1; }
       .nav-tab {
-        background: transparent; border: none; border-bottom: 2px solid transparent;
-        cursor: pointer; font-family: var(--font); font-size: .875rem; font-weight: 500;
-        color: var(--text-secondary); padding: 0 1rem; height: 56px;
-        transition: color .15s, border-color .15s; white-space: nowrap;
+        background: transparent; border: none; border-left: 3px solid transparent;
+        cursor: pointer; font-family: var(--font); font-size: .85rem; font-weight: 500;
+        color: var(--text-secondary); padding: .55rem .75rem;
+        transition: color .15s, background .15s; white-space: nowrap;
+        text-align: left; border-radius: 6px; width: 100%;
       }
-      .nav-tab:hover { color: var(--text); background: rgba(0,0,0,.05); border-radius: 6px; }
-      [data-theme="dark"] .nav-tab:hover { background: rgba(255,255,255,.06); color: #e5e7eb; }
-      .nav-tab.active { color: var(--text); background: var(--surface); border-bottom-color: transparent; border-radius: 6px; }
-      [data-theme="dark"] .nav-tab.active { background: #1a1a1a; color: #fff; }
-
-      .nav-right { display: flex; align-items: center; gap: .75rem; }
-      .btn-upgrade {
-        padding: .4rem .9rem; border: 1px solid var(--border); border-radius: 8px;
-        background: transparent; color: var(--text); font-family: var(--font);
-        font-size: .8rem; font-weight: 500; cursor: pointer;
-        transition: border-color .15s, color .15s;
-      }
-      .btn-upgrade:hover { border-color: var(--salmon); color: var(--salmon); }
+      .nav-tab:hover { color: var(--text); background: rgba(255,255,255,.04); }
+      .nav-tab.active { color: #fff; background: rgba(255,119,81,.1); border-left-color: var(--salmon); }
+      .sidebar-bottom { padding: .75rem 1rem; border-top: 1px solid var(--border); }
       .nav-avatar {
         width: 32px; height: 32px; border-radius: 50%;
         background: var(--salmon); color: #fff;
@@ -101,15 +78,24 @@
         font-size: .7rem; font-weight: 700; flex-shrink: 0; cursor: pointer;
         user-select: none;
       }
-      .btn-theme-toggle {
-        background: transparent; border: 1px solid var(--border); border-radius: 7px;
-        cursor: pointer; padding: .3rem .55rem; font-size: .82rem;
-        color: var(--text-secondary); transition: color .15s, border-color .15s;
+      .btn-upgrade {
+        padding: .4rem .9rem; border: 1px solid var(--border); border-radius: 8px;
+        background: transparent; color: var(--text); font-family: var(--font);
+        font-size: .8rem; font-weight: 500; cursor: pointer; width: 100%;
+        transition: border-color .15s, color .15s; margin-bottom: .5rem;
       }
-      .btn-theme-toggle:hover { color: var(--text); }
+      .btn-upgrade:hover { border-color: var(--salmon); color: var(--salmon); }
 
       /* ── LAYOUT ──────────────────────────────────────────────── */
-      main { max-width: 640px; margin: 0 auto; padding: 0 1.25rem 5rem; }
+      main { margin-left: 220px; padding: 2rem 2.5rem 5rem; max-width: 960px; }
+      @media (max-width: 768px) {
+        .sidebar { width: 60px; padding: 1rem 0; }
+        .sidebar .logo { font-size: 0; padding: 0 .5rem; }
+        .sidebar .logo span { font-size: 1.1rem; }
+        .sidebar .nav-tab { font-size: 0; padding: .55rem .5rem; text-align: center; }
+        .sidebar-bottom { padding: .5rem; }
+        main { margin-left: 60px; padding: 1.5rem 1.25rem 5rem; }
+      }
 
       /* ── CARDS ───────────────────────────────────────────────── */
       .card {
@@ -349,7 +335,7 @@
       .dash-welcome span { color: var(--salmon); }
       .dash-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: .65rem; margin-bottom: 1.25rem; }
       .dash-stat { background: var(--surface); border: none; border-radius: var(--radius); padding: 1rem 1.1rem; }
-      [data-theme="dark"] .dash-stat { background: #111111; }
+      .dash-stat { background: #111111; }
       .dash-stat .big { font-size: 1.75rem; font-weight: 700; letter-spacing: -.03em; color: var(--text); display: block; line-height: 1.1; }
       .dash-stat .lbl { font-size: .68rem; color: var(--text-secondary); margin-top: .3rem; display: block; text-transform: uppercase; letter-spacing: .06em; }
       .dash-edit-btn { width: 100%; height: 44px; border-radius: 8px; border: none; background: var(--salmon); color: #fff; font-family: var(--font); font-size: .875rem; font-weight: 600; cursor: pointer; margin-bottom: 1.25rem; transition: opacity .15s; }
@@ -667,9 +653,8 @@
         cursor: pointer; font-family: var(--font); text-align: left;
         transition: border-color .15s, background .15s; width: 100%;
       }
-      .style-pack-btn:hover { border-color: rgba(76,201,240,0.4); }
-      .style-pack-btn.active { border-color: #4cc9f0; background: rgba(76,201,240,0.06); }
-      [data-theme="dark"] .style-pack-btn.active { background: rgba(76,201,240,0.08); }
+      .style-pack-btn:hover { border-color: var(--salmon-border); }
+      .style-pack-btn.active { border-color: var(--salmon); background: var(--salmon-dim); }
       .style-pack-preview { flex-shrink: 0; position: relative; width: 36px; height: 64px; border-radius: 4px; overflow: hidden; }
       .sp-video { width: 100%; height: 100%; object-fit: cover; display: block; }
       .sp-fallback { position: absolute; inset: 0; }
@@ -679,7 +664,7 @@
       .style-pack-info { flex: 1; min-width: 0; }
       .sp-name { font-size: .8rem; font-weight: 700; color: var(--text); }
       .sp-desc { font-size: .65rem; color: var(--text-secondary); margin-top: .05rem; }
-      .sp-check { font-size: .8rem; color: #4cc9f0; font-weight: 700; display: none; flex-shrink: 0; }
+      .sp-check { font-size: .8rem; color: var(--salmon); font-weight: 700; display: none; flex-shrink: 0; }
       .style-pack-btn.active .sp-check { display: inline; }
       @media (max-width: 540px) {
         .sp-layout { flex-direction: column-reverse; }
@@ -713,24 +698,23 @@
   </head>
   <body>
 
-    <!-- ── NAV ───────────────────────────────────────────────── -->
-    <nav class="nav">
+    <!-- ── SIDEBAR ─────────────────────────────────────────── -->
+    <div class="app-shell">
+    <aside class="sidebar">
       <a class="logo" href="/"><span>Lean</span>Retention</a>
-
-      <div class="nav-tabs" id="navTabs">
+      <div class="sidebar-nav" id="navTabs">
         <button class="nav-tab active" data-target="editorArea">Éditeur</button>
         <button class="nav-tab" data-target="dashboardSection">Dashboard</button>
-        <button class="nav-tab" data-target="analyticsSection">Analytics</button>
         <button class="nav-tab" data-target="profileSection">Profil</button>
       </div>
-
-      <div class="nav-right">
-        <span id="navGreeting" style="font-size:.78rem;color:var(--text-secondary);display:none"></span>
-        <button id="themeToggle" class="btn-theme-toggle">Thème</button>
+      <div class="sidebar-bottom">
         <button class="btn-upgrade">Upgrade</button>
-        <div class="nav-avatar" id="navAvatar" title="Profil">?</div>
+        <div style="display:flex;align-items:center;gap:.6rem;margin-top:.5rem">
+          <div class="nav-avatar" id="navAvatar" title="Profil">?</div>
+          <span id="navGreeting" style="font-size:.75rem;color:var(--text-secondary);display:none"></span>
+        </div>
       </div>
-    </nav>
+    </aside>
 
     <!-- Feature 24: Notification Panel (hidden) -->
     <div class="notif-panel" id="notifPanel">
@@ -1447,5 +1431,6 @@
         document.getElementById("notifPanel")?.classList.remove("open");
       });
     </script>
+    </div><!-- /app-shell -->
   </body>
 </html>
