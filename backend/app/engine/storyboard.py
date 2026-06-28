@@ -116,6 +116,24 @@ def _segment_captions(
         print(f"[CAPTION AUDIT] WARNING: seg_tags has {len(seg_tags)} entries "
               f"but only {tag_idx} consumed (mismatch with remapped_words)")
 
+    # Merge apostrophe-split tokens (French elisions: m'a, l'équipe, j'ai, etc.)
+    # Whisper often splits these into ["m'", "a"] or ["m", "'a"] as separate words.
+    merged_words: list[dict] = []
+    for w in all_words:
+        if merged_words and (
+            w["text"].startswith("'") or
+            merged_words[-1]["text"].endswith("'")
+        ):
+            prev = merged_words[-1]
+            prev["text"] = prev["text"] + w["text"]
+            prev["end"] = w["end"]
+        else:
+            merged_words.append(dict(w))
+    if len(merged_words) != len(all_words):
+        print(f"[CAPTION] Merged {len(all_words) - len(merged_words)} apostrophe-split tokens "
+              f"({len(all_words)} -> {len(merged_words)} words)")
+    all_words = merged_words
+
     # Step 1: group by sentence boundary OR word count
     raw_groups: list[list[dict]] = []
     current: list[dict] = []
