@@ -297,33 +297,32 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         if p["title_glow"]:
             parts.append(f'  box-shadow: {p["accent_line_glow"]};')
         parts.append('}')
-    # Timeline: horizontal track with step dots
+    # Timeline: full-screen overlay layout
     if content_style == "timeline":
-        steps = hints.get("steps", [])
-        n_steps = min(len(steps), 6)
+        is_paper_tl = p["id"] == "lean_paper"
         parts.append(f'.card[data-card-id="{card_id}"] .tl-track {{')
         parts.append(f'  display: flex; align-items: center; gap: 0; width: 100%;')
-        parts.append(f'  position: relative; padding: 24px 0;')
+        parts.append(f'  position: relative; padding: 32px 0;')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .tl-line {{')
-        parts.append(f'  position: absolute; top: 50%; left: 0; height: 2px; width: 0;')
+        parts.append(f'  position: absolute; top: 50%; left: 0; height: 3px; width: 0;')
         parts.append(f'  background: {p["accent"]};')
-        if is_paper := (p["id"] == "lean_paper"):
+        if is_paper_tl:
             parts.append(f'  border-top: 2px dashed {p["accent"]};')
             parts.append(f'  background: transparent; height: 0;')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .tl-step {{')
         parts.append(f'  display: flex; flex-direction: column; align-items: center;')
-        parts.append(f'  gap: 8px; flex: 1; z-index: 1;')
+        parts.append(f'  gap: 10px; flex: 1; z-index: 1;')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .tl-dot {{')
-        parts.append(f'  width: 16px; height: 16px; border-radius: 50%;')
+        parts.append(f'  width: 18px; height: 18px; border-radius: 50%;')
         parts.append(f'  background: {p["text_secondary"]}; flex-shrink: 0;')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .tl-label {{')
-        parts.append(f'  font-family: {p["font"]}; font-size: 18px;')
+        parts.append(f'  font-family: {p["font"]}; font-size: 20px;')
         parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
-        parts.append(f'  text-align: center; max-width: 140px;')
+        parts.append(f'  text-align: center; white-space: nowrap;')
         parts.append('}')
     # Dialogue: two-block exchange
     if content_style == "dialogue":
@@ -386,6 +385,24 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append(f'  font-size: 14px; font-weight: 800; flex-shrink: 0;')
         parts.append('}')
     parts.append('</style>')
+    # Timeline: full-screen overlay, no card-panel wrapper
+    if content_style == "timeline":
+        steps = hints.get("steps", [])
+        parts.append(f'<div class="root" style="padding:60px 80px;justify-content:center">')
+        if kicker:
+            parts.append(f'  <div class="kicker" id="{card_id}-kicker" style="margin-bottom:24px">{_esc(kicker)}</div>')
+        parts.append(f'  <div class="tl-track">')
+        parts.append(f'    <div class="tl-line" id="{card_id}-tl-line"></div>')
+        for i, step in enumerate(steps[:6]):
+            parts.append(f'    <div class="tl-step" id="{card_id}-step-{i}">')
+            parts.append(f'      <div class="tl-dot" id="{card_id}-dot-{i}"></div>')
+            parts.append(f'      <div class="tl-label">{_esc(str(step))}</div>')
+            parts.append(f'    </div>')
+        parts.append(f'  </div>')
+        parts.append(f'  <div class="accent-line" id="{card_id}-line" style="margin-top:24px"></div>')
+        parts.append('</div>')
+        parts.append('</div>')
+        return "\n".join(parts)
     parts.append('<div class="root">')
     parts.append('  <div class="card-panel">')
     if kicker:
@@ -413,16 +430,6 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
             parts.append(f'      <div class="list-item" id="{card_id}-item-{i}">')
             parts.append(f'        <div class="list-bullet">{i + 1}</div>')
             parts.append(f'        <span>{_esc(str(item))}</span>')
-            parts.append(f'      </div>')
-        parts.append(f'    </div>')
-    elif content_style == "timeline":
-        steps = hints.get("steps", [])
-        parts.append(f'    <div class="tl-track">')
-        parts.append(f'      <div class="tl-line" id="{card_id}-tl-line"></div>')
-        for i, step in enumerate(steps[:6]):
-            parts.append(f'      <div class="tl-step" id="{card_id}-step-{i}">')
-            parts.append(f'        <div class="tl-dot" id="{card_id}-dot-{i}"></div>')
-            parts.append(f'        <div class="tl-label">{_esc(str(step))}</div>')
             parts.append(f'      </div>')
         parts.append(f'    </div>')
     elif content_style == "dialogue":

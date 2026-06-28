@@ -331,6 +331,7 @@ RULES:
 - Cards should NOT overlap each other in time
 - Most cards should last 3-8 seconds
 - "question" cards may last up to 15s (they stay while the speaker answers)
+- "timeline" cards should span the full narrated sequence (up to 20s)
 - Vary accentIndex (0-4) across cards for visual rhythm
 - Content must come from what the speaker actually says
 - "timeline" is for sequential/temporal progressions (steps along a path);
