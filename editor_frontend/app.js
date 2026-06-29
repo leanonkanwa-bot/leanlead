@@ -386,7 +386,7 @@ async function reEditVideo(jobId) {
       return;
     }
     const { job_id } = await res.json();
-    poll(job_id);
+    poll(job_id).catch(e => { console.error("poll crashed:", e); fail("Erreur inattendue pendant le suivi du job."); });
   } catch (err) {
     fail(`Erreur re-édition: ${err.message}`);
   }
@@ -959,7 +959,7 @@ async function chunkedUpload(file) {
   if (editRes.status === 401) { loginCard?.classList.remove("hidden"); appCard?.classList.add("hidden"); statusCard?.classList.add("hidden"); submitBtn.disabled = false; submitBtn.querySelector(".btn-label").textContent = "Éditer ma vidéo"; submitBtn.classList.remove("loading"); return; }
   if (!editRes.ok) throw new Error(`Edit start failed: ${editRes.status} ${await editRes.text()}`);
   const { job_id } = await editRes.json();
-  poll(job_id);
+  poll(job_id).catch(e => { console.error("poll crashed:", e); fail("Erreur inattendue pendant le suivi du job."); });
 }
 
 function directUpload(file) {
@@ -984,7 +984,7 @@ function directUpload(file) {
     try {
       const { job_id } = JSON.parse(xhr.responseText);
       setStatus("queued", "Upload complet. Traitement en cours…", 28);
-      poll(job_id);
+      poll(job_id).catch(e => { console.error("poll crashed:", e); fail("Erreur inattendue pendant le suivi du job."); });
     } catch (err) { fail(`Réponse invalide: ${err.message}`); }
   });
   xhr.addEventListener("error",   () => fail("Impossible de joindre le serveur."));
@@ -1014,23 +1014,26 @@ async function poll(jobId) {
   let consecutive5xx = 0;
   while (true) {
     await new Promise(r => setTimeout(r, 1500));
-    let res;
-    try { res = await apiFetch(`/api/jobs/${jobId}`); }
-    catch { if (++consecutive5xx > 5) return fail("Connexion perdue."); continue; }
-    if (res.status === 404) return fail("Le serveur a redémarré et votre job a été perdu. Re-uploadez votre vidéo.");
-    if ([502, 503, 504].includes(res.status)) { if (++consecutive5xx > 8) return fail(`Serveur injoignable (${res.status}). Mémoire insuffisante?`); continue; }
-    if (!res.ok) return fail(`Job perdu: ${res.status}`);
-    consecutive5xx = 0;
-    const job = await res.json();
-    setStatus(job.status, job.message || "", job.progress || 0);
-    if (job.status === "done") return showResult(jobId, job.result);
-    if (job.status === "ready_for_review") {
-      // Auto-approve: skip the review screen, proceed directly to render
-      setStatus("rendering", "Lancement du rendu…", 70);
-      try { await apiFetch(`/api/jobs/${jobId}/approve`, { method: "POST" }); } catch (_) {}
-      continue;
+    try {
+      let res;
+      try { res = await apiFetch(`/api/jobs/${jobId}`); }
+      catch { if (++consecutive5xx > 5) return fail("Connexion perdue."); continue; }
+      if (res.status === 404) return fail("Le serveur a redémarré et votre job a été perdu. Re-uploadez votre vidéo.");
+      if ([502, 503, 504].includes(res.status)) { if (++consecutive5xx > 8) return fail(`Serveur injoignable (${res.status}). Mémoire insuffisante?`); continue; }
+      if (!res.ok) return fail(`Job perdu: ${res.status}`);
+      consecutive5xx = 0;
+      const job = await res.json();
+      setStatus(job.status, job.message || "", job.progress || 0);
+      if (job.status === "done") return showResult(jobId, job.result);
+      if (job.status === "ready_for_review") {
+        setStatus("rendering", "Lancement du rendu…", 70);
+        try { await apiFetch(`/api/jobs/${jobId}/approve`, { method: "POST" }); } catch (_) {}
+        continue;
+      }
+      if (job.status === "error") return fail(job.error || "Erreur inconnue", jobId);
+    } catch (pollErr) {
+      console.warn("poll iteration error:", pollErr);
     }
-    if (job.status === "error") return fail(job.error || "Erreur inconnue", jobId);
   }
 }
 
@@ -1072,7 +1075,7 @@ $("retryBtn")?.addEventListener("click", async () => {
     const res = await apiFetch(`/api/retry/${_retryJobId}`, { method: "POST" });
     if (!res.ok) { const txt = await res.text(); return fail(txt.includes("no longer on disk") ? "Vidéo source supprimée — re-uploadez." : `Erreur retry: ${res.status}`); }
     const { job_id } = await res.json();
-    poll(job_id);
+    poll(job_id).catch(e => { console.error("poll crashed:", e); fail("Erreur inattendue pendant le suivi du job."); });
   } catch (err) { fail(`Erreur retry: ${err.message}`); }
 });
 
@@ -1385,7 +1388,7 @@ $("renderBtn")?.addEventListener("click", async () => {
   try {
     const res = await apiFetch(`/api/jobs/${_reviewJobId}/approve`, { method: "POST" });
     if (!res.ok) return fail(`Rendu échoué: ${res.status}`);
-    poll(_reviewJobId);
+    poll(_reviewJobId).catch(e => { console.error("poll crashed:", e); fail("Erreur inattendue pendant le suivi du job."); });
   } catch (err) { fail(`Erreur rendu: ${err.message}`); }
 });
 
@@ -1401,7 +1404,7 @@ $("replanBtn")?.addEventListener("click", async () => {
     if (!res.ok) return fail(`Re-plan échoué: ${res.status}`);
     const { job_id } = await res.json();
     _reviewJobId = job_id;
-    poll(job_id);
+    poll(job_id).catch(e => { console.error("poll crashed:", e); fail("Erreur inattendue pendant le suivi du job."); });
   } catch (err) { fail(`Erreur re-plan: ${err.message}`); }
 });
 
