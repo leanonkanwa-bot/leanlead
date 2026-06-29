@@ -235,7 +235,7 @@ function loadVideoLibrary() {
           <div class="video-lib-title-overlay">${title}</div>
           <div class="video-lib-overlay">
             ${v.jobId ? `<a href="/api/download/${v.jobId}" class="action-btn" download>Télécharger</a>` : ""}
-            <button class="action-btn" onclick="switchSection('editorArea')">Reediter</button>
+            ${v.jobId ? `<button class="action-btn" onclick="reEditVideo('${v.jobId}')">Reediter</button>` : ""}
           </div>
         </div>
       </div>`;
@@ -291,7 +291,7 @@ async function loadAnalytics() {
           <td>${scoreHtml}</td>
           <td>
             ${v.jobId ? `<a href="/api/download/${v.jobId}" class="action-btn" download>Télécharger</a>` : ""}
-            <button class="action-btn" onclick="switchSection('editorArea')">Reediter</button>
+            ${v.jobId ? `<button class="action-btn" onclick="reEditVideo('${v.jobId}')">Reediter</button>` : ""}
             <button class="action-btn" onclick="deleteVideo('${v.jobId || i}')" style="color:#e53e3e">Supprimer</button>
           </td>
         </tr>`;
@@ -365,6 +365,30 @@ function drawRetentionCurve(videos) {
     dropEl.setAttribute("cx", String(dropPt[0]));
     dropEl.setAttribute("cy", String(dropPt[1]));
     dropEl.setAttribute("opacity", "0.8");
+  }
+}
+
+async function reEditVideo(jobId) {
+  switchSection("editorArea");
+  const statusCard = $("statusCard");
+  const submitBtn = $("submit");
+  if (statusCard) statusCard.classList.remove("hidden");
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.querySelector(".btn-label").textContent = "Traitement…"; }
+  setStatus("queued", "Re-édition avec le fichier existant…", 5);
+  try {
+    const res = await apiFetch(`/api/retry/${jobId}`, { method: "POST" });
+    if (!res.ok) {
+      const txt = await res.text();
+      const msg = txt.includes("no longer on disk")
+        ? "Vidéo source expirée (>24h) — veuillez re-uploader le fichier."
+        : `Erreur: ${res.status}`;
+      fail(msg);
+      return;
+    }
+    const { job_id } = await res.json();
+    poll(job_id);
+  } catch (err) {
+    fail(`Erreur re-édition: ${err.message}`);
   }
 }
 
@@ -2796,39 +2820,45 @@ document.addEventListener("DOMContentLoaded", function() {
       var modal = document.createElement("div");
       modal.id = "upgradeModal";
       modal.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1rem";
+      // PRICING SOURCE OF TRUTH: Essai 0€/1 vid, Starter 29€/15 vid, Pro 79€/50 vid, Agency 199€/150 vid
       modal.innerHTML = [
-        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:16px;max-width:640px;width:100%;padding:2rem;position:relative;max-height:90vh;overflow-y:auto">',
+        '<div style="background:var(--bg);border:1px solid var(--border);border-radius:16px;max-width:780px;width:100%;padding:2rem;position:relative;max-height:90vh;overflow-y:auto">',
           '<button id="upgradeModalClose" style="position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-secondary);line-height:1">×</button>',
           '<h2 style="font-size:1.3rem;font-weight:800;margin-bottom:.25rem;letter-spacing:-.02em">Passer à Pro</h2>',
           '<p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:1.5rem">Choisissez le plan qui correspond à vos ambitions.</p>',
-          '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem">',
-            // Starter
-            '<div style="border:1px solid var(--border);border-radius:12px;padding:1.25rem;display:flex;flex-direction:column;gap:.5rem">',
-              '<div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-secondary)">Starter</div>',
-              '<div style="font-size:1.8rem;font-weight:800;letter-spacing:-.03em">€29<span style="font-size:.75rem;font-weight:500;color:var(--text-secondary)">/mo</span></div>',
-              '<ul style="list-style:none;font-size:.8rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:.3rem;flex:1;margin-top:.25rem">',
-                '<li>✓ 10 vidéos / mois</li><li>✓ Captions IA</li><li>✓ Export 1080p</li><li>✓ Support email</li>',
+          '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.65rem">',
+            '<div style="border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;flex-direction:column;gap:.4rem">',
+              '<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-secondary)">Essai gratuit</div>',
+              '<div style="font-size:1.6rem;font-weight:800;letter-spacing:-.03em">0€</div>',
+              '<ul style="list-style:none;font-size:.78rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:.25rem;flex:1;margin-top:.2rem">',
+                '<li>✓ 1 vidéo (unique)</li><li>✓ Tous les styles</li><li>✓ Export 1080p</li>',
               '</ul>',
-              '<button class="upgrade-plan-btn" style="margin-top:.75rem;width:100%;padding:.55rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:.82rem;font-weight:600;cursor:pointer">Choisir ce plan</button>',
+              '<button class="upgrade-plan-btn" style="margin-top:.5rem;width:100%;padding:.5rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:.78rem;font-weight:600;cursor:pointer">Plan actuel</button>',
             '</div>',
-            // Pro (highlighted)
-            '<div style="border:2px solid #FF7751;border-radius:12px;padding:1.25rem;display:flex;flex-direction:column;gap:.5rem;position:relative;background:rgba(255,119,81,.04)">',
-              '<div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#FF7751;color:#fff;font-size:.65rem;font-weight:700;padding:.18rem .65rem;border-radius:99px;white-space:nowrap">POPULAIRE</div>',
-              '<div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#FF7751">Pro</div>',
-              '<div style="font-size:1.8rem;font-weight:800;letter-spacing:-.03em">€79<span style="font-size:.75rem;font-weight:500;color:var(--text-secondary)">/mo</span></div>',
-              '<ul style="list-style:none;font-size:.8rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:.3rem;flex:1;margin-top:.25rem">',
-                '<li>✓ Vidéos illimitées</li><li>✓ Marque personnalisée</li><li>✓ B-roll automatique</li><li>✓ Analytics avancés</li><li>✓ Support prioritaire</li>',
+            '<div style="border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;flex-direction:column;gap:.4rem">',
+              '<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-secondary)">Starter</div>',
+              '<div style="font-size:1.6rem;font-weight:800;letter-spacing:-.03em">€29<span style="font-size:.7rem;font-weight:500;color:var(--text-secondary)">/mo</span></div>',
+              '<ul style="list-style:none;font-size:.78rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:.25rem;flex:1;margin-top:.2rem">',
+                '<li>✓ 15 vidéos / mois</li><li>✓ 6 styles visuels</li><li>✓ Captions + Hook</li>',
               '</ul>',
-              '<button class="upgrade-plan-btn" style="margin-top:.75rem;width:100%;padding:.55rem;border-radius:8px;border:none;background:#FF7751;color:#fff;font-family:var(--font);font-size:.82rem;font-weight:600;cursor:pointer">Choisir ce plan</button>',
+              '<button class="upgrade-plan-btn" style="margin-top:.5rem;width:100%;padding:.5rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:.78rem;font-weight:600;cursor:pointer">Choisir ce plan</button>',
             '</div>',
-            // Agency
-            '<div style="border:1px solid var(--border);border-radius:12px;padding:1.25rem;display:flex;flex-direction:column;gap:.5rem">',
-              '<div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-secondary)">Agency</div>',
-              '<div style="font-size:1.8rem;font-weight:800;letter-spacing:-.03em">€149<span style="font-size:.75rem;font-weight:500;color:var(--text-secondary)">/mo</span></div>',
-              '<ul style="list-style:none;font-size:.8rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:.3rem;flex:1;margin-top:.25rem">',
-                '<li>✓ Comptes illimités</li><li>✓ White label</li><li>✓ API accès</li><li>✓ Manager dédié</li><li>✓ SLA garanti</li>',
+            '<div style="border:2px solid #FF7751;border-radius:12px;padding:1.1rem;display:flex;flex-direction:column;gap:.4rem;position:relative;background:rgba(255,119,81,.04)">',
+              '<div style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#FF7751;color:#fff;font-size:.6rem;font-weight:700;padding:.15rem .55rem;border-radius:99px;white-space:nowrap">POPULAIRE</div>',
+              '<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#FF7751">Pro</div>',
+              '<div style="font-size:1.6rem;font-weight:800;letter-spacing:-.03em">€79<span style="font-size:.7rem;font-weight:500;color:var(--text-secondary)">/mo</span></div>',
+              '<ul style="list-style:none;font-size:.78rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:.25rem;flex:1;margin-top:.2rem">',
+                '<li>✓ 50 vidéos / mois</li><li>✓ Brand Kit complet</li><li>✓ B-roll + graphics</li><li>✓ Multi-plateformes</li>',
               '</ul>',
-              '<button class="upgrade-plan-btn" style="margin-top:.75rem;width:100%;padding:.55rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:.82rem;font-weight:600;cursor:pointer">Choisir ce plan</button>',
+              '<button class="upgrade-plan-btn" style="margin-top:.5rem;width:100%;padding:.5rem;border-radius:8px;border:none;background:#FF7751;color:#fff;font-family:var(--font);font-size:.78rem;font-weight:600;cursor:pointer">Choisir ce plan</button>',
+            '</div>',
+            '<div style="border:1px solid var(--border);border-radius:12px;padding:1.1rem;display:flex;flex-direction:column;gap:.4rem">',
+              '<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-secondary)">Agency</div>',
+              '<div style="font-size:1.6rem;font-weight:800;letter-spacing:-.03em">€199<span style="font-size:.7rem;font-weight:500;color:var(--text-secondary)">/mo</span></div>',
+              '<ul style="list-style:none;font-size:.78rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:.25rem;flex:1;margin-top:.2rem">',
+                '<li>✓ 150 vidéos / mois</li><li>✓ White label + API</li><li>✓ Manager dédié</li>',
+              '</ul>',
+              '<button class="upgrade-plan-btn" style="margin-top:.5rem;width:100%;padding:.5rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:.78rem;font-weight:600;cursor:pointer">Choisir ce plan</button>',
             '</div>',
           '</div>',
         '</div>'

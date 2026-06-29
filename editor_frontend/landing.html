@@ -542,24 +542,39 @@
       <span class="section-tag">Tarifs</span>
       <h2 class="section-title">Simple. Transparent. Sans surprise.</h2>
       <p class="section-sub" style="margin-bottom:3rem">Commencez gratuitement. Évoluez quand vous en avez besoin.</p>
-      <div class="pricing-grid">
+      <!-- PRICING SOURCE OF TRUTH: Essai 0€/1 vid, Starter 29€/15 vid, Pro 79€/50 vid, Agency 199€/150 vid -->
+      <div class="pricing-grid" style="grid-template-columns:repeat(4,1fr)">
 
-        <!-- Free -->
+        <!-- Essai gratuit -->
         <div class="pricing-card fade">
           <div>
-            <div class="pricing-name">Gratuit</div>
-            <div class="pricing-price">0<span class="pricing-period">€ / mois</span></div>
-            <div class="pricing-desc" style="margin-top:.5rem">Parfait pour commencer et tester la puissance de l'IA.</div>
+            <div class="pricing-name">Essai gratuit</div>
+            <div class="pricing-price">0<span class="pricing-period">€</span></div>
+            <div class="pricing-desc" style="margin-top:.5rem">Testez avec 1 vidéo, sans engagement.</div>
           </div>
           <ul class="pricing-features">
-            <li><span class="pricing-check">✓</span> 1 vidéo par mois</li>
-            <li><span class="pricing-check">✓</span> Transcription + suppression silences</li>
-            <li><span class="pricing-check">✓</span> Hook Rewriter</li>
-            <li><span class="pricing-check">✓</span> Export MP4 720p</li>
-            <li><span class="pricing-x">✕</span> <span style="color:var(--muted)">Brand Kit personnalisé</span></li>
-            <li><span class="pricing-x">✕</span> <span style="color:var(--muted)">Publication automatique</span></li>
+            <li><span class="pricing-check">✓</span> 1 vidéo (unique)</li>
+            <li><span class="pricing-check">✓</span> Tous les styles visuels</li>
+            <li><span class="pricing-check">✓</span> Captions IA</li>
+            <li><span class="pricing-check">✓</span> Export MP4 1080p</li>
           </ul>
-          <button class="pricing-btn pricing-btn-ghost" onclick="openOnboarding()">Commencer gratuitement</button>
+          <button class="pricing-btn pricing-btn-ghost" onclick="openOnboarding()">Essayer gratuitement</button>
+        </div>
+
+        <!-- Starter -->
+        <div class="pricing-card fade">
+          <div>
+            <div class="pricing-name">Starter</div>
+            <div class="pricing-price"><sup>€</sup>29<span class="pricing-period">/ mois</span></div>
+            <div class="pricing-desc" style="margin-top:.5rem">Pour le coach solo qui démarre sa présence vidéo.</div>
+          </div>
+          <ul class="pricing-features">
+            <li><span class="pricing-check">✓</span> <strong>15 vidéos / mois</strong></li>
+            <li><span class="pricing-check">✓</span> 6 styles visuels</li>
+            <li><span class="pricing-check">✓</span> Captions + Hook Rewriter</li>
+            <li><span class="pricing-check">✓</span> Export 1080p</li>
+          </ul>
+          <button class="pricing-btn pricing-btn-ghost" onclick="openOnboarding()">Choisir Starter</button>
         </div>
 
         <!-- Pro -->
@@ -567,34 +582,31 @@
           <div>
             <span class="pricing-badge">POPULAIRE</span>
             <div class="pricing-name">Pro</div>
-            <div class="pricing-price"><sup>€</sup>19<span class="pricing-period">/ mois</span></div>
-            <div class="pricing-desc" style="margin-top:.5rem">Pour les créateurs sérieux qui veulent scaler leur contenu.</div>
+            <div class="pricing-price"><sup>€</sup>79<span class="pricing-period">/ mois</span></div>
+            <div class="pricing-desc" style="margin-top:.5rem">Pour le créateur établi qui poste quotidiennement.</div>
           </div>
           <ul class="pricing-features">
-            <li><span class="pricing-check">✓</span> <strong>Vidéos illimitées</strong></li>
+            <li><span class="pricing-check">✓</span> <strong>50 vidéos / mois</strong></li>
             <li><span class="pricing-check">✓</span> Brand Kit complet</li>
-            <li><span class="pricing-check">✓</span> Captions word-by-word</li>
             <li><span class="pricing-check">✓</span> B-roll &amp; motion graphics</li>
-            <li><span class="pricing-check">✓</span> Publication YouTube / TikTok / IG</li>
-            <li><span class="pricing-check">✓</span> Export MP4 1080p / 4K</li>
+            <li><span class="pricing-check">✓</span> Publication multi-plateformes</li>
+            <li><span class="pricing-check">✓</span> Support prioritaire</li>
           </ul>
-          <button class="pricing-btn pricing-btn-salmon" onclick="openOnboarding()">Commencer l'essai gratuit →</button>
+          <button class="pricing-btn pricing-btn-salmon" onclick="openOnboarding()">Choisir Pro →</button>
         </div>
 
         <!-- Agency -->
         <div class="pricing-card fade">
           <div>
             <div class="pricing-name">Agency</div>
-            <div class="pricing-price"><sup>€</sup>49<span class="pricing-period">/ mois</span></div>
-            <div class="pricing-desc" style="margin-top:.5rem">Pour les agences et équipes qui gèrent plusieurs créateurs.</div>
+            <div class="pricing-price"><sup>€</sup>199<span class="pricing-period">/ mois</span></div>
+            <div class="pricing-desc" style="margin-top:.5rem">Pour les agences gérant plusieurs créateurs.</div>
           </div>
           <ul class="pricing-features">
-            <li><span class="pricing-check">✓</span> Tout le plan Pro</li>
-            <li><span class="pricing-check">✓</span> <strong>5 marques / comptes</strong></li>
-            <li><span class="pricing-check">✓</span> Templates partagés</li>
-            <li><span class="pricing-check">✓</span> Tableau de bord multi-clients</li>
+            <li><span class="pricing-check">✓</span> <strong>150 vidéos / mois</strong></li>
+            <li><span class="pricing-check">✓</span> Multi-comptes &amp; white label</li>
             <li><span class="pricing-check">✓</span> API access</li>
-            <li><span class="pricing-check">✓</span> Support prioritaire</li>
+            <li><span class="pricing-check">✓</span> Manager dédié</li>
           </ul>
           <button class="pricing-btn pricing-btn-ghost" onclick="openOnboarding()">Contacter l'équipe →</button>
         </div>
@@ -672,7 +684,7 @@
       <a class="logo" href="/"><span class="logo-mark"></span><span class="logo-name">LeanRetention</span></a>
       <div class="footer-links">
         <a href="#features">Fonctionnalités</a>
-        <a href="#email-capture">Tarifs</a>
+        <a href="#pricing">Tarifs</a>
         <a href="mailto:contact@leanretention.com">Contact</a>
       </div>
       <span class="footer-copy">© 2026 LeanRetention. Tous droits réservés.</span>
