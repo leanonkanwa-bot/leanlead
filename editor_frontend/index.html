@@ -1023,7 +1023,11 @@
 
           <div style="display:flex;gap:.75rem;align-items:center;margin-top:.5rem">
             <button class="btn-submit" id="saveProfileBtn" style="height:44px;width:auto;padding:0 1.5rem;font-size:.875rem">Enregistrer</button>
-            <button class="action-btn" id="editProfileBtn">Modifier le profil complet</button>
+            <!-- Only ICP + pillars are editable here. The 9 onboarding fields
+                 (email, nom, marque, rôle, audience, offre, plateformes,
+                 format, style) are not re-editable after initial setup.
+                 TODO: future "full profile editor" feature. -->
+            <button class="action-btn" id="editProfileBtn">Modifier ICP &amp; piliers</button>
           </div>
           <p id="profileSaveMsg" class="save-msg">Profil enregistré.</p>
         </div>

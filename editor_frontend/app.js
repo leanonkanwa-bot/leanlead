@@ -453,7 +453,9 @@ function loadProfileSection() {
 
 // Edit profile → open onboarding on landing
 $("editProfileBtn")?.addEventListener("click", () => {
-  window.location.href = "/?edit=1";
+  switchSection("profileSection");
+  const icp = $("profileIcp");
+  if (icp) { icp.focus(); icp.scrollIntoView({ behavior: "smooth", block: "center" }); }
 });
 
 // Save profile

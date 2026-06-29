@@ -468,7 +468,7 @@
             <li><span class="pricing-check">✓</span> Captions IA</li>
             <li><span class="pricing-check">✓</span> Export MP4 1080p</li>
           </ul>
-          <button class="pricing-btn pricing-btn-ghost" onclick="openOnboarding()">Essayer gratuitement</button>
+          <button class="pricing-btn pricing-btn-ghost" onclick="openOnboarding('free')">Essayer gratuitement</button>
         </div>
 
         <!-- Starter -->
@@ -484,7 +484,7 @@
             <li><span class="pricing-check">✓</span> Captions + Hook Rewriter</li>
             <li><span class="pricing-check">✓</span> Export 1080p</li>
           </ul>
-          <button class="pricing-btn pricing-btn-ghost" onclick="openOnboarding()">Choisir Starter</button>
+          <button class="pricing-btn pricing-btn-ghost" onclick="openOnboarding('starter')">Choisir Starter</button>
         </div>
 
         <!-- Pro -->
@@ -501,7 +501,7 @@
             <li><span class="pricing-check">✓</span> Captions + Hook Rewriter</li>
             <li><span class="pricing-check">✓</span> Support prioritaire</li>
           </ul>
-          <button class="pricing-btn pricing-btn-salmon" onclick="openOnboarding()">Choisir Pro →</button>
+          <button class="pricing-btn pricing-btn-salmon" onclick="openOnboarding('pro')">Choisir Pro →</button>
         </div>
 
         <!-- Agency -->
@@ -516,7 +516,7 @@
             <li><span class="pricing-check">✓</span> Graphics IA</li>
             <li><span class="pricing-check">✓</span> Multi-comptes</li>
           </ul>
-          <button class="pricing-btn pricing-btn-ghost" onclick="openOnboarding()">Contacter l'équipe →</button>
+          <a class="pricing-btn pricing-btn-ghost" href="mailto:contact@leanretention.com" style="text-align:center;text-decoration:none">Contacter l'équipe →</a>
         </div>
 
       </div>
@@ -763,9 +763,11 @@
       });
     })();
 
-    // ── Returning users (have profile + have edited at least one video) ─
+    // ── Returning users — only redirect if session is still valid ─
     if (localStorage.getItem('coach_profile') && localStorage.getItem('has_edited_video')) {
-      window.location.href = '/app';
+      fetch('/api/auth/status').then(r => r.json()).then(j => {
+        if (!j.required || j.authed) window.location.href = '/app';
+      }).catch(() => {});
     }
 
     // ── Scroll-based nav ────────────────────────────────────────────────
@@ -778,7 +780,11 @@
     document.getElementById('seConnecterLink').addEventListener('click', (e) => {
       e.preventDefault();
       if (localStorage.getItem('coach_profile')) {
-        window.location.href = '/app';
+        fetch('/api/auth/status').then(r => r.json()).then(j => {
+          if (!j.required || j.authed) window.location.href = '/app';
+          else openOnboarding();
+        }).catch(() => openOnboarding());
+        return;
       } else {
         openOnboarding();
       }
@@ -820,7 +826,8 @@
       font: 'Poppins',
     };
 
-    function openOnboarding() {
+    function openOnboarding(tier) {
+      if (tier) localStorage.setItem('selected_tier', tier);
       const overlay = document.getElementById('onboardingOverlay');
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
