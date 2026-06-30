@@ -1512,4 +1512,23 @@ if editor_dir.exists():
     def app_page():
         return FileResponse(str(editor_dir / "index.html"))
 
+    # Style-pack preview clips are re-rendered and re-committed occasionally
+    # (e.g. content simplification). Without an explicit Cache-Control, browsers
+    # and the Railway edge fall back to heuristic caching off Last-Modified,
+    # which can keep serving a stale clip after redeploy even on hard refresh.
+    _PREVIEWS_DIR = (editor_dir / "previews").resolve()
+
+    @app.get("/previews/{filename}", include_in_schema=False)
+    def preview_clip(filename: str):
+        if not filename.endswith(".mp4"):
+            raise HTTPException(404)
+        path = (_PREVIEWS_DIR / filename).resolve()
+        if path.parent != _PREVIEWS_DIR or not path.is_file():
+            raise HTTPException(404)
+        return FileResponse(
+            str(path),
+            media_type="video/mp4",
+            headers={"Cache-Control": "no-cache, must-revalidate"},
+        )
+
     app.mount("/", StaticFiles(directory=str(editor_dir)), name="frontend")
