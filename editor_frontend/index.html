@@ -87,7 +87,14 @@
       .btn-upgrade:hover { border-color: var(--salmon); color: var(--salmon); }
 
       /* ── LAYOUT ──────────────────────────────────────────────── */
-      main { margin-left: 220px; padding: 2rem 2.5rem 5rem; max-width: 960px; position: relative; }
+      main {
+        /* Center the 960px content column in the space right of the fixed
+           220px sidebar on wide viewports, instead of hugging the sidebar.
+           max() keeps the original 220px offset as a floor on narrower
+           screens (mobile/tablet override this in the media query below). */
+        margin-left: max(220px, calc(50vw - 370px));
+        padding: 2rem 2.5rem 5rem; max-width: 960px; position: relative;
+      }
       main::before {
         content: ""; position: absolute; top: -120px; left: -40px; right: -40px;
         height: 420px; z-index: -1; pointer-events: none;
