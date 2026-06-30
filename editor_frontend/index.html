@@ -652,6 +652,12 @@
         align-items: center; justify-content: center;
       }
       .style-pack-btn.active .sp-check { display: flex; }
+      .sp-recommended-badge {
+        position: absolute; top: .4rem; left: .4rem; z-index: 1;
+        font-size: .6rem; font-weight: 700; color: #fff;
+        background: var(--salmon); padding: .2rem .45rem;
+        border-radius: 99px; letter-spacing: .01em;
+      }
       @media (max-width: 768px) { .style-pack-grid { grid-template-columns: repeat(2, 1fr); } }
       @media (max-width: 420px) { .style-pack-grid { grid-template-columns: 1fr; } }
 
@@ -1278,6 +1284,24 @@
           v.addEventListener("loadeddata", () => { v.play().catch(() => {}); });
           v.play().catch(() => {});
         });
+
+        // ── Recommended pack from onboarding ──────────────────
+        const recommended = localStorage.getItem("recommended_pack");
+        const recCard = recommended ? container.querySelector(`.style-pack-btn[data-pack="${recommended}"]`) : null;
+        if (recCard) {
+          const badge = document.createElement("span");
+          badge.className = "sp-recommended-badge";
+          badge.textContent = "Recommandé pour toi";
+          recCard.appendChild(badge);
+
+          // Pre-select only once (first visit) — never override a later manual choice.
+          if (!localStorage.getItem("recommended_pack_applied")) {
+            container.querySelectorAll(".style-pack-btn").forEach(b => b.classList.remove("active"));
+            recCard.classList.add("active");
+            hidden.value = recommended;
+            localStorage.setItem("recommended_pack_applied", "1");
+          }
+        }
       })();
 
       // ── Notification bell ─────────────────────────────────────

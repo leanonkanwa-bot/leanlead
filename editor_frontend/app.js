@@ -215,9 +215,7 @@ function loadVideoLibrary() {
     emptyEl.style.display = "none";
     gridEl.style.display = "grid";
     gridEl.innerHTML = videos.slice(0, 12).map((v, i) => {
-      const score = v.retention_score || Math.floor(Math.random() * 20) + 75;
       const title = v.title || `Vidéo #${i + 1}`;
-      const scoreBg = score >= 85 ? "#22c55e" : score >= 70 ? "#f59e0b" : "#ef4444";
       const thumbSrc = v.thumbnail_url || v.thumbnail || (v.jobId ? `/api/thumbnail/${v.jobId}` : null);
       const thumbHtml = thumbSrc
         ? `<img src="${thumbSrc}" alt="${title}" style="width:100%;height:100%;object-fit:cover;display:block" />`
@@ -225,7 +223,6 @@ function loadVideoLibrary() {
       return `<div class="video-lib-card" title="${title}">
         <div class="video-lib-thumb">
           ${thumbHtml}
-          <span class="video-lib-retention" style="background:${scoreBg}">${score}%</span>
           <div class="video-lib-title-overlay">${title}</div>
           <div class="video-lib-overlay">
             ${v.jobId ? `<a href="/api/download/${v.jobId}" class="action-btn" download>Télécharger</a>` : ""}
@@ -1298,7 +1295,7 @@ async function showResult(jobId, result) {
   // Features 17 & 20
   generateChapters(result, jobId);
   recordPerfPrediction(jobId, result);
-  addNotification("✅", "Vidéo prête !", "Votre vidéo éditée est disponible au téléchargement.");
+  addNotification('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--salmon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>', "Vidéo prête !", "Votre vidéo éditée est disponible au téléchargement.");
 }
 
 let _currentJobId = null;
@@ -2527,7 +2524,8 @@ function addNotification(icon, title, body) {
   renderNotifications();
 
   if ("Notification" in window && Notification.permission === "granted") {
-    try { new Notification(`${icon} ${title}`, { body, icon: "/static/favicon.ico" }); } catch {}
+    // Native OS notifications can't render inline SVG -- title text only.
+    try { new Notification(title, { body, icon: "/static/favicon.ico" }); } catch {}
   }
 }
 
@@ -2597,7 +2595,7 @@ document.addEventListener("click", (e) => {
       const existing = JSON.parse(localStorage.getItem("notifications") || "[]");
       const hasInactivity = existing.some(n => n.title === "Tu nous manques !");
       if (!hasInactivity) {
-        addNotification("⏰", "Tu nous manques !", `Ça fait ${daysSince} jours sans édition. Revenez pour maintenir votre streak !`);
+        addNotification('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--salmon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>', "Tu nous manques !", `Ça fait ${daysSince} jours sans édition. Revenez pour maintenir votre streak !`);
       }
     }
   }
@@ -2607,7 +2605,7 @@ document.addEventListener("click", (e) => {
     const existing = JSON.parse(localStorage.getItem("notifications") || "[]");
     const hasTrend = existing.some(n => n.title === "Tendance détectée");
     if (!hasTrend) {
-      addNotification("📈", "Tendance détectée", "Les vidéos courtes (< 60s) ont +34% d'engagement ce mois-ci. Adaptez votre stratégie !");
+      addNotification('<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--salmon)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>', "Tendance détectée", "Les vidéos courtes (< 60s) ont +34% d'engagement ce mois-ci. Adaptez votre stratégie !");
     }
   }
 })();
@@ -2961,7 +2959,7 @@ document.addEventListener("DOMContentLoaded", function() {
               '<div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-secondary)">Agency</div>',
               '<div style="font-size:1.6rem;font-weight:800;letter-spacing:-.03em">€199<span style="font-size:.7rem;font-weight:500;color:var(--text-secondary)">/mo</span></div>',
               '<ul style="list-style:none;font-size:.78rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:.25rem;flex:1;margin-top:.2rem">',
-                '<li>✓ 150 vidéos / mois</li><li>✓ Graphics IA</li><li>✓ Multi-comptes</li>',
+                '<li>✓ 150 vidéos / mois</li><li>✓ Graphics IA</li><li>✓ Captions + Hook Rewriter</li><li>✓ Multi-comptes</li>',
               '</ul>',
               '<button class="upgrade-plan-btn" data-tier="agency" style="margin-top:.5rem;width:100%;padding:.5rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);font-family:var(--font);font-size:.78rem;font-weight:600;cursor:pointer">Choisir ce plan</button>',
             '</div>',

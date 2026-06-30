@@ -514,6 +514,7 @@
           <ul class="pricing-features">
             <li><span class="pricing-check">✓</span> <strong>150 vidéos / mois</strong></li>
             <li><span class="pricing-check">✓</span> Graphics IA</li>
+            <li><span class="pricing-check">✓</span> Captions + Hook Rewriter</li>
             <li><span class="pricing-check">✓</span> Multi-comptes</li>
           </ul>
           <a class="pricing-btn pricing-btn-ghost" href="mailto:contact@leanretention.com" style="text-align:center;text-decoration:none">Contacter l'équipe →</a>
@@ -611,11 +612,11 @@
       <div class="ob-progress-track">
         <div class="ob-progress-fill" id="obFill" style="width:20%"></div>
       </div>
-      <p class="ob-progress-label" id="obProgressLabel">Étape 1 sur 5</p>
+      <p class="ob-progress-label" id="obProgressLabel">Étape 1 sur 4</p>
 
       <!-- ── STEP 1 — Identity ── -->
       <div class="ob-step active" id="ob-step-1">
-        <h2>Créons votre profil 👋</h2>
+        <h2>Créons votre profil</h2>
         <p>Pour personnaliser votre expérience d'édition et garder vos résultats.</p>
         <div class="ob-field">
           <label>Email <span style="color:var(--salmon)">*</span></label>
@@ -633,15 +634,15 @@
 
       <!-- ── STEP 2 — Content ── -->
       <div class="ob-step" id="ob-step-2">
-        <h2>Votre contenu 🎯</h2>
+        <h2>Votre contenu</h2>
         <p>Ce que vous créez et pour qui vous le créez.</p>
         <div class="ob-field">
           <label>Qu'est-ce que vous faites&nbsp;?</label>
           <div class="ob-btns" id="ob-role-btns">
-            <button type="button" class="ob-btn" data-val="coach">🎯 Coach</button>
-            <button type="button" class="ob-btn" data-val="entrepreneur">💼 Entrepreneur</button>
-            <button type="button" class="ob-btn" data-val="educator">📚 Éducateur</button>
-            <button type="button" class="ob-btn" data-val="creator">🎬 Créateur</button>
+            <button type="button" class="ob-btn" data-val="coach"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:.3rem"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Coach</button>
+            <button type="button" class="ob-btn" data-val="entrepreneur"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:.3rem"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Entrepreneur</button>
+            <button type="button" class="ob-btn" data-val="educator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:.3rem"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Éducateur</button>
+            <button type="button" class="ob-btn" data-val="creator"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:.3rem"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>Créateur</button>
           </div>
         </div>
         <div class="ob-field">
@@ -656,7 +657,7 @@
 
       <!-- ── STEP 3 — Style ── -->
       <div class="ob-step" id="ob-step-3">
-        <h2>Votre style 🎬</h2>
+        <h2>Votre style</h2>
         <p>Comment vous voulez que vos vidéos sonnent et se ressentent.</p>
         <div class="ob-field">
           <label>Plateforme(s) — sélection multiple</label>
@@ -677,56 +678,22 @@
           </div>
         </div>
         <div class="ob-field">
-          <label>Style de montage</label>
-          <div class="ob-btns" id="ob-style-btns" style="flex-direction:column;gap:.4rem">
-            <button type="button" class="ob-btn" data-val="punchy" data-desc="Coupes rapides, énergie haute — parfait pour TikTok et Reels" style="text-align:left">⚡ Rapide &amp; percutant</button>
-            <button type="button" class="ob-btn" data-val="cinematic" data-desc="Mouvement fluide, ambiance cinématique — YouTube longue durée" style="text-align:left">🎬 Cinématique &amp; lent</button>
-            <button type="button" class="ob-btn" data-val="documentary" data-desc="Storytelling authentique, rythme naturel — idéal pour le coaching" style="text-align:left">📽 Documentaire</button>
-            <button type="button" class="ob-btn" data-val="minimal" data-desc="Épuré, focus total sur le message — LinkedIn &amp; corporate" style="text-align:left">✦ Minimal</button>
+          <label>Quelle ambiance tu recherches&nbsp;?</label>
+          <div class="ob-btns" id="ob-pack-btns" style="flex-direction:column;gap:.4rem">
+            <button type="button" class="ob-btn" data-val="lean_glass" data-desc="Pour paraître l'autorité incontestée de ton secteur" style="text-align:left">Autorité &amp; crédibilité premium</button>
+            <button type="button" class="ob-btn" data-val="lean_paper" data-desc="Pour qu'on te prenne au sérieux dès la première seconde" style="text-align:left">Sérieux dès la 1ère seconde</button>
+            <button type="button" class="ob-btn" data-val="lean_vibe" data-desc="Pour arrêter le scroll et faire exploser ton reach" style="text-align:left">Énergie &amp; viralité</button>
+            <button type="button" class="ob-btn" data-val="lean_ledger" data-desc="Pour que les investisseurs et clients premium te fassent confiance" style="text-align:left">Corporate &amp; confiance</button>
+            <button type="button" class="ob-btn" data-val="lean_craft" data-desc="Pour qu'on sente que c'est VRAIMENT toi qui parles" style="text-align:left">Authentique &amp; brut</button>
+            <button type="button" class="ob-btn" data-val="lean_cinema" data-desc="Pour transformer ton histoire en moment inoubliable" style="text-align:left">Cinématique &amp; émotion</button>
           </div>
           <p class="ob-style-desc" id="ob-style-desc"></p>
         </div>
       </div>
 
-      <!-- ── STEP 4 — Brand ── -->
+      <!-- ── STEP 4 — Confirmation ── -->
       <div class="ob-step" id="ob-step-4">
-        <h2>Votre identité visuelle 🎨</h2>
-        <p>Appliquée automatiquement à toutes vos vidéos.</p>
-        <div class="ob-field">
-          <label>Couleur principale</label>
-          <div class="ob-color-row">
-            <input type="color" id="ob-primary-color" value="#FF7751" />
-            <span class="ob-color-hex" id="ob-primary-hex">#FF7751</span>
-            <div style="width:36px;height:36px;border-radius:8px;background:#FF7751;border:1px solid rgba(255,255,255,.1)" id="ob-primary-swatch"></div>
-          </div>
-        </div>
-        <div class="ob-field">
-          <label>Couleur secondaire</label>
-          <div class="ob-color-row">
-            <input type="color" id="ob-secondary-color" value="#FFFFFF" />
-            <span class="ob-color-hex" id="ob-secondary-hex">#FFFFFF</span>
-            <div style="width:36px;height:36px;border-radius:8px;background:#FFFFFF;border:1px solid rgba(255,255,255,.1)" id="ob-secondary-swatch"></div>
-          </div>
-        </div>
-        <div class="ob-field">
-          <label>Police de caractères</label>
-          <div class="ob-btns" id="ob-font-btns" style="flex-wrap:wrap">
-            <button type="button" class="ob-btn" data-val="Poppins" style="font-family:'Poppins',sans-serif;font-size:.9rem">Poppins</button>
-            <button type="button" class="ob-btn" data-val="Montserrat" style="font-family:'Montserrat',sans-serif;font-size:.9rem;font-weight:600">Montserrat</button>
-            <button type="button" class="ob-btn" data-val="Inter" style="font-family:'Inter',sans-serif;font-size:.9rem">Inter</button>
-            <button type="button" class="ob-btn" data-val="DM Sans" style="font-family:'DM Sans',sans-serif;font-size:.9rem">DM Sans</button>
-            <button type="button" class="ob-btn" data-val="Bebas Neue" style="font-family:'Bebas Neue',sans-serif;font-size:1rem;letter-spacing:.06em">BEBAS NEUE</button>
-          </div>
-        </div>
-        <div class="ob-field">
-          <label>Logo <em style="font-weight:400;text-transform:none">(optionnel)</em></label>
-          <input type="file" id="ob-logo" accept="image/*" style="color:var(--muted);font-size:.85rem;font-family:var(--font)" />
-        </div>
-      </div>
-
-      <!-- ── STEP 5 — Confirmation ── -->
-      <div class="ob-step" id="ob-step-5">
-        <h2>Tout est prêt&nbsp;✓</h2>
+        <h2>Tout est prêt</h2>
         <p>Voici votre profil de création. Vous pouvez le modifier à tout moment.</p>
         <div class="ob-summary" id="ob-summary"></div>
         <button type="button" class="ob-finish-btn" id="ob-finish">Commencer l'édition →</button>
@@ -820,14 +787,12 @@
     // ════════════════════════════════════════════════════════════════════
     // ONBOARDING MODAL
     // ════════════════════════════════════════════════════════════════════
-    const OB_TOTAL = 5;
+    const OB_TOTAL = 4;
     let obStep = 1;
     let obData = {
       email: '', name: '', brandName: '',
       role: '', audience: '', offer: '',
-      platforms: [], format: '', editingStyle: '',
-      primaryColor: '#FF7751', secondaryColor: '#FFFFFF',
-      font: 'Poppins',
+      platforms: [], format: '', recommendedPack: '',
     };
 
     function openOnboarding(tier) {
@@ -863,10 +828,10 @@
       const backBtn = document.getElementById('obBack');
       backBtn.style.display = n === 1 ? 'none' : 'inline-flex';
 
-      // Footer — hide on step 5 (has its own finish button)
+      // Footer — hide on the last step (has its own finish button)
       document.getElementById('obFooter').style.display = n === OB_TOTAL ? 'none' : 'flex';
 
-      // On step 5, render summary
+      // On the last step, render summary
       if (n === OB_TOTAL) renderSummary();
 
       // Scroll card to top
@@ -906,23 +871,8 @@
     singleSelect('ob-role-btns');
     multiSelect('ob-platform-btns');
     singleSelect('ob-format-btns');
-    singleSelect('ob-style-btns', (val, btn) => {
+    singleSelect('ob-pack-btns', (val, btn) => {
       document.getElementById('ob-style-desc').textContent = btn.dataset.desc || '';
-    });
-    singleSelect('ob-font-btns');
-
-    // Color pickers
-    document.getElementById('ob-primary-color').addEventListener('input', function() {
-      const v = this.value.toUpperCase();
-      document.getElementById('ob-primary-hex').textContent = v;
-      document.getElementById('ob-primary-swatch').style.background = v;
-      obData.primaryColor = v;
-    });
-    document.getElementById('ob-secondary-color').addEventListener('input', function() {
-      const v = this.value.toUpperCase();
-      document.getElementById('ob-secondary-hex').textContent = v;
-      document.getElementById('ob-secondary-swatch').style.background = v;
-      obData.secondaryColor = v;
     });
 
     // ── Collect data from current step ─────────────────────────────────
@@ -940,14 +890,9 @@
         const plats = document.querySelectorAll('#ob-platform-btns .ob-btn.active');
         obData.platforms    = [...plats].map(b => b.dataset.val);
         const fmt = document.querySelector('#ob-format-btns .ob-btn.active');
-        obData.format       = fmt?.dataset.val || '';
-        const sty = document.querySelector('#ob-style-btns .ob-btn.active');
-        obData.editingStyle = sty?.dataset.val || '';
-      } else if (n === 4) {
-        obData.primaryColor   = document.getElementById('ob-primary-color')?.value || '#FF7751';
-        obData.secondaryColor = document.getElementById('ob-secondary-color')?.value || '#FFFFFF';
-        const fnt = document.querySelector('#ob-font-btns .ob-btn.active');
-        obData.font = fnt?.dataset.val || 'Poppins';
+        obData.format          = fmt?.dataset.val || '';
+        const pack = document.querySelector('#ob-pack-btns .ob-btn.active');
+        obData.recommendedPack = pack?.dataset.val || '';
       }
     }
 
@@ -966,25 +911,42 @@
       return true;
     }
 
-    // ── Render summary (step 5) ─────────────────────────────────────────
+    // ── Small monochrome icons for the summary rows (salmon accent) ──────
+    const OB_ICONS = {
+      email:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>',
+      user:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 1 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>',
+      tag:      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29a1 1 0 0 0 1.41 0l8.59-8.59a1 1 0 0 0 0-1.41z"/><circle cx="7" cy="7" r="1"/></svg>',
+      role:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>',
+      users:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      phone:    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>',
+      film:     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>',
+      sparkle:  '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8"/></svg>',
+    };
+    const obIcon = (key, label) => `<span style="display:inline-flex;align-items:center;gap:.4rem"><span style="color:var(--salmon);display:inline-flex">${OB_ICONS[key]}</span>${label}</span>`;
+
+    const PACK_NAMES = {
+      lean_glass: 'LeanGlass', lean_paper: 'LeanPaper', lean_vibe: 'LeanVibe',
+      lean_ledger: 'LeanLedger', lean_craft: 'LeanCraft', lean_cinema: 'LeanCinema',
+    };
+
+    // ── Render summary (last step) ────────────────────────────────────────
     function renderSummary() {
       const el = document.getElementById('ob-summary');
       if (!el) return;
-      const roleLabel = { coach:'🎯 Coach', entrepreneur:'💼 Entrepreneur', educator:'📚 Éducateur', creator:'🎬 Créateur' };
+      const roleLabel = { coach:'Coach', entrepreneur:'Entrepreneur', educator:'Éducateur', creator:'Créateur' };
       const fmtLabel  = { short:'Court-format (<60s)', long:'Long-format (5min+)', both:'Les deux' };
-      const styLabel  = { punchy:'⚡ Rapide & percutant', cinematic:'🎬 Cinématique', documentary:'📽 Documentaire', minimal:'✦ Minimal' };
 
       const rows = [
-        ['📧 Email', obData.email || '—'],
-        obData.name ? ['👤 Nom', obData.name] : null,
-        obData.brandName ? ['🏷 Marque', obData.brandName] : null,
-        obData.role ? ['💼 Rôle', roleLabel[obData.role] || obData.role] : null,
-        obData.audience ? ['👥 Audience', obData.audience] : null,
-        obData.platforms.length ? ['📱 Plateformes', obData.platforms.join(', ')] : null,
-        obData.format ? ['📹 Format', fmtLabel[obData.format] || obData.format] : null,
-        obData.editingStyle ? ['🎬 Style', styLabel[obData.editingStyle] || obData.editingStyle] : null,
-        ['🎨 Couleur', `<span style="display:inline-flex;align-items:center;gap:.4rem"><span style="width:14px;height:14px;border-radius:50%;background:${obData.primaryColor};display:inline-block;border:1px solid rgba(255,255,255,.2)"></span>${obData.primaryColor}</span>`],
-        ['🔤 Police', obData.font],
+        [obIcon('email', 'Email'), obData.email || '—'],
+        obData.name ? [obIcon('user', 'Nom'), obData.name] : null,
+        obData.brandName ? [obIcon('tag', 'Marque'), obData.brandName] : null,
+        obData.role ? [obIcon('role', 'Rôle'), roleLabel[obData.role] || obData.role] : null,
+        obData.audience ? [obIcon('users', 'Audience'), obData.audience] : null,
+        obData.platforms.length ? [obIcon('phone', 'Plateformes'), obData.platforms.join(', ')] : null,
+        obData.format ? [obIcon('film', 'Format'), fmtLabel[obData.format] || obData.format] : null,
+        obData.recommendedPack
+          ? [obIcon('sparkle', 'Pack recommandé'), PACK_NAMES[obData.recommendedPack] || obData.recommendedPack]
+          : null,
       ].filter(Boolean);
 
       el.innerHTML = rows.map(([label, val]) =>
@@ -1013,6 +975,7 @@
       const profile = { ...obData, timestamp: new Date().toISOString() };
       localStorage.setItem('coach_profile', JSON.stringify(profile));
       localStorage.setItem('onboarded', 'true');
+      if (obData.recommendedPack) localStorage.setItem('recommended_pack', obData.recommendedPack);
 
       // Persist profile to backend so it survives cache clears
       try {
