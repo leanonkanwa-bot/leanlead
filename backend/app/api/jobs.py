@@ -52,6 +52,8 @@ class Job:
     # Plan quota tracking
     profile_id: str | None = None   # coach profile that submitted this job
     is_retry: bool = False          # True if created via /api/retry — excluded from quota counting
+    # Trash (Feature: soft-delete with 7-day auto-purge)
+    trashed_at: float | None = None  # unix timestamp when moved to trash; None = not trashed
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -125,6 +127,47 @@ class JobStore:
     def get(self, job_id: str) -> Job | None:
         with self._lock:
             return self._jobs.get(job_id)
+
+    def delete(self, job_id: str) -> None:
+        with self._lock:
+            self._jobs.pop(job_id, None)
+            self._save_locked()
+
+    def list_for_profile(self, profile_id: str, *, trashed: bool | None = None) -> list[Job]:
+        """List jobs submitted by this profile, optionally filtered by trash state.
+
+        trashed=True -> only trashed jobs, trashed=False -> only non-trashed,
+        trashed=None -> all jobs regardless of trash state.
+        """
+        if not profile_id:
+            return []
+        with self._lock:
+            jobs = [j for j in self._jobs.values() if j.profile_id == profile_id]
+        if trashed is True:
+            jobs = [j for j in jobs if j.trashed_at is not None]
+        elif trashed is False:
+            jobs = [j for j in jobs if j.trashed_at is None]
+        return sorted(jobs, key=lambda j: j.created_at, reverse=True)
+
+    def purge_expired_trash(self, max_age_hours: float) -> int:
+        """Permanently delete jobs trashed longer than max_age_hours: removes
+        the rendered output (+ thumbnail/landscape variants) from disk and
+        the job entry itself. Returns the number of jobs purged.
+        """
+        cutoff = time.time() - max_age_hours * 3600
+        with self._lock:
+            expired = [j for j in self._jobs.values() if j.trashed_at is not None and j.trashed_at < cutoff]
+        for job in expired:
+            out = settings.outputs_dir / f"{job.id}.mp4"
+            thumb = settings.outputs_dir / f"{job.id}_thumb.jpg"
+            landscape = settings.outputs_dir / f"{job.id}_landscape.mp4"
+            for path in (out, thumb, landscape):
+                try:
+                    path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            self.delete(job.id)
+        return len(expired)
 
     def count_for_profile(self, profile_id: str, period: str) -> int:
         """Count non-retry jobs submitted by this profile.

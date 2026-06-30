@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import secrets
 import shutil
 import subprocess
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -74,6 +76,29 @@ def _cleanup_old_uploads() -> None:
         pass
 
 
+def _purge_trash() -> None:
+    """Permanently delete jobs trashed longer than TRASH_RETENTION_HOURS:
+    removes the rendered output (+ thumbnail/landscape variants) from disk
+    and the job entry itself."""
+    try:
+        n = store.purge_expired_trash(TRASH_RETENTION_HOURS)
+        if n:
+            print(f"[TRASH] Purged {n} job(s) older than {TRASH_RETENTION_HOURS}h in trash")
+    except Exception as e:
+        print(f"[TRASH] Purge failed: {e}")
+
+
+async def _purge_trash_loop() -> None:
+    """Re-checks trash every 12h for the process lifetime. Startup-only
+    cleanup (like _cleanup_old_uploads) is fine for the uploads dir since
+    deploys are frequent, but isn't a reliable 7-day SLA for trash if the
+    container stays up for weeks without restarting.
+    """
+    while True:
+        await asyncio.sleep(12 * 3600)
+        _purge_trash()
+
+
 app = FastAPI(title="AI Video Editor Agent", version="0.1.0")
 
 
@@ -85,6 +110,8 @@ def _on_startup() -> None:
     _commit = _os.environ.get("RAILWAY_GIT_COMMIT_SHA", "") or _commit
     print(f"[BUILD] Running commit: {_commit}")
     _cleanup_old_uploads()
+    _purge_trash()
+    asyncio.create_task(_purge_trash_loop())
 
 app.add_middleware(
     CORSMiddleware,
@@ -384,6 +411,28 @@ def get_job(job_id: str, request: Request, _: None = Depends(_check_auth)) -> di
     if not job:
         raise HTTPException(404, "Job not found")
     return job.to_dict()
+
+
+# ── Trash (soft-delete with 7-day auto-purge) ─────────────────────────────────
+TRASH_RETENTION_HOURS = 7 * 24
+
+
+@app.post("/api/jobs/{job_id}/trash")
+def trash_job(job_id: str, _: None = Depends(_check_auth)) -> dict:
+    job = store.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    store.update(job_id, trashed_at=time.time())
+    return {"job_id": job_id, "trashed": True}
+
+
+@app.post("/api/jobs/{job_id}/restore")
+def restore_job(job_id: str, _: None = Depends(_check_auth)) -> dict:
+    job = store.get(job_id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    store.update(job_id, trashed_at=None)
+    return {"job_id": job_id, "trashed": False}
 
 
 @app.post("/api/retry/{job_id}")

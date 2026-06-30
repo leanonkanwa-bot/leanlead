@@ -50,6 +50,11 @@ $("dashEditBtn")?.addEventListener("click", () => switchSection("editorArea"));
 
 // ── Init: decide which section to show ───────────────────────────────────────
 (async function initSection() {
+  // Wired unconditionally, before any profile-load attempt: a 404'd or
+  // still-loading profile must never leave the avatar inert.
+  const navAvatar = $("navAvatar");
+  navAvatar?.addEventListener("click", () => switchSection("profileSection"));
+
   try {
     let raw = localStorage.getItem("coach_profile");
 
@@ -64,17 +69,24 @@ $("dashEditBtn")?.addEventListener("click", () => switchSection("editorArea"));
           raw = JSON.stringify(restored);
         }
       } catch {}
+
+      // Plan label under the avatar, independent of whether the profile
+      // JSON itself loaded — fails silently if the request errors.
+      const planLabelEl = $("navPlanLabel");
+      if (planLabelEl) {
+        fetch(`/api/billing/usage/${profileId}`).then(r => r.ok ? r.json() : null).then(u => {
+          if (u?.plan_label) { planLabelEl.textContent = u.plan_label; planLabelEl.style.display = ""; }
+        }).catch(() => {});
+      }
     }
 
     if (!raw) { switchSection("editorArea"); return; }
     const p = JSON.parse(raw);
 
     // Update nav avatar with initials
-    const navAvatar = $("navAvatar");
     if (navAvatar) {
       const initials = (p.name || p.brandName || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
       navAvatar.textContent = initials;
-      navAvatar.addEventListener("click", () => switchSection("profileSection"));
     }
     const greetingEl = $("navGreeting");
     if (greetingEl) {
@@ -109,7 +121,7 @@ $("dashEditBtn")?.addEventListener("click", () => switchSection("editorArea"));
 // ── Dashboard stats ───────────────────────────────────────────────────────────
 function updateDashboardStats() {
   try {
-    const videos = JSON.parse(localStorage.getItem("edited_videos") || "[]");
+    const videos = JSON.parse(localStorage.getItem("edited_videos") || "[]").filter(v => !v.trashedAt);
     const count = videos.length;
     if ($("dashVideos")) $("dashVideos").textContent = count;
     if ($("dashTimeSaved")) $("dashTimeSaved").textContent = (count * 4) + "h";
@@ -199,16 +211,24 @@ function updateAchievements() {
 }
 
 // ── Video Library ─────────────────────────────────────────────────────────────
+const TRASH_RETENTION_DAYS = 7;
+let _libTab = "active"; // "active" | "trash"
+
 function loadVideoLibrary() {
   try {
-    const videos = JSON.parse(localStorage.getItem("edited_videos") || "[]");
+    const all = JSON.parse(localStorage.getItem("edited_videos") || "[]");
     const gridEl = $("videoLibraryGrid");
     const emptyEl = $("videoLibraryEmpty");
     if (!gridEl || !emptyEl) return;
 
+    const videos = all.filter(v => _libTab === "trash" ? !!v.trashedAt : !v.trashedAt);
+
     if (videos.length === 0) {
       gridEl.style.display = "none";
       emptyEl.style.display = "block";
+      emptyEl.textContent = _libTab === "trash"
+        ? "Corbeille vide."
+        : "Aucune vidéo éditée pour l'instant.";
       return;
     }
 
@@ -217,21 +237,90 @@ function loadVideoLibrary() {
     gridEl.innerHTML = videos.slice(0, 12).map((v, i) => {
       const title = v.title || `Vidéo #${i + 1}`;
       const thumbSrc = v.thumbnail_url || v.thumbnail || (v.jobId ? `/api/thumbnail/${v.jobId}` : null);
+      // Source of truth: v.format, captured from the format_hint radio at
+      // submit time ("short"/"long"). Missing/unknown values (older entries,
+      // "auto") default to portrait.
+      const aspectClass = v.format === "long" ? "is-landscape" : "is-portrait";
+      const placeholderSvg = `<svg class="video-lib-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>`;
       const thumbHtml = thumbSrc
-        ? `<img src="${thumbSrc}" alt="${title}" style="width:100%;height:100%;object-fit:cover;display:block" />`
-        : `<div class="video-lib-thumb-placeholder"><svg class="video-lib-play" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg></div>`;
+        ? `<img src="${thumbSrc}" alt="${title}" style="width:100%;height:100%;object-fit:cover;display:block" /><div class="video-lib-thumb-placeholder">${placeholderSvg}</div>`
+        : `<div class="video-lib-thumb-placeholder" style="display:flex">${placeholderSvg}</div>`;
+
+      let trashNote = "";
+      let actionButtons;
+      if (v.trashedAt) {
+        const daysLeft = Math.max(0, TRASH_RETENTION_DAYS - Math.floor((Date.now() - new Date(v.trashedAt).getTime()) / 86400000));
+        trashNote = `<div class="video-lib-trash-note">Purge dans ${daysLeft}j</div>`;
+        actionButtons = v.jobId ? `<button class="action-btn" onclick="restoreVideo('${v.jobId}')">Restaurer</button>` : "";
+      } else {
+        actionButtons = v.jobId
+          ? `<a href="/api/download/${v.jobId}" class="action-btn" download>Télécharger</a>
+             <button class="action-btn" onclick="trashVideo('${v.jobId}')" style="color:#ff5c7a">Supprimer</button>`
+          : "";
+      }
+
       return `<div class="video-lib-card" title="${title}">
-        <div class="video-lib-thumb">
+        <div class="video-lib-thumb ${aspectClass}">
           ${thumbHtml}
+          ${trashNote}
           <div class="video-lib-title-overlay">${title}</div>
           <div class="video-lib-overlay">
-            ${v.jobId ? `<a href="/api/download/${v.jobId}" class="action-btn" download>Télécharger</a>` : ""}
-            ${v.jobId ? `<button class="action-btn" onclick="reEditVideo('${v.jobId}')">Reediter</button>` : ""}
+            ${actionButtons}
           </div>
         </div>
       </div>`;
     }).join("");
+
+    gridEl.querySelectorAll(".video-lib-thumb img").forEach(img => {
+      img.addEventListener("error", () => img.setAttribute("data-error", "1"));
+    });
   } catch {}
+}
+
+document.getElementById("libTabActive")?.addEventListener("click", () => {
+  _libTab = "active";
+  document.getElementById("libTabActive")?.classList.add("active");
+  document.getElementById("libTabTrash")?.classList.remove("active");
+  loadVideoLibrary();
+});
+document.getElementById("libTabTrash")?.addEventListener("click", () => {
+  _libTab = "trash";
+  document.getElementById("libTabTrash")?.classList.add("active");
+  document.getElementById("libTabActive")?.classList.remove("active");
+  loadVideoLibrary();
+});
+
+async function trashVideo(jobId) {
+  if (!confirm("Supprimer cette vidéo ? Elle restera dans la corbeille 7 jours avant suppression définitive.")) return;
+  try {
+    const res = await apiFetch(`/api/jobs/${jobId}/trash`, { method: "POST" });
+    if (!res.ok) { alert("Impossible de supprimer cette vidéo. Réessayez."); return; }
+    const videos = JSON.parse(localStorage.getItem("edited_videos") || "[]");
+    const updated = videos.map(v => v.jobId === jobId ? { ...v, trashedAt: new Date().toISOString() } : v);
+    localStorage.setItem("edited_videos", JSON.stringify(updated));
+    loadVideoLibrary();
+    updateDashboardStats();
+  } catch {
+    alert("Impossible de supprimer cette vidéo. Réessayez.");
+  }
+}
+
+async function restoreVideo(jobId) {
+  try {
+    const res = await apiFetch(`/api/jobs/${jobId}/restore`, { method: "POST" });
+    if (!res.ok) { alert("Impossible de restaurer cette vidéo. Réessayez."); return; }
+    const videos = JSON.parse(localStorage.getItem("edited_videos") || "[]");
+    const updated = videos.map(v => {
+      if (v.jobId !== jobId) return v;
+      const { trashedAt, ...rest } = v;
+      return rest;
+    });
+    localStorage.setItem("edited_videos", JSON.stringify(updated));
+    loadVideoLibrary();
+    updateDashboardStats();
+  } catch {
+    alert("Impossible de restaurer cette vidéo. Réessayez.");
+  }
 }
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
@@ -282,7 +371,6 @@ async function loadAnalytics() {
           <td>${scoreHtml}</td>
           <td>
             ${v.jobId ? `<a href="/api/download/${v.jobId}" class="action-btn" download>Télécharger</a>` : ""}
-            ${v.jobId ? `<button class="action-btn" onclick="reEditVideo('${v.jobId}')">Reediter</button>` : ""}
             <button class="action-btn" onclick="deleteVideo('${v.jobId || i}')" style="color:#e53e3e">Supprimer</button>
           </td>
         </tr>`;
@@ -356,30 +444,6 @@ function drawRetentionCurve(videos) {
     dropEl.setAttribute("cx", String(dropPt[0]));
     dropEl.setAttribute("cy", String(dropPt[1]));
     dropEl.setAttribute("opacity", "0.8");
-  }
-}
-
-async function reEditVideo(jobId) {
-  switchSection("editorArea");
-  const statusCard = $("statusCard");
-  const submitBtn = $("submit");
-  if (statusCard) statusCard.classList.remove("hidden");
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.querySelector(".btn-label").textContent = "Traitement…"; }
-  setStatus("queued", "Re-édition avec le fichier existant…", 5);
-  try {
-    const res = await apiFetch(`/api/retry/${jobId}`, { method: "POST" });
-    if (!res.ok) {
-      const txt = await res.text();
-      const msg = txt.includes("no longer on disk")
-        ? "Vidéo source expirée (>24h) — veuillez re-uploader le fichier."
-        : `Erreur: ${res.status}`;
-      fail(msg);
-      return;
-    }
-    const { job_id } = await res.json();
-    poll(job_id).catch(e => { console.error("poll crashed:", e); fail("Erreur inattendue pendant le suivi du job."); });
-  } catch (err) {
-    fail(`Erreur re-édition: ${err.message}`);
   }
 }
 
