@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import shlex
 import subprocess
+import time
 from pathlib import Path
 from typing import Any
 
@@ -1525,6 +1526,65 @@ def _health_check(src: Path) -> None:
     print(f"[HEALTH] src={src.name}  size={size_mb:.1f}MB  est_render_time=~{est_min}min")
 
 
+def _round_even(x: float) -> int:
+    return max(2, int(round(x / 2) * 2))
+
+
+def _upscale_to_source_resolution(output_path: Path, src: Path, short_form: bool) -> dict[str, Any]:
+    """Upscale a 1080p-class HyperFrames output to match the source video's
+    resolution, capped at 4K. No-op (returns immediately) if the source isn't
+    meaningfully larger than 1080p — never downscales, never re-encodes for
+    nothing.
+
+    The HyperFrames composition canvas is fixed at 1080x1920/1920x1080 (see
+    storyboard.py) -- changing that would require rewriting every pixel-based
+    zone/font/padding constant in compose.py across 6 packs x 16 card types.
+    Upscaling the final render is the low-risk alternative: it doesn't touch
+    any of that, it just avoids visibly degrading a 4K source down to 1080p
+    in the delivered file.
+    """
+    info = _probe_video_info(src)
+    src_w, src_h = info.get("width", 0), info.get("height", 0)
+    src_max = max(src_w, src_h)
+
+    base_w, base_h = (1080, 1920) if short_form else (1920, 1080)
+    scale = max(1.0, min(src_max / 1920.0, 2.0))  # 1.0 = no-op, 2.0 = 4K cap
+
+    if scale <= 1.0001:
+        return {"upscaled": False, "output_resolution": f"{base_w}x{base_h}"}
+
+    target_w = _round_even(base_w * scale)
+    target_h = _round_even(base_h * scale)
+    is_4k_target = scale >= 1.999
+    crf = "14" if is_4k_target else "16"
+
+    print(f"[UPSCALE] source={src_w}x{src_h} -> target={target_w}x{target_h} (scale={scale:.2f}, crf={crf})")
+    t0 = time.perf_counter()
+
+    tmp_path = output_path.with_suffix(".upscale_tmp.mp4")
+    try:
+        subprocess.run(
+            [
+                FFMPEG_PATH, "-y", "-loglevel", "error",
+                "-i", str(output_path),
+                "-vf", f"scale={target_w}:{target_h}:flags=lanczos",
+                "-c:v", "libx264", "-crf", crf, "-preset", "medium",
+                "-c:a", "copy",
+                str(tmp_path),
+            ],
+            check=True, capture_output=True, timeout=600,
+        )
+        tmp_path.replace(output_path)
+        elapsed = time.perf_counter() - t0
+        print(f"[UPSCALE] Done in {elapsed:.1f}s -> {target_w}x{target_h}")
+        return {"upscaled": True, "output_resolution": f"{target_w}x{target_h}", "upscale_seconds": round(elapsed, 1)}
+    except Exception as e:
+        elapsed = time.perf_counter() - t0
+        print(f"[UPSCALE] Failed after {elapsed:.1f}s, keeping 1080p-class output: {e}")
+        tmp_path.unlink(missing_ok=True)
+        return {"upscaled": False, "output_resolution": f"{base_w}x{base_h}", "upscale_error": str(e)}
+
+
 def _render_hyperframes(
     src: Path,
     transcript: dict[str, Any],
@@ -1681,6 +1741,11 @@ def _render_hyperframes(
     print(f"[HF] Done: {output_path}")
     _probe_av_durations(output_path, "hyperframes_output")
 
+    # Stage 5: Upscale to source resolution (capped at 4K) — the HyperFrames
+    # composition canvas is fixed 1080p-class; this avoids silently
+    # delivering a 4K source back at 1080p without touching compose.py.
+    upscale_info = _upscale_to_source_resolution(output_path, src, short_form=plan.format == "short")
+
     return {
         "output": str(output_path),
         "duration": timing_map.output_duration,
@@ -1692,6 +1757,7 @@ def _render_hyperframes(
         "broll_pauses": 0,
         "graphics_rendered": ["hyperframes"],
         "vignette_moments": 0,
+        **upscale_info,
     }
 
 
