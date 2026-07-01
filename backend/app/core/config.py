@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     stripe_price_pro: str = ""
     stripe_price_agency: str = ""
 
+    # Public base URL of the app (no trailing slash). Required on Railway so
+    # the OAuth redirect_uri uses the public HTTPS domain instead of the
+    # internal container address that request.base_url returns behind a proxy.
+    # Example: https://leanlead-production.up.railway.app
+    app_base_url: str = ""
+
     # Google OAuth login. Set on Railway.
     google_client_id: str = ""
     google_client_secret: str = ""
