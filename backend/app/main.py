@@ -680,8 +680,11 @@ async def get_profile(profile_id: str) -> dict:
 
 
 def _oauth_redirect_uri(request: Request) -> str:
-    base = settings.app_base_url.rstrip("/") if settings.app_base_url else str(request.base_url).rstrip("/")
-    return f"{base}/api/auth/google/callback"
+    configured = settings.app_base_url.strip().rstrip("/")
+    base = configured if configured else str(request.base_url).rstrip("/")
+    uri = f"{base}/api/auth/google/callback"
+    print(f"[OAUTH] redirect_uri={uri!r}  (APP_BASE_URL={settings.app_base_url!r})")
+    return uri
 
 
 @app.get("/api/auth/google/login")
