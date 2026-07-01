@@ -1586,7 +1586,7 @@ def _build_timeline_js(
                 f'{{ scale: 0.97, duration: 0.180, ease: _eOut }}, '
                 f'{exit_start:.4f});'
             )
-        lines.append(f'  tl.set(\'{sel}\', {{ visibility: "hidden" }}, {end:.4f});')
+        lines.append(f'  tl.set(\'{sel}\', {{ opacity: 0, visibility: "hidden" }}, {end:.3f});')
 
         lines.append(f'  }} catch(_e) {{ console.warn("card {card_id} animation error:", _e); }}')
         lines.append("")

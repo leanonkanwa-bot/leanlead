@@ -1749,7 +1749,7 @@ def _render_hyperframes(
         raise RuntimeError("HyperFrames CLI render timed out")
 
     if stdout.strip():
-        print(f"[HF] CLI stdout:\n{stdout[:3000]}", flush=True)
+        print(f"[HF] CLI stdout:\n{stdout[:8000]}", flush=True)
     if stderr.strip():
         print(f"[HF] CLI stderr:\n{stderr[:2000]}", flush=True)
 
