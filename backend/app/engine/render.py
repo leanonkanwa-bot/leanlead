@@ -1686,6 +1686,10 @@ def _render_hyperframes(
     n_caption = sum(1 for c in storyboard.get("cards", []) if c.get("type") == "caption")
     print(f"[HF] Storyboard: {n_graphic} graphic + {n_caption} caption cards", flush=True)
     print(f"[TIMING] storyboard: {time.perf_counter()-_t:.1f}s", flush=True)
+    import json as _json
+    (work_dir / "storyboard.json").write_text(
+        _json.dumps(storyboard, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     # Stage 3: Compose
     _t = time.perf_counter()
