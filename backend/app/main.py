@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import secrets
 import shutil
@@ -12,7 +14,9 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
+from urllib.parse import urlencode
 
+import requests
 from fastapi import (
     BackgroundTasks,
     Body,
@@ -26,7 +30,7 @@ from fastapi import (
     UploadFile,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api.jobs import store
@@ -145,6 +149,42 @@ def _check_auth(request: Request) -> None:
     token = request.cookies.get(AUTH_COOKIE) or request.headers.get("x-access-token")
     if not token or not secrets.compare_digest(token, settings.access_password):
         raise HTTPException(status_code=401, detail="auth required")
+
+
+# ── Google OAuth identity (separate from the site-wide access_password
+# gate above -- this answers "which profile is this", not "is this visitor
+# allowed in the beta") ────────────────────────────────────────────────────
+SESSION_COOKIE = "lle_session"
+OAUTH_STATE_COOKIE = "lle_oauth_state"
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
+
+
+def _session_secret() -> str:
+    if settings.session_secret:
+        return settings.session_secret
+    # Derive a stable key from access_password so sessions survive restarts
+    # without requiring a new Railway env var. access_password is already a
+    # server-only secret; this just namespaces it for a different purpose.
+    base = settings.access_password or "lle-default-dev-secret"
+    return hashlib.sha256(f"{base}:session-signing".encode()).hexdigest()
+
+
+def _sign_session(profile_id: str) -> str:
+    sig = hmac.new(_session_secret().encode(), profile_id.encode(), hashlib.sha256).hexdigest()
+    return f"{profile_id}.{sig}"
+
+
+def _verify_session(token: str | None) -> str | None:
+    """Returns the profile_id if the signed session cookie is valid, else None."""
+    if not token or "." not in token:
+        return None
+    profile_id, _, sig = token.rpartition(".")
+    expected = hmac.new(_session_secret().encode(), profile_id.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(sig, expected):
+        return None
+    return profile_id
 
 
 @app.get("/api/health")
@@ -640,6 +680,144 @@ async def save_profile(payload: dict = Body(...)) -> dict:
 @app.get("/api/profile/{profile_id}")
 async def get_profile(profile_id: str) -> dict:
     """Fetch a previously saved coach profile."""
+    profile_path = _PROFILES_DIR / f"{profile_id}.json"
+    if not profile_path.exists():
+        raise HTTPException(404, "Profile not found")
+    try:
+        return json.loads(profile_path.read_text(encoding="utf-8"))
+    except Exception:
+        raise HTTPException(500, "Corrupt profile file")
+
+
+def _oauth_redirect_uri(request: Request) -> str:
+    return f"{str(request.base_url).rstrip('/')}/api/auth/google/callback"
+
+
+@app.get("/api/auth/google/login")
+def google_login(request: Request) -> Response:
+    if not settings.google_client_id:
+        raise HTTPException(503, "Google login is not configured")
+    state = secrets.token_urlsafe(24)
+    params = {
+        "client_id": settings.google_client_id,
+        "redirect_uri": _oauth_redirect_uri(request),
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "online",
+        "prompt": "select_account",
+    }
+    resp = RedirectResponse(f"{GOOGLE_AUTH_URL}?{urlencode(params)}")
+    resp.set_cookie(
+        OAUTH_STATE_COOKIE, state,
+        httponly=True, samesite="lax", secure=True, max_age=600,
+    )
+    return resp
+
+
+@app.get("/api/auth/google/callback")
+def google_callback(
+    request: Request,
+    code: str = Query(""),
+    state: str = Query(""),
+    error: str = Query(""),
+) -> Response:
+    base = str(request.base_url).rstrip("/")
+    if error:
+        return RedirectResponse(f"{base}/?login=error")
+
+    cookie_state = request.cookies.get(OAUTH_STATE_COOKIE)
+    if not state or not cookie_state or not secrets.compare_digest(state, cookie_state):
+        raise HTTPException(400, "Invalid OAuth state")
+    if not code:
+        raise HTTPException(400, "Missing authorization code")
+
+    try:
+        token_resp = requests.post(GOOGLE_TOKEN_URL, data={
+            "code": code,
+            "client_id": settings.google_client_id,
+            "client_secret": settings.google_client_secret,
+            "redirect_uri": _oauth_redirect_uri(request),
+            "grant_type": "authorization_code",
+        }, timeout=10)
+        token_resp.raise_for_status()
+        access_token = token_resp.json()["access_token"]
+
+        userinfo_resp = requests.get(
+            GOOGLE_USERINFO_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10,
+        )
+        userinfo_resp.raise_for_status()
+        info = userinfo_resp.json()
+    except Exception as e:
+        print(f"[OAUTH] Google exchange failed: {e}")
+        raise HTTPException(502, "Google authentication failed")
+
+    email = (info.get("email") or "").strip().lower()
+    email_verified = bool(info.get("email_verified"))
+    name = info.get("name") or ""
+
+    if not email or not email_verified:
+        raise HTTPException(403, "Google account email is not verified")
+
+    _PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+
+    founder_email = (settings.founder_google_email or "").strip().lower()
+    if founder_email and email == founder_email:
+        # Exact match only -- no fuzzy/partial matching.
+        profile_id = settings.founder_profile_id
+        profile_path = _PROFILES_DIR / f"{profile_id}.json"
+        profile: dict = {}
+        if profile_path.exists():
+            try:
+                profile = json.loads(profile_path.read_text(encoding="utf-8"))
+            except Exception:
+                profile = {}
+        # Self-healing: recreate with is_founder=True even if the file was
+        # lost again, so the founder never needs manual Railway-shell repair.
+        profile["profile_id"] = profile_id
+        profile["email"] = email
+        profile.setdefault("name", name)
+        profile["is_founder"] = True
+        profile.setdefault("plan", "agency")
+        profile_path.write_text(
+            json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8",
+        )
+    else:
+        profile_id = None
+        for p_path in _PROFILES_DIR.glob("*.json"):
+            try:
+                p_data = json.loads(p_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if (p_data.get("email") or "").strip().lower() == email:
+                profile_id = p_data.get("profile_id") or p_path.stem
+                break
+        if not profile_id:
+            profile_id = secrets.token_urlsafe(12)
+            profile_path = _PROFILES_DIR / f"{profile_id}.json"
+            profile_path.write_text(json.dumps({
+                "profile_id": profile_id,
+                "email": email,
+                "name": name,
+                "plan": DEFAULT_PLAN,
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    resp = RedirectResponse(f"{base}/app?oauth=success")
+    resp.delete_cookie(OAUTH_STATE_COOKIE)
+    resp.set_cookie(
+        SESSION_COOKIE, _sign_session(profile_id),
+        httponly=True, samesite="lax", secure=True, max_age=60 * 60 * 24 * 30,
+    )
+    return resp
+
+
+@app.get("/api/auth/me")
+def auth_me(request: Request) -> dict:
+    profile_id = _verify_session(request.cookies.get(SESSION_COOKIE))
+    if not profile_id:
+        raise HTTPException(401, "Not logged in")
     profile_path = _PROFILES_DIR / f"{profile_id}.json"
     if not profile_path.exists():
         raise HTTPException(404, "Profile not found")

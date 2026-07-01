@@ -55,6 +55,26 @@ $("dashEditBtn")?.addEventListener("click", () => switchSection("editorArea"));
   const navAvatar = $("navAvatar");
   navAvatar?.addEventListener("click", () => switchSection("profileSection"));
 
+  // Google OAuth session self-heal: if a signed lle_session cookie exists
+  // (set by /api/auth/google/callback), restore localStorage from it even
+  // if it was wiped entirely. Fails silently (401) when there's no session
+  // cookie — this runs on every load, not just right after a fresh login.
+  try {
+    const meRes = await fetch("/api/auth/me");
+    if (meRes.ok) {
+      const profile = await meRes.json();
+      localStorage.setItem("coach_profile", JSON.stringify(profile));
+      if (profile.profile_id) localStorage.setItem("profile_id", profile.profile_id);
+      localStorage.setItem("onboarded", "true");
+    }
+  } catch {}
+
+  if (new URLSearchParams(window.location.search).has("oauth")) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete("oauth");
+    history.replaceState({}, "", url.pathname + url.search);
+  }
+
   try {
     let raw = localStorage.getItem("coach_profile");
 

@@ -118,16 +118,14 @@
     }
     .email-card h2 { font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; letter-spacing: -.03em; margin-bottom: .65rem; }
     .email-card p { color: var(--muted); font-size: .95rem; margin-bottom: 1.75rem; }
-    .email-form { display: flex; gap: .6rem; max-width: 480px; margin: 0 auto; }
-    .email-input {
-      flex: 1; padding: .78rem 1rem; border-radius: 10px;
-      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
-      color: var(--text); font-family: var(--font); font-size: .95rem; transition: border-color .2s; outline: none;
+    .btn-google {
+      display: inline-flex; align-items: center; justify-content: center; gap: .6rem;
+      background: #fff; color: #3c4043; border: 1px solid var(--border);
+      border-radius: 10px; padding: .85rem 1.5rem; font-family: var(--font);
+      font-size: .9rem; font-weight: 600; text-decoration: none; cursor: pointer;
+      max-width: 320px; margin: 0 auto; transition: box-shadow .15s, border-color .15s;
     }
-    .email-input:focus { border-color: var(--salmon); box-shadow: 0 0 0 3px rgba(255,119,81,.12); }
-    .email-input::placeholder { color: var(--muted); }
-    .email-anti-spam { font-size: .75rem; color: var(--muted); margin-top: .85rem; }
-    .email-success { display: none; font-size: 1rem; font-weight: 600; color: var(--salmon); padding: 1rem; }
+    .btn-google:hover { box-shadow: 0 2px 10px rgba(0,0,0,.18); border-color: rgba(0,0,0,.25); }
 
     /* ── STATS BAR ───────────────────────────────────────────────────── */
     .stats-section { padding: 4rem 1.5rem; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
@@ -320,7 +318,6 @@
       .testi-grid { grid-template-columns: 1fr; }
       .pricing-grid { grid-template-columns: 1fr; }
       .stats-grid { grid-template-columns: 1fr 1fr; }
-      .email-form { flex-direction: column; }
       .hero-ctas { flex-direction: column; align-items: stretch; }
       .hero-ctas .btn { text-align: center; justify-content: center; }
       .nav-right .nav-link { display: none; }
@@ -343,7 +340,7 @@
         <span class="logo-name">LeanRetention</span>
       </a>
       <div class="nav-right">
-        <a href="#" class="nav-link" id="seConnecterLink">Se connecter</a>
+        <a href="/api/auth/google/login" class="nav-link">Se connecter</a>
         <button class="btn btn-salmon" onclick="openOnboarding()">Commencer gratuitement</button>
       </div>
     </div>
@@ -373,13 +370,16 @@
   <section class="email-section" id="email-capture">
     <div class="email-card fade">
       <h2>Obtenez votre première vidéo éditée gratuitement</h2>
-      <p>Rejoignez 500+ créateurs qui économisent 4h par semaine</p>
-      <form class="email-form" id="captureForm1" onsubmit="handleEmailCapture(event,'captureEmail1','captureSuccess1','captureForm1')">
-        <input type="email" class="email-input" id="captureEmail1" placeholder="votre@email.com" required />
-        <button type="submit" class="btn btn-salmon">Commencer gratuitement →</button>
-      </form>
-      <div class="email-success" id="captureSuccess1">✓ Parfait&nbsp;! Vérifiez votre email.</div>
-      <p class="email-anti-spam">Pas de spam. Désabonnement en 1 clic.</p>
+      <p>Sans carte bancaire. Connexion en un clic.</p>
+      <a href="/api/auth/google/login" class="btn-google">
+        <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+          <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+          <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+          <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+          <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+        </svg>
+        Continuer avec Google
+      </a>
     </div>
   </section>
 
@@ -517,12 +517,15 @@
       <h2>Prêt à arrêter de perdre<br>des heures à éditer&nbsp;?</h2>
       <p>Première vidéo offerte. Aucune carte requise.</p>
       <div class="email-card fade" style="max-width:520px;margin:0 auto">
-        <form class="email-form" id="captureForm2" onsubmit="handleEmailCapture(event,'captureEmail2','captureSuccess2','captureForm2')" style="margin-bottom:0">
-          <input type="email" class="email-input" id="captureEmail2" placeholder="votre@email.com" required />
-          <button type="submit" class="btn btn-salmon">Commencer →</button>
-        </form>
-        <div class="email-success" id="captureSuccess2">✓ Parfait&nbsp;! Vérifiez votre email.</div>
-        <p class="email-anti-spam" style="margin-top:.6rem">Pas de spam. Désabonnement en 1 clic.</p>
+        <a href="/api/auth/google/login" class="btn-google" style="width:100%">
+          <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+            <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z"/>
+            <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+            <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+          </svg>
+          Continuer avec Google
+        </a>
       </div>
     </div>
   </section>
@@ -663,46 +666,12 @@
       nav.classList.toggle('scrolled', window.scrollY > 20);
     }, { passive: true });
 
-    // ── Issue 1: "Se connecter" — onboard-first ────────────────────────
-    document.getElementById('seConnecterLink').addEventListener('click', (e) => {
-      e.preventDefault();
-      if (localStorage.getItem('coach_profile')) {
-        fetch('/api/auth/status').then(r => r.json()).then(j => {
-          if (!j.required || j.authed) window.location.href = '/app';
-          else openOnboarding();
-        }).catch(() => openOnboarding());
-        return;
-      } else {
-        openOnboarding();
-      }
-    });
-
     // ── Fade-in on scroll ───────────────────────────────────────────────
     const fades = document.querySelectorAll('.fade');
     const io = new IntersectionObserver((entries) => {
       entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
     }, { threshold: 0.12 });
     fades.forEach(el => io.observe(el));
-
-    // ── Email capture (waitlist) ────────────────────────────────────────
-    async function handleEmailCapture(e, inputId, successId, formId) {
-      e.preventDefault();
-      const email = document.getElementById(inputId)?.value?.trim();
-      if (!email) return;
-      try {
-        const res = await fetch('/api/waitlist', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, timestamp: new Date().toISOString() }),
-        });
-        if (!res.ok) throw new Error(res.status);
-        document.getElementById(formId).style.display = 'none';
-        document.getElementById(successId).style.display = 'block';
-      } catch {
-        const input = document.getElementById(inputId);
-        if (input) { input.style.borderColor = '#ff5c7a'; input.placeholder = 'Erreur — réessayez'; }
-      }
-    }
 
     // ════════════════════════════════════════════════════════════════════
     // ONBOARDING MODAL

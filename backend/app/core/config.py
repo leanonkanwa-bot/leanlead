@@ -75,6 +75,21 @@ class Settings(BaseSettings):
     stripe_price_pro: str = ""
     stripe_price_agency: str = ""
 
+    # Google OAuth login. Set on Railway.
+    google_client_id: str = ""
+    google_client_secret: str = ""
+
+    # Server-only: the Google account that auto-links to the founder profile
+    # on login. Never settable through any client-facing API.
+    founder_google_email: str = ""
+    founder_profile_id: str = "jPxx5_4OKXPIm7xR"
+
+    # HMAC key for signing the lle_session cookie. Leave empty to derive a
+    # stable key from access_password (fine since it's already a server-only
+    # secret) -- set a dedicated SESSION_SECRET on Railway for stronger
+    # isolation if desired, but it isn't required to get started.
+    session_secret: str = ""
+
     @property
     def _data_root(self) -> Path:
         p = Path(self.data_dir)
