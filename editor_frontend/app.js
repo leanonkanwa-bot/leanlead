@@ -33,7 +33,11 @@ function apiFetch(url, opts = {}) {
 function switchSection(targetId) {
   ["editorArea", "dashboardSection", "profileSection", "learnSection", "outilsSection"].forEach(id => {
     const el = $(id);
-    if (el) el.classList.toggle("active", id === targetId);
+    if (el) {
+      const isTarget = id === targetId;
+      el.classList.toggle("active", isTarget);
+      el.style.display = isTarget ? "block" : "none";
+    }
   });
   document.querySelectorAll(".nav-tab[data-target]").forEach(tab => {
     tab.classList.toggle("active", tab.dataset.target === targetId);
