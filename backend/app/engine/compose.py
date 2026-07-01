@@ -56,8 +56,8 @@ def _zone_bounds(zone: str, layout: str) -> dict:
 def _build_card_host(card: dict, layout: str, track_index: int, pack: dict | None = None) -> str:
     """Build a card-host div with correct classes, data attributes, and inline bounds."""
     card_id = card["id"]
-    start = float(card.get("startSec", 0))
-    duration = float(card.get("endSec", start + 3)) - start
+    start = round(float(card.get("startSec", 0)), 3)
+    duration = round(float(card.get("endSec", start + 3)) - start, 3)
     zone = card.get("zone", "lower-third")
 
     is_caption = card.get("type") == "caption"
@@ -1566,7 +1566,7 @@ def _build_timeline_js(
                 f'{{ scale: 0.97, duration: 0.180, ease: _eOut }}, '
                 f'{exit_start:.4f});'
             )
-        lines.append(f'  tl.set(\'{sel}\', {{ visibility: "hidden" }}, {end:.4f});')
+        lines.append(f'  tl.set(\'{sel}\', {{ opacity: 0, visibility: "hidden" }}, {end:.4f});')
 
         lines.append(f'  }} catch(_e) {{ console.warn("card {card_id} animation error:", _e); }}')
         lines.append("")
