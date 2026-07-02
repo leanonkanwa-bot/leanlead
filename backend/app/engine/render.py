@@ -1747,6 +1747,8 @@ def _render_hyperframes(
 
         # Launch in its own process group so we can kill the entire tree
         # (npx + Chrome children) on timeout, preventing orphaned processes.
+        _hf_tmp = work_dir / "hf_tmp"
+        _hf_tmp.mkdir(parents=True, exist_ok=True)
         proc = subprocess.Popen(
             [
                 *_hf_cmd, "render",
@@ -1757,6 +1759,8 @@ def _render_hyperframes(
                 "--workers", "1",
                 "--protocol-timeout", "600000",
                 "--low-memory-mode",
+                "--sdr",
+                "--tmp-dir", str(_hf_tmp),
             ],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             text=True, env=env,
