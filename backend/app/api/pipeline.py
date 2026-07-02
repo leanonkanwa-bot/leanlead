@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import shutil
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
@@ -25,6 +26,18 @@ from app.engine.silence_remover import RhythmAwareSilenceRemover, apply_drops_to
 from app.engine.speaker_detector import SpeakerDetector
 from app.engine.template_engine import apply_template, get_template
 from app.engine.transcribe import transcribe, unload_model
+
+# Purge work_dirs older than 2 days at module load (i.e. server startup).
+def _purge_old_work_dirs() -> None:
+    _work_root = settings.work_dir
+    if not _work_root.exists():
+        return
+    _cutoff = time.time() - 172800  # 2 days
+    for _d in _work_root.iterdir():
+        if _d.is_dir() and _d.stat().st_mtime < _cutoff:
+            shutil.rmtree(_d, ignore_errors=True)
+
+_purge_old_work_dirs()
 
 
 def verify_caption_sync(remapped_words: list, edited_duration: float) -> list:
