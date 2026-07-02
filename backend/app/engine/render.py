@@ -1644,7 +1644,7 @@ def _render_hyperframes(
         capture_output=True,
         timeout=300,
     )
-    if _hdr_stripped.exists():
+    if _hdr_stripped.exists() and _hdr_stripped.stat().st_size > 0:
         print("[HF] HDR strip: trimmed_sdr.mp4 ready", flush=True)
         trimmed = _hdr_stripped
 
