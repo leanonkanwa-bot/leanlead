@@ -1629,37 +1629,33 @@ def _render_hyperframes(
     print(f"[HF] Source intervals: {len(timing_map.source_intervals)}, compressed: {timing_map.compressed_intervals is not None}", flush=True)
     print(f"[TIMING] pretrim: {time.perf_counter()-_t_hf_start:.1f}s", flush=True)
 
-    # Detect HDR and tone-map to BT.709 so HyperFrames/Chrome sees clean SDR.
-    # Only runs when ffprobe confirms smpte2084 (HDR10) or arib-std-b67 (HLG).
+    # Detect HDR via ffprobe, retag metadata to BT.709 if needed.
+    # Retag only (no zscale/tonemap) — preserves pixel values, just fixes color metadata.
     _ct_probe = subprocess.run(
         [
-            FFPROBE_PATH, "-v", "error",
+            FFPROBE_PATH, "-v", "quiet",
             "-select_streams", "v:0",
             "-show_entries", "stream=color_transfer",
-            "-of", "default=noprint_wrappers=1:nokey=1",
+            "-of", "default=nw=1",
             str(trimmed),
         ],
         capture_output=True, text=True, timeout=20,
     )
-    _color_transfer = _ct_probe.stdout.strip().lower()
-    print(f"[HF] color_transfer={_color_transfer!r}", flush=True)
-    _is_hdr = any(t in _color_transfer for t in ("smpte2084", "arib-std-b67"))
+    _is_hdr = any(x in _ct_probe.stdout for x in ("smpte2084", "arib-std-b67", "bt2020"))
+    print(f"[HF] HDR detection: {_is_hdr} (color_transfer={_ct_probe.stdout.strip()!r})", flush=True)
 
     if _is_hdr:
-        print("[HF] HDR detected — tone-mapping to BT.709 (Hable)...", flush=True)
+        print("[HF] HDR metadata detected — retagging to BT.709...", flush=True)
         _hdr_stripped = work_dir / "trimmed_sdr.mp4"
         subprocess.run(
             [
                 FFMPEG_PATH, "-y", "-loglevel", "error",
                 "-i", str(trimmed),
                 "-c:v", "libx264", "-crf", "18",
-                "-vf", (
-                    "zscale=t=linear:npl=100,format=gbrpf32le,"
-                    "zscale=p=bt709,"
-                    "tonemap=tonemap=hable:desat=0,"
-                    "zscale=t=bt709:m=bt709:r=tv,"
-                    "format=yuv420p"
-                ),
+                "-vf", "format=yuv420p",
+                "-colorspace", "bt709",
+                "-color_trc", "bt709",
+                "-color_primaries", "bt709",
                 "-c:a", "copy",
                 str(_hdr_stripped),
             ],
@@ -1667,12 +1663,12 @@ def _render_hyperframes(
             timeout=300,
         )
         if _hdr_stripped.exists() and _hdr_stripped.stat().st_size > 0:
-            print("[HF] HDR→SDR tone-map done: trimmed_sdr.mp4 ready", flush=True)
+            print("[HF] BT.709 retag done: trimmed_sdr.mp4 ready", flush=True)
             trimmed = _hdr_stripped
         else:
-            print("[HF] HDR tone-map failed — continuing with original trimmed", flush=True)
+            print("[HF] BT.709 retag failed — continuing with original trimmed", flush=True)
     else:
-        print("[HF] SDR source — skipping tone-map", flush=True)
+        print("[HF] SDR source — skipping retag", flush=True)
 
     # Dump diagnostic data for coverage audit
     import json as _json
