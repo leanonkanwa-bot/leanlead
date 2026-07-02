@@ -1769,7 +1769,7 @@ def _render_hyperframes(
                         zf.write(f, f.relative_to(public_dir))
             zip_bytes = zip_buffer.getvalue()
             print(f"[HF] Zip size: {len(zip_bytes) // 1024} KB", flush=True)
-            render_fn = _modal.Function.lookup("leanlead-hyperframes", "render_hf")
+            render_fn = _modal.Function.from_name("leanlead-hyperframes", "render_hf")
             mp4_bytes = render_fn.remote(zip_bytes)
             output_path.write_bytes(mp4_bytes)
             print(f"[HF] Modal render done: {len(mp4_bytes) // 1024} KB", flush=True)
