@@ -1629,6 +1629,25 @@ def _render_hyperframes(
     print(f"[HF] Source intervals: {len(timing_map.source_intervals)}, compressed: {timing_map.compressed_intervals is not None}", flush=True)
     print(f"[TIMING] pretrim: {time.perf_counter()-_t_hf_start:.1f}s", flush=True)
 
+    # Strip HDR metadata so HyperFrames/Chrome receives a clean BT.709 stream.
+    # Done here (post-pretrim, pre-compose) so compose() and the CLI both see SDR.
+    _hdr_stripped = work_dir / "trimmed_sdr.mp4"
+    subprocess.run(
+        [
+            FFMPEG_PATH, "-y", "-loglevel", "error",
+            "-i", str(trimmed),
+            "-c:v", "libx264", "-crf", "18",
+            "-vf", "zscale=transfer=bt709:matrix=bt709:primaries=bt709,format=yuv420p",
+            "-c:a", "copy",
+            str(_hdr_stripped),
+        ],
+        capture_output=True,
+        timeout=300,
+    )
+    if _hdr_stripped.exists():
+        print("[HF] HDR strip: trimmed_sdr.mp4 ready", flush=True)
+        trimmed = _hdr_stripped
+
     # Dump diagnostic data for coverage audit
     import json as _json
     _diag = {
@@ -1759,7 +1778,6 @@ def _render_hyperframes(
                 "--workers", "1",
                 "--protocol-timeout", "600000",
                 "--low-memory-mode",
-                "--video-frame-format", "jpg",
                 "--debug",
                 "--tmp-dir", str(_hf_tmp),
             ],
