@@ -1757,22 +1757,29 @@ def _render_hyperframes(
     _modal_id = _os.environ.get("MODAL_TOKEN_ID")
     _modal_secret = _os.environ.get("MODAL_TOKEN_SECRET")
 
+    _modal_used = False
     if _modal_id and _modal_secret:
-        print("[HF] Stage 4: Rendering via Modal (A10G)...", flush=True)
-        import io as _io
-        import zipfile as _zipfile
-        from app.engine.modal_render import render_hf as _modal_render_hf
-        buf = _io.BytesIO()
-        with _zipfile.ZipFile(buf, "w", _zipfile.ZIP_DEFLATED) as zf:
-            for hf in public_dir.rglob("*"):
-                if hf.is_file():
-                    zf.write(hf, hf.relative_to(public_dir))
-        zip_bytes = buf.getvalue()
-        print(f"[HF] Modal: zipping {len(zip_bytes) // 1024} KB -> remote call", flush=True)
-        mp4_bytes = _modal_render_hf.remote(zip_bytes)
-        output_path.write_bytes(mp4_bytes)
-        print(f"[HF] Modal render complete: {len(mp4_bytes) // 1024} KB", flush=True)
-    else:
+        try:
+            import io as _io
+            import zipfile as _zipfile
+            import modal as _modal
+            print("[HF] Using Modal GPU render", flush=True)
+            zip_buffer = _io.BytesIO()
+            with _zipfile.ZipFile(zip_buffer, "w", _zipfile.ZIP_DEFLATED) as zf:
+                for f in public_dir.rglob("*"):
+                    if f.is_file():
+                        zf.write(f, f.relative_to(public_dir))
+            zip_bytes = zip_buffer.getvalue()
+            print(f"[HF] Zip size: {len(zip_bytes) // 1024} KB", flush=True)
+            render_fn = _modal.Function.lookup("leanlead-hyperframes", "render_hf")
+            mp4_bytes = render_fn.remote(zip_bytes)
+            output_path.write_bytes(mp4_bytes)
+            print(f"[HF] Modal render done: {len(mp4_bytes) // 1024} KB", flush=True)
+            _modal_used = True
+        except Exception as _modal_err:
+            print(f"[HF] Modal failed: {_modal_err}, falling back to local", flush=True)
+
+    if not _modal_used:
         import signal as _signal
         print("[HF] Stage 4: Rendering via HyperFrames CLI (local)...", flush=True)
         env = _os.environ.copy()
