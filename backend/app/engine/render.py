@@ -1859,10 +1859,11 @@ def render(
             print("[RENDER] Falling back to FFmpeg pipeline")
         finally:
             import shutil as _shutil
-            _hf_dir = work_dir / "hf_project"
-            if _hf_dir.exists():
-                _shutil.rmtree(_hf_dir, ignore_errors=True)
-                print(f"[HF] Cleaned up hf_project ({_hf_dir})", flush=True)
+            for _dir_name in ["hf_project", "hf_tmp"]:
+                _d = work_dir / _dir_name
+                if _d.exists():
+                    _shutil.rmtree(_d, ignore_errors=True)
+                    print(f"[HF] Cleaned up {_dir_name}", flush=True)
 
     # ── FFmpeg pipeline (default / fallback) ──────────────────────────
     _health_check(src)
