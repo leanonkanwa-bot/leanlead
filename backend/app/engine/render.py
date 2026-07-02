@@ -1645,17 +1645,14 @@ def _render_hyperframes(
     print(f"[HF] HDR detection: {_is_hdr} (color_transfer={_ct_probe.stdout.strip()!r})", flush=True)
 
     if _is_hdr:
-        print("[HF] HDR metadata detected — retagging to BT.709...", flush=True)
+        print("[HF] HDR detected — tone-mapping to BT.709 (Reinhard)...", flush=True)
         _hdr_stripped = work_dir / "trimmed_sdr.mp4"
-        subprocess.run(
+        _r = subprocess.run(
             [
                 FFMPEG_PATH, "-y", "-loglevel", "error",
                 "-i", str(trimmed),
+                "-vf", "zscale=transfer=bt709:matrix=bt709:primaries=bt709,tonemap=reinhard,format=yuv420p",
                 "-c:v", "libx264", "-crf", "18",
-                "-vf", "format=yuv420p",
-                "-colorspace", "bt709",
-                "-color_trc", "bt709",
-                "-color_primaries", "bt709",
                 "-c:a", "copy",
                 str(_hdr_stripped),
             ],
@@ -1663,12 +1660,32 @@ def _render_hyperframes(
             timeout=300,
         )
         if _hdr_stripped.exists() and _hdr_stripped.stat().st_size > 0:
-            print("[HF] BT.709 retag done: trimmed_sdr.mp4 ready", flush=True)
+            print("[HF] zscale+reinhard done: trimmed_sdr.mp4 ready", flush=True)
             trimmed = _hdr_stripped
         else:
-            print("[HF] BT.709 retag failed — continuing with original trimmed", flush=True)
+            print(f"[HF] zscale unavailable (rc={_r.returncode}) — falling back to metadata retag", flush=True)
+            _hdr_stripped.unlink(missing_ok=True)
+            subprocess.run(
+                [
+                    FFMPEG_PATH, "-y", "-loglevel", "error",
+                    "-i", str(trimmed),
+                    "-c:v", "copy", "-c:a", "copy",
+                    "-map_metadata", "0",
+                    "-colorspace", "bt709",
+                    "-color_trc", "bt709",
+                    "-color_primaries", "bt709",
+                    str(_hdr_stripped),
+                ],
+                capture_output=True,
+                timeout=300,
+            )
+            if _hdr_stripped.exists() and _hdr_stripped.stat().st_size > 0:
+                print("[HF] Metadata retag done: trimmed_sdr.mp4 ready", flush=True)
+                trimmed = _hdr_stripped
+            else:
+                print("[HF] Retag also failed — continuing with original trimmed", flush=True)
     else:
-        print("[HF] SDR source — skipping retag", flush=True)
+        print("[HF] SDR source — skipping HDR strip", flush=True)
 
     # Dump diagnostic data for coverage audit
     import json as _json
