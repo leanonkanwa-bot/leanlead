@@ -1864,6 +1864,11 @@ def render(
                 if _d.exists():
                     _shutil.rmtree(_d, ignore_errors=True)
                     print(f"[HF] Cleaned up {_dir_name}", flush=True)
+            for _f in ["trimmed.mp4", "trimmed_sdr.mp4", "trimmed_pretrim.mp4"]:
+                _fp = work_dir / _f
+                if _fp.exists():
+                    _fp.unlink()
+                    print(f"[HF] Cleaned up {_f}", flush=True)
 
     # ── FFmpeg pipeline (default / fallback) ──────────────────────────
     _health_check(src)
