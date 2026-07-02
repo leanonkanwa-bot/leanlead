@@ -1629,24 +1629,50 @@ def _render_hyperframes(
     print(f"[HF] Source intervals: {len(timing_map.source_intervals)}, compressed: {timing_map.compressed_intervals is not None}", flush=True)
     print(f"[TIMING] pretrim: {time.perf_counter()-_t_hf_start:.1f}s", flush=True)
 
-    # Strip HDR metadata so HyperFrames/Chrome receives a clean BT.709 stream.
-    # Done here (post-pretrim, pre-compose) so compose() and the CLI both see SDR.
-    _hdr_stripped = work_dir / "trimmed_sdr.mp4"
-    subprocess.run(
+    # Detect HDR and tone-map to BT.709 so HyperFrames/Chrome sees clean SDR.
+    # Only runs when ffprobe confirms smpte2084 (HDR10) or arib-std-b67 (HLG).
+    _ct_probe = subprocess.run(
         [
-            FFMPEG_PATH, "-y", "-loglevel", "error",
-            "-i", str(trimmed),
-            "-c:v", "libx264", "-crf", "18",
-            "-vf", "zscale=transfer=bt709:matrix=bt709:primaries=bt709,format=yuv420p",
-            "-c:a", "copy",
-            str(_hdr_stripped),
+            FFPROBE_PATH, "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=color_transfer",
+            "-of", "default=noprint_wrappers=1:nokey=1",
+            str(trimmed),
         ],
-        capture_output=True,
-        timeout=300,
+        capture_output=True, text=True, timeout=20,
     )
-    if _hdr_stripped.exists() and _hdr_stripped.stat().st_size > 0:
-        print("[HF] HDR strip: trimmed_sdr.mp4 ready", flush=True)
-        trimmed = _hdr_stripped
+    _color_transfer = _ct_probe.stdout.strip().lower()
+    print(f"[HF] color_transfer={_color_transfer!r}", flush=True)
+    _is_hdr = any(t in _color_transfer for t in ("smpte2084", "arib-std-b67"))
+
+    if _is_hdr:
+        print("[HF] HDR detected — tone-mapping to BT.709 (Hable)...", flush=True)
+        _hdr_stripped = work_dir / "trimmed_sdr.mp4"
+        subprocess.run(
+            [
+                FFMPEG_PATH, "-y", "-loglevel", "error",
+                "-i", str(trimmed),
+                "-c:v", "libx264", "-crf", "18",
+                "-vf", (
+                    "zscale=t=linear:npl=100,format=gbrpf32le,"
+                    "zscale=p=bt709,"
+                    "tonemap=tonemap=hable:desat=0,"
+                    "zscale=t=bt709:m=bt709:r=tv,"
+                    "format=yuv420p"
+                ),
+                "-c:a", "copy",
+                str(_hdr_stripped),
+            ],
+            capture_output=True,
+            timeout=300,
+        )
+        if _hdr_stripped.exists() and _hdr_stripped.stat().st_size > 0:
+            print("[HF] HDR→SDR tone-map done: trimmed_sdr.mp4 ready", flush=True)
+            trimmed = _hdr_stripped
+        else:
+            print("[HF] HDR tone-map failed — continuing with original trimmed", flush=True)
+    else:
+        print("[HF] SDR source — skipping tone-map", flush=True)
 
     # Dump diagnostic data for coverage audit
     import json as _json
