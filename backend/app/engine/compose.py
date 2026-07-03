@@ -846,7 +846,11 @@ def _build_timeline_js(
         lines.append("")
 
     for card in cards:
-        card_id = _esc_js(str(card.get("id", f"unknown-{id(card)}")))
+        card_id = _esc_js(str(card.get("id", "")))
+        if not card_id:
+            # Card has no id — all GSAP selectors would be empty/invalid; skip it.
+            print(f"[COMPOSE] WARNING: skipping card with missing id in timeline JS (startSec={card.get('startSec')})", flush=True)
+            continue
         start = round(float(card.get("startSec", 0)), 3)
         end = round(float(card.get("endSec", start + 3)), 3)
         dur = round(end - start, 3)
@@ -1584,8 +1588,10 @@ def _build_timeline_js(
         for c in cards if c.get("type") != "caption"
     ]
     caption_ids = [
-        _esc_js(str(c.get("id", "")))
+        _esc_js(str(cid))
         for c in cards if c.get("type") == "caption"
+        for cid in [c.get("id", "")]
+        if cid  # skip captions with missing/empty id — sel would be invalid
     ]
     if graphic_windows and caption_ids:
         lines.append("  // ── Caption suppression during graphic cards ──")
@@ -1756,14 +1762,16 @@ def compose(
 
     graphic_cards = _clamp_overlaps(graphic_cards, "graphic")
     caption_cards = _clamp_overlaps(caption_cards, "caption")
+    # Single source of truth: all_cards feeds BOTH _build_card_host and
+    # _build_timeline_js so HTML attributes and GSAP animations are always in sync.
     all_cards = graphic_cards + caption_cards
 
-    # Build card host divs
+    # Build card host divs — iterate all_cards (not graphic/caption separately)
+    # so there is exactly one list reference shared with _build_timeline_js below.
     card_hosts = []
-    for c in graphic_cards:
-        card_hosts.append(_build_card_host(c, layout, track_index=2, pack=pack))
-    for c in caption_cards:
-        card_hosts.append(_build_card_host(c, layout, track_index=3, pack=pack))
+    for c in all_cards:
+        track = 3 if c.get("type") == "caption" else 2
+        card_hosts.append(_build_card_host(c, layout, track_index=track, pack=pack))
 
     # Build master timeline
     timeline_js = _build_timeline_js(all_cards, zoom_entries=zoom_entries, subject_position=subject_position, pack=pack)
