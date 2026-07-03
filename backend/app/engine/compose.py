@@ -844,9 +844,9 @@ def _build_timeline_js(
 
     for card in cards:
         card_id = _esc_js(str(card.get("id", f"unknown-{id(card)}")))
-        start = float(card.get("startSec", 0))
-        end = float(card.get("endSec", start + 3))
-        dur = end - start
+        start = round(float(card.get("startSec", 0)), 3)
+        end = round(float(card.get("endSec", start + 3)), 3)
+        dur = round(end - start, 3)
         sel = f'.card-host[data-card-id="{card_id}"]'
 
         is_caption = card.get("type") == "caption"
@@ -1574,7 +1574,7 @@ def _build_timeline_js(
 
     # Caption suppression: fade captions out while graphic cards are visible
     graphic_windows = [
-        (float(c.get("startSec", 0)), float(c.get("endSec", 0)))
+        (round(float(c.get("startSec", 0)), 3), round(float(c.get("endSec", 0)), 3))
         for c in cards if c.get("type") != "caption"
     ]
     caption_ids = [
