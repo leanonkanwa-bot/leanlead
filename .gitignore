@@ -13,4 +13,6 @@ analysis/
 !editor_frontend/previews/*.mp4
 __pycache__/
 backend/.env
+storage/
+backend/replicate/
 # trigger
