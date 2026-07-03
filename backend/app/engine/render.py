@@ -1800,8 +1800,15 @@ def _render_hyperframes(
             return None
 
         _mem_gb = _cgroup_mem_gb() or 8.0
-        _n_workers = min(24, max(4, int(_mem_gb / 1.5)))
-        print(f"[HF] workers: {_n_workers} (cgroup {_mem_gb:.1f} GB / 1.5 GB per worker)", flush=True)
+        _mem_workers = int(_mem_gb / 1.0)
+        _cpu_count = _os.cpu_count() or 8
+        _cpu_workers = max(4, _cpu_count - 2)
+        _n_workers = min(24, max(4, min(_mem_workers, _cpu_workers)))
+        print(
+            f"[HF] workers: {_n_workers} "
+            f"(mem {_mem_gb:.1f}GB→{_mem_workers}, cpu {_cpu_count}→{_cpu_workers}, cap 24)",
+            flush=True,
+        )
 
         env["PRODUCER_MAX_WORKERS"] = str(_n_workers)
         env["PRODUCER_MIN_PARALLEL_FRAMES"] = "60"
