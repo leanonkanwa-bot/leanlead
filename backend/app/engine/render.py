@@ -1879,6 +1879,7 @@ def _render_hyperframes(
         "broll_pauses": 0,
         "graphics_rendered": ["hyperframes"],
         "vignette_moments": 0,
+        "engine_used": "hyperframes",
         **upscale_info,
     }
 
@@ -1919,8 +1920,11 @@ def render(
             )
         except Exception as _hf_err:
             import traceback as _tb
-            print(f"[RENDER] HyperFrames pipeline failed: {_hf_err}")
-            print(f"[RENDER] Traceback:\n{_tb.format_exc()}")
+            print("\n" + "=" * 60, flush=True)
+            print("[HF] !!! HYPERFRAMES RENDER FAILED !!!", flush=True)
+            print(f"[HF] Error: {_hf_err}", flush=True)
+            print(f"[HF] Traceback:\n{_tb.format_exc()}", flush=True)
+            print("=" * 60 + "\n", flush=True)
             _kill_orphan_chrome()
             raise RuntimeError(
                 "Le rendu HyperFrames a échoué. "
