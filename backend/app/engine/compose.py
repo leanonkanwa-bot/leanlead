@@ -57,7 +57,8 @@ def _build_card_host(card: dict, layout: str, track_index: int, pack: dict | Non
     """Build a card-host div with correct classes, data attributes, and inline bounds."""
     card_id = card["id"]
     start = round(float(card.get("startSec", 0)), 3)
-    duration = round(float(card.get("endSec", start + 3)) - start, 3)
+    _end_raw = float(card.get("endSec", start + 3))
+    duration = round(_end_raw - start, 3)
     zone = card.get("zone", "lower-third")
 
     is_caption = card.get("type") == "caption"
@@ -74,7 +75,7 @@ def _build_card_host(card: dict, layout: str, track_index: int, pack: dict | Non
 
     return (
         f'<div class="card-host clip" data-card-id="{card_id}" '
-        f'data-start="{start:.4f}" data-duration="{duration:.4f}" '
+        f'data-start="{start:.3f}" data-duration="{duration:.3f}" '
         f'data-track-index="{track_index}" '
         f'style="left:{bounds["left"]}px;top:{bounds["top"]}px;'
         f'width:{bounds["width"]}px;height:{bounds["height"]}px;'
