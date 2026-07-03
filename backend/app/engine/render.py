@@ -1629,6 +1629,47 @@ def _render_hyperframes(
     print(f"[HF] Source intervals: {len(timing_map.source_intervals)}, compressed: {timing_map.compressed_intervals is not None}", flush=True)
     print(f"[TIMING] pretrim: {time.perf_counter()-_t_hf_start:.1f}s", flush=True)
 
+    # HDR detection and conversion (Mobius tone-map, npl=203)
+    _ct_probe = subprocess.run(
+        [
+            FFPROBE_PATH, "-v", "quiet",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=color_transfer",
+            "-of", "default=nw=1",
+            str(trimmed),
+        ],
+        capture_output=True, text=True, timeout=30,
+    )
+    _is_hdr = any(x in _ct_probe.stdout for x in ("smpte2084", "arib-std-b67", "bt2020"))
+    print(f"[HF] HDR detection: {_is_hdr} (color_transfer={_ct_probe.stdout.strip()!r})", flush=True)
+
+    if _is_hdr:
+        print("[HF] HDR detected — converting to SDR (Mobius npl=203)...", flush=True)
+        _hdr_stripped = work_dir / "trimmed_sdr.mp4"
+        subprocess.run(
+            [
+                FFMPEG_PATH, "-y", "-loglevel", "error",
+                "-i", str(trimmed),
+                "-vf", (
+                    "zscale=t=linear:npl=203,format=gbrpf32le,"
+                    "zscale=p=bt709,"
+                    "tonemap=mobius:desat=0,"
+                    "zscale=t=bt709:m=bt709:r=tv,"
+                    "format=yuv420p"
+                ),
+                "-c:v", "libx264", "-crf", "18",
+                "-c:a", "copy",
+                str(_hdr_stripped),
+            ],
+            capture_output=True, timeout=300,
+        )
+        if _hdr_stripped.exists() and _hdr_stripped.stat().st_size > 0:
+            trimmed = _hdr_stripped
+            print("[HF] HDR→SDR conversion done", flush=True)
+        else:
+            print("[HF] HDR conversion failed — continuing with original trimmed", flush=True)
+    else:
+        print("[HF] SDR source — skipping HDR conversion", flush=True)
 
     # Dump diagnostic data for coverage audit
     import json as _json
