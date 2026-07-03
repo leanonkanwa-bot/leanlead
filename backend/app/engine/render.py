@@ -1855,7 +1855,10 @@ def render(
             print(f"[RENDER] HyperFrames pipeline failed: {_hf_err}")
             print(f"[RENDER] Traceback:\n{_tb.format_exc()}")
             _kill_orphan_chrome()
-            print("[RENDER] Falling back to FFmpeg pipeline")
+            raise RuntimeError(
+                "Le rendu HyperFrames a échoué. "
+                "Veuillez réessayer."
+            ) from _hf_err
         finally:
             import shutil as _shutil
             for _dir_name in ["hf_project", "hf_tmp"]:
