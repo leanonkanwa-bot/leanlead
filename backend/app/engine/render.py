@@ -1783,7 +1783,23 @@ def _render_hyperframes(
         print("[HF] Stage 4: Rendering via HyperFrames CLI (local)...", flush=True)
         env = _os.environ.copy()
         env["DISPLAY"] = env.get("DISPLAY", ":99")
-        env["PRODUCER_MAX_WORKERS"] = "24"
+
+        def _cgroup_mem_gb() -> float | None:
+            for _p in ["/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"]:
+                try:
+                    _v = Path(_p).read_text().strip()
+                    if _v == "max":
+                        return None
+                    return int(_v) / (1024 ** 3)
+                except (FileNotFoundError, ValueError):
+                    continue
+            return None
+
+        _mem_gb = _cgroup_mem_gb() or 8.0
+        _n_workers = min(24, max(4, int(_mem_gb / 1.5)))
+        print(f"[HF] workers: {_n_workers} (cgroup {_mem_gb:.1f} GB / 1.5 GB per worker)", flush=True)
+
+        env["PRODUCER_MAX_WORKERS"] = str(_n_workers)
         env["PRODUCER_MIN_PARALLEL_FRAMES"] = "60"
 
         _shell_candidates = sorted(
@@ -1817,7 +1833,7 @@ def _render_hyperframes(
                 "-o", str(output_path),
                 "--fps", str(fps),
                 "--quality", "standard",
-                "--workers", "24",
+                "--workers", str(_n_workers),
                 "--protocol-timeout", "600000",
                 "--debug",
                 "--video-frame-format", "jpg",

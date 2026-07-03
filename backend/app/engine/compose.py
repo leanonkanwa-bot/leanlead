@@ -1713,6 +1713,51 @@ def compose(
     graphic_cards = [c for c in all_cards if c.get("type") != "caption"]
     caption_cards = [c for c in all_cards if c.get("type") == "caption"]
 
+    # Guard against overlapping clips on the same HyperFrames track.
+    # Must run before _build_card_host AND _build_timeline_js so both
+    # consume the clamped endSec (HTML attributes + GSAP exit keyframes).
+    def _clamp_overlaps(cards: list, track_name: str) -> list:
+        cards = sorted(cards, key=lambda c: float(c.get("startSec", 0)))
+        kept: list = []
+        for card in cards:
+            start = float(card.get("startSec", 0))
+            end   = float(card.get("endSec", start + 1))
+            if kept:
+                prev_end = float(kept[-1].get("endSec", 0))
+                if end <= start or start < prev_end:
+                    if start <= float(kept[-1].get("startSec", 0)) or end <= start:
+                        # Fully contained or zero-duration — drop it
+                        print(
+                            f"[COMPOSE] WARNING: {track_name} card dropped (fully overlapped): "
+                            f"id={card.get('id', '?')} [{start:.3f}s–{end:.3f}s] inside prev end {prev_end:.3f}s",
+                            flush=True,
+                        )
+                        continue
+                    # Partial overlap — clamp previous card's endSec
+                    clamped = start - 0.001
+                    if clamped <= float(kept[-1].get("startSec", 0)):
+                        # Clamp would make previous card zero/negative — drop it instead
+                        dropped = kept.pop()
+                        print(
+                            f"[COMPOSE] WARNING: {track_name} card dropped (fully overlapped after clamp): "
+                            f"id={dropped.get('id', '?')} [{float(dropped.get('startSec',0)):.3f}s–{float(dropped.get('endSec',0)):.3f}s]",
+                            flush=True,
+                        )
+                    else:
+                        print(
+                            f"[COMPOSE] WARNING: {track_name} overlap — card[{kept[-1].get('id','?')}].endSec "
+                            f"clamped {float(kept[-1].get('endSec',0)):.3f}→{clamped:.3f} "
+                            f"(next card starts at {start:.3f})",
+                            flush=True,
+                        )
+                        kept[-1]["endSec"] = clamped
+            kept.append(card)
+        return kept
+
+    graphic_cards = _clamp_overlaps(graphic_cards, "graphic")
+    caption_cards = _clamp_overlaps(caption_cards, "caption")
+    all_cards = graphic_cards + caption_cards
+
     # Build card host divs
     card_hosts = []
     for c in graphic_cards:
