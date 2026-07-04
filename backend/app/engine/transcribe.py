@@ -52,6 +52,10 @@ else:
     FFPROBE_PATH: str = shutil.which("ffprobe") or "ffprobe"
 
 
+class AudioMissingError(RuntimeError):
+    """Raised when the input video has no audio stream."""
+
+
 _model = None
 
 
@@ -167,12 +171,36 @@ class Transcript:
         }
 
 
+def _has_audio_stream(video_path: Path) -> bool:
+    """Return True iff the video contains at least one audio stream."""
+    try:
+        result = subprocess.run(
+            [
+                FFPROBE_PATH, "-v", "error",
+                "-select_streams", "a:0",
+                "-show_entries", "stream=codec_type",
+                "-of", "csv=p=0",
+                str(video_path),
+            ],
+            capture_output=True, text=True, timeout=15,
+        )
+        return bool(result.stdout.strip())
+    except Exception:
+        return True  # fail-open: let _extract_audio_wav surface the real error
+
+
 def transcribe(video_path: Path) -> Transcript:
     # Use a deterministic path in the project work_dir rather than the system
     # temp directory.  On Windows, NamedTemporaryFile keeps the file handle
     # open while the context manager is active, so ffmpeg gets "Permission
     # denied" when it tries to write to the same path.  Writing to work_dir
     # and cleaning up with try/finally avoids the lock entirely.
+    if not _has_audio_stream(video_path):
+        raise AudioMissingError(
+            "Cette vidéo ne contient pas de piste audio. "
+            "Veuillez fournir une vidéo avec une piste audio pour continuer."
+        )
+
     wav_path = settings.work_dir / f"{video_path.stem}_audio.wav"
     try:
         _extract_audio_wav(video_path, wav_path)

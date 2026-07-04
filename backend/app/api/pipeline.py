@@ -25,7 +25,7 @@ from app.engine.render import render
 from app.engine.silence_remover import RhythmAwareSilenceRemover, apply_drops_to_transcript
 from app.engine.speaker_detector import SpeakerDetector
 from app.engine.template_engine import apply_template, get_template
-from app.engine.transcribe import transcribe, unload_model
+from app.engine.transcribe import AudioMissingError, transcribe, unload_model
 
 # Purge work_dirs older than 2 days at module load (i.e. server startup).
 def _purge_old_work_dirs() -> None:
@@ -389,6 +389,13 @@ def run_job(
             ),
         )
 
+    except AudioMissingError as e:
+        store.update(
+            job_id,
+            status="error",
+            error=str(e),
+            message=str(e),
+        )
     except Exception as e:
         store.update(
             job_id,

@@ -73,6 +73,7 @@ def _pretrim_passthrough(
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(src),
+        "-r", str(fps), "-vsync", "cfr",
         "-c:v", "libx264", "-preset", "fast", "-crf", "18",
         "-g", str(fps), "-keyint_min", str(fps),
         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
@@ -264,6 +265,7 @@ def pretrim(
     _run([
         FFMPEG_PATH, "-y", "-loglevel", "error",
         "-i", str(output_path),
+        "-r", str(fps), "-vsync", "cfr",
         "-c:v", "libx264", "-preset", "fast", "-crf", "18",
         "-g", str(fps), "-keyint_min", str(fps),
         "-pix_fmt", "yuv420p",
