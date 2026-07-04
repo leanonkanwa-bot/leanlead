@@ -56,13 +56,12 @@ def _zone_bounds(zone: str, layout: str) -> dict:
     return table.get(zone, table["lower-third"])
 
 
-# Types that coexist with a visible speaker — must not sit center-frame.
-# Claude assigns these fullscreen/video-overlay; we remap them to a side panel.
-_FACE_SAFE_TYPES = {
-    "question", "dialogue", "carousel", "definition",
-    "key_phrase", "quote", "attributed_quote",
-}
+# Data cards are remapped to a side panel when Claude places them in a center zone.
+# Hero cards (key_phrase, quote, question, definition, etc.) remain in Claude's
+# chosen zone — they carry the visual message and need the full canvas.
+_DATA_PANEL_TYPES = {"stat", "list", "comparison", "checklist", "score", "trend"}
 _CENTER_ZONES = {"fullscreen", "video-overlay"}
+_SIDE_PANEL_ZONES = {"side-panel", "side-panel-left", "side-panel-right", "side-panel-top"}
 
 
 def _build_card_host(card: dict, layout: str, track_index: int, pack: dict | None = None) -> str:
@@ -86,7 +85,8 @@ def _build_card_host(card: dict, layout: str, track_index: int, pack: dict | Non
     if is_caption:
         inner = _build_caption_card_html(card, pack=pack)
     else:
-        inner = _build_graphic_card_html(card, pack=pack)
+        compact = zone in _SIDE_PANEL_ZONES
+        inner = _build_graphic_card_html(card, pack=pack, compact=compact)
 
     return (
         f'<div class="card-host clip" data-card-id="{card_id}" '
@@ -319,7 +319,7 @@ _FILM_GRAIN_SVG = (
 )
 
 
-def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
+def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool = False) -> str:
     """Build inner HTML for a graphic overlay card using the given style pack."""
     card_id = card["id"]
     hints = card.get("contentHints", {})
@@ -329,8 +329,37 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
     number = hints.get("number", "")
     p = pack or _LEAN_GLASS
 
+    # Compact variant for side-panel zones — scale typography and tighten padding so
+    # content fits the 806px-wide container without awkward wrapping or overflow.
+    if compact:
+        def _s(px_str: str, f: float) -> str:
+            return f"{int(float(px_str.replace('px', '')) * f)}px"
+        title_size_eff  = _s(p["title_size"],  0.65)
+        number_size_eff = _s(p["number_size"], 0.67)
+        detail_size_eff = "20px"
+        kicker_size_eff = "16px"
+        list_item_size  = "18px"
+        chk_item_size   = "17px"
+        panel_padding   = "28px 32px"
+        root_padding    = "32px"
+        text_align      = "left"
+        panel_align     = "flex-start"
+        max_width_eff   = "92%"
+    else:
+        title_size_eff  = p["title_size"]
+        number_size_eff = p["number_size"]
+        detail_size_eff = p["detail_size"]
+        kicker_size_eff = p["kicker_size"]
+        list_item_size  = "28px"
+        chk_item_size   = "26px"
+        panel_padding   = "44px 52px"
+        root_padding    = "48px"
+        text_align      = "center"
+        panel_align     = "center"
+        max_width_eff   = "85%"
+
     display_text = number if number else title
-    title_size = p["number_size"] if number else p["title_size"]
+    title_size   = number_size_eff if number else title_size_eff
 
     shadow_val = f'{p["shadow"]}, {p["shadow_inset"]}' if p["shadow_inset"] else p["shadow"]
     parts = [f'<div class="card" data-card-id="{card_id}">']
@@ -338,15 +367,15 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
     parts.append(f'.card[data-card-id="{card_id}"] .root {{')
     parts.append('  width: 100%; height: 100%; display: flex; flex-direction: column;')
     parts.append('  justify-content: center; align-items: center;')
-    parts.append('  padding: 48px; gap: 16px;')
+    parts.append(f'  padding: {root_padding}; gap: 16px;')
     parts.append('}')
     parts.append(f'.card[data-card-id="{card_id}"] .card-panel {{')
     parts.append(f'  background: {p["bg"]};')
     parts.append(f'  border-radius: {p["radius"]};')
     parts.append(f'  border: {p["border"]};')
-    parts.append(f'  padding: 44px 52px;')
-    parts.append(f'  display: flex; flex-direction: column; align-items: center;')
-    parts.append(f'  gap: 14px; max-width: 85%; position: relative;')
+    parts.append(f'  padding: {panel_padding};')
+    parts.append(f'  display: flex; flex-direction: column; align-items: {panel_align};')
+    parts.append(f'  gap: 14px; max-width: {max_width_eff}; position: relative;')
     parts.append(f'  box-shadow: {shadow_val};')
     parts.append('}')
     if p["has_grain"]:
@@ -360,14 +389,14 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append('}')
     if kicker:
         parts.append(f'.card[data-card-id="{card_id}"] .kicker {{')
-        parts.append(f'  font-family: {p["font"]}; font-size: {p["kicker_size"]};')
+        parts.append(f'  font-family: {p["font"]}; font-size: {kicker_size_eff};')
         parts.append(f'  font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;')
         parts.append(f'  color: {p["accent"]};')
         parts.append('}')
     glow_css = f'  text-shadow: {p["title_glow"]};' if p["title_glow"] else ''
     parts.append(f'.card[data-card-id="{card_id}"] .title {{')
     parts.append(f'  font-family: {p["font"]}; font-size: {title_size};')
-    parts.append(f'  font-weight: {p["font_weight"]}; line-height: 1.15; text-align: center;')
+    parts.append(f'  font-weight: {p["font_weight"]}; line-height: 1.15; text-align: {text_align};')
     parts.append(f'  color: {p["text"]}; max-width: 100%;')
     if glow_css:
         parts.append(glow_css)
@@ -376,8 +405,8 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
     detail_font = p.get("font_detail", p["font"])
     if detail:
         parts.append(f'.card[data-card-id="{card_id}"] .detail {{')
-        parts.append(f'  font-family: {detail_font}; font-size: {p["detail_size"]};')
-        parts.append(f'  font-weight: 400; text-align: center;')
+        parts.append(f'  font-family: {detail_font}; font-size: {detail_size_eff};')
+        parts.append(f'  font-weight: 400; text-align: {text_align};')
         parts.append(f'  color: {p["text_secondary"]}; max-width: 90%;')
         parts.append('}')
     parts.append(f'.card[data-card-id="{card_id}"] .accent-line {{')
@@ -401,7 +430,10 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         lv = hints.get("left_value", "")
         rv = hints.get("right_value", "")
         max_val_len = max(len(str(lv)), len(str(rv)))
-        val_size = "36px" if max_val_len > 15 else "48px" if max_val_len > 8 else p["title_size"]
+        if compact:
+            val_size = "23px" if max_val_len > 15 else "31px" if max_val_len > 8 else title_size_eff
+        else:
+            val_size = "36px" if max_val_len > 15 else "48px" if max_val_len > 8 else title_size_eff
         parts.append(f'.card[data-card-id="{card_id}"] .cmp-row {{')
         parts.append(f'  display: flex; gap: 24px; align-items: flex-start; width: 100%;')
         parts.append('}')
@@ -409,7 +441,7 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append(f'  flex: 1; text-align: center; min-width: 0; overflow-wrap: break-word;')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .cmp-label {{')
-        parts.append(f'  font-family: {p["font"]}; font-size: {p["kicker_size"]};')
+        parts.append(f'  font-family: {p["font"]}; font-size: {kicker_size_eff};')
         parts.append(f'  font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;')
         parts.append(f'  color: {p["text_secondary"]}; margin-bottom: 8px;')
         parts.append('}')
@@ -500,7 +532,7 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
                     parts.append(f'  box-shadow: 0 0 20px {p["accent"]}15;')
                 parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .dlg-speaker {{')
-        parts.append(f'  font-size: {p["kicker_size"]}; font-weight: 700;')
+        parts.append(f'  font-size: {kicker_size_eff}; font-weight: 700;')
         parts.append(f'  color: {p["accent"]}; margin-bottom: 4px;')
         parts.append('}')
     # Trend: simple SVG line
@@ -509,7 +541,7 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append(f'  position: relative; width: 100%; height: 120px;')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .trend-label {{')
-        parts.append(f'  font-family: {p["font"]}; font-size: {p["title_size"]};')
+        parts.append(f'  font-family: {p["font"]}; font-size: {title_size_eff};')
         parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
         parts.append(f'  text-align: center; margin-bottom: 12px;')
         parts.append('}')
@@ -527,7 +559,7 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .list-item {{')
         parts.append(f'  display: flex; align-items: center; gap: 14px;')
-        parts.append(f'  font-family: {p["font"]}; font-size: 28px;')
+        parts.append(f'  font-family: {p["font"]}; font-size: {list_item_size};')
         parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .list-bullet {{')
@@ -548,13 +580,13 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
     # Definition: term + explanation
     if content_style == "definition":
         parts.append(f'.card[data-card-id="{card_id}"] .def-term {{')
-        parts.append(f'  font-family: {p["font"]}; font-size: {p["title_size"]};')
+        parts.append(f'  font-family: {p["font"]}; font-size: {title_size_eff};')
         parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
         if p["title_glow"]:
             parts.append(f'  text-shadow: {p["title_glow"]};')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .def-text {{')
-        parts.append(f'  font-family: {p["font"]}; font-size: {p["detail_size"]};')
+        parts.append(f'  font-family: {p["font"]}; font-size: {detail_size_eff};')
         parts.append(f'  font-weight: 400; color: {p["text_secondary"]};')
         parts.append(f'  margin-top: 12px; text-align: center; max-width: 90%;')
         parts.append(f'  line-height: 1.5;')
@@ -566,7 +598,7 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .chk-item {{')
         parts.append(f'  display: flex; align-items: center; gap: 14px;')
-        parts.append(f'  font-family: {p["font"]}; font-size: 26px;')
+        parts.append(f'  font-family: {p["font"]}; font-size: {chk_item_size};')
         parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .chk-mark {{')
@@ -579,14 +611,14 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None) -> str:
     # Score: large impact score
     if content_style == "score":
         parts.append(f'.card[data-card-id="{card_id}"] .score-display {{')
-        parts.append(f'  font-family: {p["font"]}; font-size: {p["number_size"]};')
+        parts.append(f'  font-family: {p["font"]}; font-size: {number_size_eff};')
         parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
         parts.append(f'  text-align: center; font-variant-numeric: tabular-nums;')
         if p["title_glow"]:
             parts.append(f'  text-shadow: {p["title_glow"]};')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .score-label {{')
-        parts.append(f'  font-family: {p["font"]}; font-size: {p["detail_size"]};')
+        parts.append(f'  font-family: {p["font"]}; font-size: {detail_size_eff};')
         parts.append(f'  color: {p["text_secondary"]}; margin-top: 8px; text-align: center;')
         parts.append('}')
     # Mindmap: center + branches
@@ -913,13 +945,12 @@ def _build_timeline_js(
                     f'{start:.4f});'
                 )
 
-            # Dimmed backdrop for center-zone cards conflicting with speaker.
+            # Premium backdrop dim: every center-zone card darkens the video behind it.
             # Uses a separate overlay div (not CSS filter) — filter: brightness()
             # is not composited by SwiftShader on Railway.
             card_zone = card.get("zone", "")
             center_zone = card_zone in ("fullscreen", "video-overlay")
-            face_centered = has_face_data and 30.0 <= face_cx <= 70.0
-            if center_zone and face_centered:
+            if center_zone:
                 lines.append(
                     f'  tl.to("#backdrop-dim", '
                     f'{{ opacity: 1, duration: 0.30, ease: _eIn }}, {start:.4f});'
@@ -1536,10 +1567,11 @@ def _build_timeline_js(
                     f'{{ opacity: 1, y: 0, duration: 0.250, ease: _eIn }}, '
                     f'{start + 0.10:.4f});'
                 )
+            _line_w = 80 if card.get("zone", "") in _SIDE_PANEL_ZONES else 120
             lines.append(
                 f'  tl.fromTo(\'{line_sel}\', '
                 f'{{ width: 0 }}, '
-                f'{{ width: 120, duration: 0.400, ease: _eIn }}, '
+                f'{{ width: {_line_w}, duration: 0.400, ease: _eIn }}, '
                 f'{t_in + 0.30:.4f});'
             )
             # Breathing underline — half speed for question cards
@@ -1747,7 +1779,7 @@ def compose(
     def _remap_zone(card: dict) -> dict:
         style = card.get("contentHints", {}).get("style", "")
         zone = card.get("zone", "video-overlay")
-        if style not in _FACE_SAFE_TYPES or zone not in _CENTER_ZONES:
+        if style not in _DATA_PANEL_TYPES or zone not in _CENTER_ZONES:
             return card
         if layout == "landscape":
             new_zone = "side-panel-left" if _face_cx > 50.0 else "side-panel-right"
