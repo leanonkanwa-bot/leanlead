@@ -1642,7 +1642,6 @@ def _render_hyperframes(
     from app.engine.pretrim import pretrim
     from app.engine.storyboard import generate_storyboard
     from app.engine.compose import compose
-    from app.engine.hyperframes_engine import _render_with_hyperframes_cli
 
     _health_check(src)
     print("[RENDER] Using HyperFrames pipeline", flush=True)
@@ -1894,7 +1893,7 @@ def _render_hyperframes(
                 "--workers", str(_n_workers),
                 "--protocol-timeout", "120000",
                 "--debug",
-                "--video-frame-format", "jpg",
+                "--video-frame-format", "png",
                 "--tmp-dir", str(_hf_tmp),
             ],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
