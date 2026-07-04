@@ -884,7 +884,7 @@ def _build_timeline_js(
                 f'  tl.fromTo("#video-wrap", '
                 f'{{ scale: {zfrom:.4f} }}, '
                 f'{{ scale: {zto:.4f}, duration: {zdur:.4f}, ease: {ease}, '
-                f'transformOrigin: "{transform_origin}" }}, '
+                f'transformOrigin: "{transform_origin}", overwrite: "auto" }}, '
                 f'{zs:.4f});'
             )
         lines.append("")
@@ -959,6 +959,28 @@ def _build_timeline_js(
                     f'  tl.to("#backdrop-dim", '
                     f'{{ opacity: 0, duration: 0.18, ease: _eOut }}, {end - 0.18:.4f});'
                 )
+                # Punch-in: micro-zoom on video entry for hero cards.
+                # Guard: skip if a zoom_entry already animates #video-wrap
+                # in the 0.8s window — two tweens on the same property
+                # at the same time cause the overlapping_gsap_tweens warning.
+                _punch_end = start + 0.8
+                _has_zoom_conflict = any(
+                    float(ze.get("start", 0)) < _punch_end
+                    and float(ze.get("end", float(ze.get("start", 0)))) > start
+                    for ze in (zoom_entries or [])
+                )
+                if not _has_zoom_conflict:
+                    lines.append(
+                        f'  tl.to("#video-wrap", '
+                        f'{{ scale: 1.03, duration: 0.40, ease: "power2.in", '
+                        f'overwrite: "auto", transformOrigin: "{transform_origin}" }}, '
+                        f'{start:.4f});'
+                    )
+                    lines.append(
+                        f'  tl.to("#video-wrap", '
+                        f'{{ scale: 1.00, duration: 0.40, ease: "power2.out" }}, '
+                        f'{start + 0.40:.4f});'
+                    )
 
             content_style = card.get("contentHints", {}).get("style", "key_phrase")
             title_sel = f'.card[data-card-id="{card_id}"] #{card_id}-title'
