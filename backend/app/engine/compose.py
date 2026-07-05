@@ -1091,7 +1091,43 @@ def _build_timeline_js(
                 f'{{ opacity: 1, duration: {ent_dur:.3f}, ease: _eIn }}, '
                 f'{start:.4f});'
             )
-            if not is_cinema:
+            # Per-pack panel entry (the card-panel slides/scales into view)
+            if is_cinema:
+                pass  # cinema: slow opacity only, no panel movement
+            elif is_ledger:
+                # Scan down: clip from top (matches ledger's terminal aesthetic)
+                lines.append(
+                    f'  tl.fromTo(\'{panel_sel}\', '
+                    f'{{ clipPath: "inset(100% 0 0% 0)" }}, '
+                    f'{{ clipPath: "inset(0% 0 0% 0)", duration: 0.350, ease: _eIn }}, '
+                    f'{start:.4f});'
+                )
+            elif is_vibe:
+                # Bouncy: more scale, more y, slight tilt
+                lines.append(
+                    f'  tl.fromTo(\'{panel_sel}\', '
+                    f'{{ scale: 1.08, y: 20, rotation: -1.5 }}, '
+                    f'{{ scale: 1, y: 0, rotation: 0, duration: 0.400, ease: _eIn }}, '
+                    f'{start:.4f});'
+                )
+            elif is_craft:
+                # Handwritten tilt: slight rotation on entry
+                lines.append(
+                    f'  tl.fromTo(\'{panel_sel}\', '
+                    f'{{ scale: 1.05, y: 10, rotation: 1 }}, '
+                    f'{{ scale: 1, y: 0, rotation: 0, duration: 0.450, ease: _eIn }}, '
+                    f'{start:.4f});'
+                )
+            elif is_paper:
+                # Minimal: barely perceptible scale (clean aesthetic)
+                lines.append(
+                    f'  tl.fromTo(\'{panel_sel}\', '
+                    f'{{ scale: 1.01, y: 6 }}, '
+                    f'{{ scale: 1, y: 0, duration: 0.300, ease: _eIn }}, '
+                    f'{start:.4f});'
+                )
+            else:
+                # lean_glass (default)
                 lines.append(
                     f'  tl.fromTo(\'{panel_sel}\', '
                     f'{{ scale: 1.04, y: 14 }}, '
