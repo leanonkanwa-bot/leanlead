@@ -198,6 +198,9 @@ class RhythmAwareSilenceRemover:
 
         drops.extend(physical_drops)
         drops.sort(key=lambda d: d.start)
+
+        _log_false_start_candidates(words)
+
         return _merge_drops(drops), physical_drops
 
     def _find_filler_word_drops(
@@ -318,6 +321,66 @@ def _find_stutter_drops(
         i = run_end
 
     return drops
+
+
+def _log_false_start_candidates(
+    words: list[tuple[str, float, float]],
+) -> None:
+    """Log potential false-start sequences for calibration. No cuts made.
+
+    Looks for a bigram that reappears within WINDOW_S seconds after a pause or
+    filler, indicating the speaker abandoned the phrase and restarted it.
+    Activate cuts only after reviewing [FALSE-START] output on production renders.
+    """
+    if len(words) < 4:
+        return
+
+    WINDOW_S    = 10.0  # max time between first and second occurrence
+    MIN_NGRAM   = 2     # words in the repeated sequence
+    GAP_TRIGGER = 0.35  # pause threshold signalling an abandoned phrase
+
+    norms = [_normalize_word(w[0]) for w in words]
+
+    for i in range(len(words) - MIN_NGRAM):
+        if not norms[i]:
+            continue
+
+        for j in range(i + MIN_NGRAM, len(words) - MIN_NGRAM + 1):
+            if words[j][1] - words[i][1] > WINDOW_S:
+                break
+            # Require bigram match.
+            if norms[j] != norms[i]:
+                continue
+            if norms[j + 1] != norms[i + 1]:
+                continue
+
+            # Found matching bigram at positions i and j.
+            # Check: is there a pause or filler in the bridge between them?
+            bridge_gap = words[j][1] - words[i + MIN_NGRAM - 1][2]
+            has_filler = any(
+                _FILLERS_RE.match(words[k][0])
+                for k in range(i + MIN_NGRAM, j)
+            )
+            has_pause = bridge_gap > GAP_TRIGGER or any(
+                words[k + 1][1] - words[k][2] > GAP_TRIGGER
+                for k in range(i + MIN_NGRAM - 1, min(j, i + MIN_NGRAM + 3))
+                if k + 1 < j
+            )
+
+            if has_filler or has_pause:
+                first_phrase = " ".join(w[0] for w in words[i: i + MIN_NGRAM])
+                filler_note = (
+                    f", filler={words[i + MIN_NGRAM][0]!r}"
+                    if has_filler and i + MIN_NGRAM < j
+                    else ""
+                )
+                print(
+                    f"[FALSE-START] candidate: '{first_phrase}' at {words[i][1]:.2f}s"
+                    f" → restarts at {words[j][1]:.2f}s"
+                    f" (bridge={bridge_gap:.2f}s{filler_note})",
+                    flush=True,
+                )
+            break  # one report per i position
 
 
 def _is_comparison_like(preceding_word: str) -> bool:
