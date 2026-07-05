@@ -952,8 +952,6 @@ def _build_caption_card_html(card: dict, pack: dict | None = None) -> str:
         cls = "cap-word cap-emphasis" if emphasis else "cap-word"
         word_spans.append(f'<span class="{cls}">{_esc(text)}</span>')
 
-    _emph_bg = _accent_bg_css(p)
-    _emph_bg_lines = _emph_bg.rstrip() if _emph_bg else ""
     return (
         f'<div class="card caption-card" data-card-id="{card_id}">\n'
         f'<style>\n'
@@ -967,7 +965,6 @@ def _build_caption_card_html(card: dict, pack: dict | None = None) -> str:
         f'}}\n'
         f'.card[data-card-id="{card_id}"] .cap-emphasis {{\n'
         f'  color: {p["accent"]};\n'
-        f'{_emph_bg_lines}\n'
         f'}}\n'
         f'</style>\n'
         f'<div class="cap-line" id="{card_id}-line">\n'
@@ -1079,11 +1076,8 @@ def _build_timeline_js(
                 lines.append(
                     f'  tl.set(\'{word_sel}\', {{ opacity: 1, y: 0 }}, {start:.4f});'
                 )
-            # Per-pack highlight swipe on emphasis words (fires after fade-in)
-            _has_emph = any(w.get("emphasis", False) for w in card.get("words", []))
-            if _has_emph:
-                _emph_sel = f'.card[data-card-id="{card_id}"] .cap-emphasis'
-                lines.extend(_accent_treatment(p, _emph_sel, start + fade_in_dur))
+            # Caption emphasis = accent color only. No swipe/underline — captions are
+            # already karaoke-animated; a swipe on top creates visual overload.
         else:
             panel_sel = f'.card[data-card-id="{card_id}"] .card-panel'
             ent_dur = 0.550 if is_cinema else 0.320
@@ -1793,25 +1787,28 @@ def _build_timeline_js(
                     f'{{ opacity: 1, y: 0, duration: 0.250, ease: _eIn }}, '
                     f'{start + 0.10:.4f});'
                 )
-            _line_w = 80 if card.get("zone", "") in _SIDE_PANEL_ZONES else 120
-            lines.append(
-                f'  tl.fromTo(\'{line_sel}\', '
-                f'{{ width: 0 }}, '
-                f'{{ width: {_line_w}, duration: 0.400, ease: _eIn }}, '
-                f'{t_in + 0.30:.4f});'
-            )
-            # Breathing underline — half speed for question cards
-            breath_period = 2.5 if content_style == "question" else 1.25
-            pulse_dur = max(0.5, dur - 1.0)
-            pulse_repeats = max(1, int(pulse_dur / (breath_period * 2)))
-            lines.append(
-                f'  tl.fromTo(\'{line_sel}\', '
-                f'{{ boxShadow: "{_esc_js(p["accent_line_glow"])}" }}, '
-                f'{{ boxShadow: "{_esc_js(p["accent_line_glow_bright"])}", '
-                f'duration: {breath_period:.2f}, ease: "sine.inOut", '
-                f'repeat: {pulse_repeats}, yoyo: true }}, '
-                f'{t_in + 0.70:.4f});'
-            )
+            # Accent-line is suppressed when accent_word is active — the word-level
+            # underline swipe takes precedence; two competing line emphases clash.
+            if not _aw:
+                _line_w = 80 if card.get("zone", "") in _SIDE_PANEL_ZONES else 120
+                lines.append(
+                    f'  tl.fromTo(\'{line_sel}\', '
+                    f'{{ width: 0 }}, '
+                    f'{{ width: {_line_w}, duration: 0.400, ease: _eIn }}, '
+                    f'{t_in + 0.30:.4f});'
+                )
+                # Breathing glow — half speed for question cards
+                breath_period = 2.5 if content_style == "question" else 1.25
+                pulse_dur = max(0.5, dur - 1.0)
+                pulse_repeats = max(1, int(pulse_dur / (breath_period * 2)))
+                lines.append(
+                    f'  tl.fromTo(\'{line_sel}\', '
+                    f'{{ boxShadow: "{_esc_js(p["accent_line_glow"])}" }}, '
+                    f'{{ boxShadow: "{_esc_js(p["accent_line_glow_bright"])}", '
+                    f'duration: {breath_period:.2f}, ease: "sine.inOut", '
+                    f'repeat: {pulse_repeats}, yoyo: true }}, '
+                    f'{t_in + 0.70:.4f});'
+                )
             # Shimmer sweep — only for cards that have a shimmer-mask in DOM
             # (timeline cards return early in _build_graphic_card_html, no shimmer-mask)
             if content_style != "timeline":
