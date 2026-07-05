@@ -249,6 +249,11 @@ def pretrim(
             if si_end - si_start < 0.05:
                 continue
             sub_part = work_dir / f"trim_{i:04d}_{j:02d}.mp4"
+            # 4ms audio fade-in on every sub-part after the first to prevent
+            # the click that results from a hard cut into a new sub-interval.
+            audio_args = (
+                ["-af", "afade=t=in:st=0:d=0.004"] if j > 0 else []
+            )
             _run([
                 FFMPEG_PATH, "-y", "-loglevel", "error",
                 "-ss", f"{si_start:.6f}", "-accurate_seek",
@@ -256,6 +261,7 @@ def pretrim(
                 "-t", f"{si_end - si_start:.6f}",
                 "-c:v", "libx264", "-preset", "ultrafast", "-crf", "0",
                 "-c:a", "aac", "-b:a", "192k",
+                *audio_args,
                 "-avoid_negative_ts", "make_zero",
                 str(sub_part),
             ])
