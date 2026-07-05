@@ -47,6 +47,11 @@ _FILLERS_RE = re.compile(
     re.IGNORECASE,
 )
 
+
+def _is_filler(word: str) -> bool:
+    """Return True if *word* is a filler, ignoring attached punctuation."""
+    return bool(_FILLERS_RE.match(word.strip(".,!?;:'\"()")))
+
 # Pause-isolation guard: a filler is only physically cut when it has a pause
 # on at least one side. Fillers embedded in normal speech flow are left in place —
 # a missed filler sounds natural; a spurious mid-word cut sounds broken.
@@ -150,7 +155,7 @@ class RhythmAwareSilenceRemover:
                 continue
 
             # Remove: pause after a filler word (checked before touch threshold).
-            if _FILLERS_RE.match(cur_text) and gap_dur > _PAUSE_AFTER_FILLER:
+            if _is_filler(cur_text) and gap_dur > _PAUSE_AFTER_FILLER:
                 drops.append(DropSegment(gap_start, gap_end, f"pause_after_filler:{cur_text}"))
                 continue
 
@@ -216,7 +221,7 @@ class RhythmAwareSilenceRemover:
         """
         drops: list[DropSegment] = []
         for i, (text, start, end) in enumerate(words):
-            if not _FILLERS_RE.match(text):
+            if not _is_filler(text):
                 continue
 
             if i == 0 or i == len(words) - 1:
@@ -287,10 +292,19 @@ def _find_stutter_drops(
             continue
 
         # Count consecutive identical normalized words starting at i.
+        # Punctuation-only tokens (e.g. "," as a standalone Whisper token) have
+        # norm == "" and are treated as transparent separators so they don't
+        # prematurely break a run of 3 like "jamais , jamais , jamais".
         run_end = i + 1
-        while run_end < len(words) and _normalize_word(words[run_end][0]) == norm:
-            run_end += 1
-        run_len = run_end - i
+        while run_end < len(words):
+            rn = _normalize_word(words[run_end][0])
+            if rn == norm:
+                run_end += 1
+            elif not rn:
+                run_end += 1
+            else:
+                break
+        run_len = sum(1 for k in range(i, run_end) if _normalize_word(words[k][0]) == norm)
 
         if run_len < 2:
             i += 1
@@ -358,7 +372,7 @@ def _log_false_start_candidates(
             # Check: is there a pause or filler in the bridge between them?
             bridge_gap = words[j][1] - words[i + MIN_NGRAM - 1][2]
             has_filler = any(
-                _FILLERS_RE.match(words[k][0])
+                _is_filler(words[k][0])
                 for k in range(i + MIN_NGRAM, j)
             )
             has_pause = bridge_gap > GAP_TRIGGER or any(
