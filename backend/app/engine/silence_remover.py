@@ -211,6 +211,7 @@ class RhythmAwareSilenceRemover:
         drops.extend(physical_drops)
         drops.sort(key=lambda d: d.start)
 
+        _log_stutter_near_misses(words)
         _log_false_start_candidates(words)
 
         _n_pause = sum(1 for d in drops if d.reason.startswith("pause_"))
@@ -239,9 +240,6 @@ class RhythmAwareSilenceRemover:
             if not _is_filler(text):
                 continue
 
-            if i == 0 or i == len(words) - 1:
-                continue
-
             # Don't drop if it's at a segment boundary.
             if any(abs(end - se) < 0.1 for se in segment_ends):
                 continue
@@ -253,20 +251,24 @@ class RhythmAwareSilenceRemover:
                     continue
 
             # Don't drop "so" if it's a meaningful sentence-start connector.
-            if text.lower() == "so":
+            if text.lower() == "so" and i > 0:
                 prev_end = words[i - 1][2]
                 if start - prev_end > 0.3:
                     continue
 
+            # Gap before the filler: beginning of recording counts as infinite pre-gap.
+            pre_gap = start - words[i - 1][2] if i > 0 else start
+
+            # Gap after the filler: end of recording counts as infinite post-gap.
+            post_gap = words[i + 1][1] - end if i < len(words) - 1 else float("inf")
+
             # Pause-isolation guard: only cut if there's a pause on at least one side.
-            pre_gap  = start - words[i - 1][2]
-            post_gap = words[i + 1][1] - end
             if not (pre_gap > _FILLER_PAUSE_GUARD_PRE or post_gap > _FILLER_PAUSE_GUARD_POST):
                 continue
 
-            # Apply padding to absorb Whisper timing imprecision; clamp to adjacent words.
-            cut_start = max(start - _FILLER_CUT_PAD, words[i - 1][2])
-            cut_end   = min(end   + _FILLER_CUT_PAD, words[i + 1][1])
+            # Clamp cut boundaries to adjacent word edges (or recording start/end).
+            cut_start = max(start - _FILLER_CUT_PAD, words[i - 1][2] if i > 0 else 0.0)
+            cut_end   = min(end   + _FILLER_CUT_PAD, words[i + 1][1] if i < len(words) - 1 else end + _FILLER_CUT_PAD)
 
             print(
                 f"[FILLER] cut {text!r} at {start:.2f}s "
@@ -350,6 +352,49 @@ def _find_stutter_drops(
         i = run_end
 
     return drops
+
+
+# Near-miss scan window: look this many word positions ahead.
+_STUTTER_NEAR_MISS_WINDOW = 8
+
+
+def _log_stutter_near_misses(words: list[tuple[str, float, float]]) -> None:
+    """Log word repetitions that were NOT caught as stutters, with rejection reason.
+
+    Scans all words for same-normalized-form pairs within _STUTTER_NEAR_MISS_WINDOW
+    positions. A pair that was already cut by _find_stutter_drops (adjacent with
+    only transparent separators between them) is skipped. All others get a
+    [STUTTER] near-miss line explaining why they were not cut.
+    """
+    norms = [_normalize_word(w[0]) for w in words]
+
+    for i in range(len(words)):
+        if len(norms[i]) < 2:
+            continue
+        for j in range(i + 1, min(i + _STUTTER_NEAR_MISS_WINDOW + 1, len(words))):
+            if norms[j] != norms[i]:
+                continue
+
+            # Same normalized word at i and j.
+            bridge_norms = norms[i + 1: j]
+            non_transparent = [norms[k] for k in range(i + 1, j) if norms[k]]
+
+            if not non_transparent:
+                # Adjacent (possibly with transparent separators) — should have
+                # been caught by _find_stutter_drops; skip.
+                pass
+            else:
+                gap = words[j][1] - words[i][2]
+                bridge_tokens = [words[k][0] for k in range(i + 1, j)]
+                print(
+                    f"[STUTTER] near-miss: '{words[i][0]}' x2"
+                    f" at {words[i][1]:.2f}s / {words[j][1]:.2f}s"
+                    f" gap={gap:.2f}s"
+                    f" bridge={bridge_tokens!r}"
+                    f" reason=not_adjacent",
+                    flush=True,
+                )
+            break  # one report per i position
 
 
 def _log_false_start_candidates(
