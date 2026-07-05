@@ -952,6 +952,112 @@ def _zoom_filter_for_level(zoom_level: int, target_w: int, target_h: int) -> str
     )
 
 
+def _interp_zoom_scale(t: float, zoom_entries: list[dict]) -> float:
+    """Linear-interpolate the running zoom scale at output time t.
+
+    Walks sorted entries; for entries past their end, tracks the last `to`
+    value as the running baseline. Returns 1.0 if no entries exist.
+    """
+    running = 1.0
+    for ze in sorted(zoom_entries, key=lambda e: float(e.get("start", 0))):
+        zs = float(ze.get("start", 0))
+        ze_end = float(ze.get("end", zs))
+        zfrom = float(ze.get("from", 1.0))
+        zto = float(ze.get("to", zfrom))
+        if t < zs:
+            break
+        if t <= ze_end:
+            dur = ze_end - zs
+            frac = (t - zs) / dur if dur > 0 else 1.0
+            return round(zfrom + (zto - zfrom) * frac, 6)
+        running = zto
+    return running
+
+
+def _cut_output_times(timing_map: object, min_source_gap: float = 0.30) -> list[float]:
+    """Output-timeline timestamps for physical cuts where the removed source gap > min_source_gap.
+
+    Reads timing_map.source_intervals (list of kept (start, end) tuples). Consecutive
+    intervals with gap > min_source_gap represent a meaningful cut — filler, stutter, or
+    a kept-segment boundary. The cut in the output is at the end of the earlier interval.
+    """
+    times: list[float] = []
+    intervals = timing_map.source_intervals
+    for i in range(len(intervals) - 1):
+        src_gap = intervals[i + 1][0] - intervals[i][1]
+        if src_gap > min_source_gap:
+            t_out = timing_map.source_to_output(intervals[i][1])
+            times.append(round(t_out, 4))
+    return times
+
+
+def _inject_jump_cut_zooms(
+    zoom_entries: list[dict],
+    cut_times: list[float],
+    jump_scale: float = 1.040,
+) -> list[dict]:
+    """Inject alternating ±4% scale jumps at cut_times, composing with existing zooms.
+
+    At each cut the jump is relative to the running slow-zoom baseline:
+      cut 1: baseline × 1.040  (zoom in)
+      cut 2: baseline × 1/1.040 (zoom out)
+      ...
+
+    Drift entries spanning a cut are split into pre- and post-cut halves so the
+    post-cut half starts from the jumped scale. The endpoint is adjusted
+    proportionally to preserve drift velocity after the jump.
+
+    Each jump is a 1ms tween — imperceptible as animation, precise as a cut signal.
+    The 1ms gap between pre-cut half and post-cut half avoids GSAP overwrite conflicts
+    at the exact same timeline position.
+    """
+    result = list(zoom_entries)
+    parity = True  # True = zoom-in (×jump_scale), False = zoom-out (×1/jump_scale)
+
+    for t_cut in sorted(cut_times):
+        baseline = _interp_zoom_scale(t_cut, result)
+        factor = jump_scale if parity else (1.0 / jump_scale)
+        parity = not parity
+        new_scale = round(baseline * factor, 4)
+
+        processed: list[dict] = []
+        for ze in result:
+            zs = float(ze.get("start", 0))
+            ze_end = float(ze.get("end", zs))
+            zfrom = float(ze.get("from", 1.0))
+            zto = float(ze.get("to", zfrom))
+            # Only split proper drift entries that span the cut point.
+            if zs < t_cut < ze_end and ze.get("kind") != "jump_cut":
+                dur = ze_end - zs
+                frac = (t_cut - zs) / dur
+                scale_at_cut = round(zfrom + (zto - zfrom) * frac, 4)
+                # Pre-cut half: unchanged.
+                processed.append({**ze, "end": round(t_cut, 4), "to": scale_at_cut})
+                # Post-cut half: starts 1ms after the jump tween to avoid GSAP conflict.
+                # Endpoint adjusted proportionally to maintain drift velocity.
+                ratio = new_scale / scale_at_cut if scale_at_cut > 0 else 1.0
+                processed.append({
+                    **ze,
+                    "start": round(t_cut + 0.001, 4),
+                    "from": new_scale,
+                    "to": round(zto * ratio, 4),
+                })
+            else:
+                processed.append(ze)
+
+        # 1ms instantaneous jump tween.
+        processed.append({
+            "start": round(t_cut, 4),
+            "end": round(t_cut + 0.001, 4),
+            "from": round(baseline, 4),
+            "to": new_scale,
+            "kind": "jump_cut",
+        })
+        result = processed
+
+    return sorted(result, key=lambda e: float(e.get("start", 0)))
+
+
 def _concat_with_zoom(
     parts: list[Path],
     zoom_levels: list[int],
@@ -1748,6 +1854,12 @@ def _render_hyperframes(
                 "end": round(out_e, 4),
             })
     print(f"[HF] Remapped {len(remapped_zoom)} zoom entries to trimmed timeline")
+
+    # Inject alternating jump-cut zooms at every physical cut > 0.30s
+    _jump_cut_times = _cut_output_times(timing_map, min_source_gap=0.30)
+    if _jump_cut_times:
+        remapped_zoom = _inject_jump_cut_zooms(remapped_zoom, _jump_cut_times, jump_scale=1.040)
+        print(f"[HF] Jump-cut zooms: {len(_jump_cut_times)} cut(s) -> {len(remapped_zoom)} total zoom entries", flush=True)
 
     # Stage 2: Storyboard
     _t = time.perf_counter()

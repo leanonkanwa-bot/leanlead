@@ -1024,7 +1024,9 @@ def _build_timeline_js(
             kind = ze.get("kind", "drift")
             zdur = max(0.001, ze_end - zs)
 
-            if kind == "punch_in" or kind == "pull_out":
+            if kind == "jump_cut":
+                ease = '"none"'
+            elif kind == "punch_in" or kind == "pull_out":
                 ease = '"power2.in"'
             else:
                 ease = '"sine.inOut"'
