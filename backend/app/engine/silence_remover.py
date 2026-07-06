@@ -202,24 +202,35 @@ class RhythmAwareSilenceRemover:
                     f"pause_shortened:{gap_dur:.2f}s→{keep_s:.2f}s",
                 ))
 
+        # Pause drops are already in `drops` (added by the loop above).
+        # They must also go into physical_drops so _subtract_fillers() in
+        # pretrim excises them from the source video.  Without this, the
+        # virtual path (apply_drops_to_transcript) compresses transcript
+        # timestamps making the gap invisible, so _smart_pause_cuts() always
+        # sees 0-gap words and logs "none" even when pauses exist in the video.
+        pause_drops = list(drops)
+
         # Remove standalone filler words.
         filler_drops = self._find_filler_word_drops(words, segment_ends)
         # Detect word-repetition stutters (physical cuts like fillers).
         stutter_drops = _find_stutter_drops(words)
         # Detect and cut false-start phrases (abandoned phrase + restart).
         false_start_drops = _find_false_start_drops(words)
-        physical_drops = filler_drops + stutter_drops + false_start_drops
 
-        drops.extend(physical_drops)
+        # Physical drops = all categories that get excised from the source video.
+        physical_drops = pause_drops + filler_drops + stutter_drops + false_start_drops
+
+        # Extend master drops with non-pause categories (pause_drops already there).
+        drops.extend(filler_drops + stutter_drops + false_start_drops)
         drops.sort(key=lambda d: d.start)
 
         _log_stutter_near_misses(words)
 
-        _n_pause = sum(1 for d in drops if d.reason.startswith("pause_"))
         print(
-            f"[SILENCE] detected: {len(filler_drops)} fillers, "
-            f"{len(stutter_drops)} stutters, {len(false_start_drops)} false-starts, "
-            f"{_n_pause} pause-excess ({len(drops)} raw drops total)",
+            f"[SILENCE] detected: {len(pause_drops)} pause-excess, "
+            f"{len(filler_drops)} fillers, {len(stutter_drops)} stutters, "
+            f"{len(false_start_drops)} false-starts "
+            f"({len(drops)} raw drops total, {len(physical_drops)} physical)",
             flush=True,
         )
 
