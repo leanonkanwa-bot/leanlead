@@ -84,6 +84,11 @@ class DropSegment:
     start: float
     end: float
     reason: str
+    # Source-space intervals of words this drop is *intended* to remove.
+    # word_safe_drops only acts on collateral (non-target) overlaps.
+    # Filler drops carry just the filler word span; stutter/false-start carry
+    # the full cut span so word_safe treats the entire phrase as intentional.
+    target_intervals: tuple[tuple[float, float], ...] = ()
 
 
 class RhythmAwareSilenceRemover:
@@ -305,7 +310,11 @@ class RhythmAwareSilenceRemover:
                 f"(pre_gap {pre_gap:.2f}s, post_gap {post_gap:.2f}s)",
                 flush=True,
             )
-            drops.append(DropSegment(cut_start, cut_end, f"filler_word:{text}"))
+            drops.append(DropSegment(
+                cut_start, cut_end,
+                f"filler_word:{text}",
+                target_intervals=((start, end),),
+            ))
 
         return drops
 
@@ -378,7 +387,11 @@ def _find_stutter_drops(
             f"(gap={nxt_start - cur_end:.2f}s)",
             flush=True,
         )
-        drops.append(DropSegment(cut_start, cut_end, f"stutter:{cur_text}"))
+        drops.append(DropSegment(
+            cut_start, cut_end,
+            f"stutter:{cur_text}",
+            target_intervals=((cut_start, cut_end),),
+        ))
         i = run_end
 
     return drops
@@ -580,7 +593,11 @@ def _find_false_start_drops(
                 f" -> restart at {words[j][1]:.2f}s (bridge={bridge_gap:.2f}s)",
                 flush=True,
             )
-            drops.append(DropSegment(cut_start, cut_end, f"false_start:{first_phrase}"))
+            drops.append(DropSegment(
+                cut_start, cut_end,
+                f"false_start:{first_phrase}",
+                target_intervals=((cut_start, cut_end),),
+            ))
             break  # one cut per i position
 
     return drops
@@ -626,13 +643,34 @@ def word_safe_drops(
             result.append(drop)
             continue
 
+        # Separate overlapping words into intended targets vs collateral.
+        # A word is a target when it overlaps any of the drop's declared target
+        # intervals (overlap > 5ms on each side).  Filler drops carry just their
+        # filler word; stutter/false-start carry the full cut span so every word
+        # inside is treated as intentional.
+        def _is_target(ws: float, we: float) -> bool:
+            return any(
+                ts < we - 0.005 and te > ws + 0.005
+                for ts, te in drop.target_intervals
+            )
+
+        collateral = [
+            w for w in overlapping
+            if not _is_target(float(w["start"]), float(w["end"]))
+        ]
+        if not collateral:
+            # Overlaps only intended target words — keep the drop unchanged.
+            result.append(drop)
+            continue
+
+        # There are collateral words: try to shrink to avoid them.
         before = [w for w in real_words if float(w["end"]) <= ce - 0.005]
         after  = [w for w in real_words if float(w["start"]) >= cs + 0.005]
         if not before or not after:
-            txt = " ".join(str(w.get("text", "")).strip() for w in overlapping[:5])
+            txt = " ".join(str(w.get("text", "")).strip() for w in collateral[:5])
             print(
                 f"[WORD-SAFE] cancelled drop {cs:.2f}-{ce:.2f}"
-                f" (no real silence; overlaps speech: '{txt}')",
+                f" (no real silence; collateral: '{txt}')",
                 flush=True,
             )
             continue
@@ -643,27 +681,28 @@ def word_safe_drops(
         # "silence" is outside [cs, ce] — the drop is sitting entirely over speech
         # with no usable internal silence.  Cancel rather than relocate the cut.
         if new_start >= ce - 0.005 or new_end <= cs + 0.005:
-            txt = " ".join(str(w.get("text", "")).strip() for w in overlapping[:5])
+            txt = " ".join(str(w.get("text", "")).strip() for w in collateral[:5])
             print(
                 f"[WORD-SAFE] cancelled drop {cs:.2f}-{ce:.2f}"
                 f" (silence {new_start:.2f}-{new_end:.2f} escapes drop bounds;"
-                f" overlaps: '{txt}')",
+                f" collateral: '{txt}')",
                 flush=True,
             )
             continue
         if new_end - new_start < min_cut_s:
-            txt = " ".join(str(w.get("text", "")).strip() for w in overlapping[:5])
+            txt = " ".join(str(w.get("text", "")).strip() for w in collateral[:5])
             print(
                 f"[WORD-SAFE] cancelled drop {cs:.2f}-{ce:.2f}"
-                f" (silence {new_start:.2f}-{new_end:.2f} too short; overlaps: '{txt}')",
+                f" (silence {new_start:.2f}-{new_end:.2f} too short; collateral: '{txt}')",
                 flush=True,
             )
             continue
 
         if abs(new_start - cs) > 0.005 or abs(new_end - ce) > 0.005:
+            txt = " ".join(str(w.get("text", "")).strip() for w in collateral[:5])
             print(
                 f"[WORD-SAFE] shrunk drop {cs:.2f}-{ce:.2f}"
-                f" → {new_start:.2f}-{new_end:.2f}",
+                f" -> {new_start:.2f}-{new_end:.2f} (collateral: '{txt}')",
                 flush=True,
             )
             result.append(DropSegment(new_start, new_end, drop.reason))

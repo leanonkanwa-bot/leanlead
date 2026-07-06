@@ -425,6 +425,8 @@ def run_job(
                     float(_keep_raw[_gi + 1].get("start", 0)),
                 ))
         for _gid, _gs, _ge in _gap_pairs:
+            if _ge <= _gs + 0.001:
+                continue  # zero-width gap: segments share a boundary, nothing lost
             _gs_src, _gs_offset = _c2s_diag(_gs)
             _ge_src, _ge_offset = _c2s_diag(_ge)
             # Always log the c2s offset so we can prove whether conversion fired
