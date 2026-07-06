@@ -206,19 +206,20 @@ class RhythmAwareSilenceRemover:
         filler_drops = self._find_filler_word_drops(words, segment_ends)
         # Detect word-repetition stutters (physical cuts like fillers).
         stutter_drops = _find_stutter_drops(words)
-        physical_drops = filler_drops + stutter_drops
+        # Detect and cut false-start phrases (abandoned phrase + restart).
+        false_start_drops = _find_false_start_drops(words)
+        physical_drops = filler_drops + stutter_drops + false_start_drops
 
         drops.extend(physical_drops)
         drops.sort(key=lambda d: d.start)
 
         _log_stutter_near_misses(words)
-        _log_false_start_candidates(words)
 
         _n_pause = sum(1 for d in drops if d.reason.startswith("pause_"))
         print(
             f"[SILENCE] detected: {len(filler_drops)} fillers, "
-            f"{len(stutter_drops)} stutters, {_n_pause} pause-excess "
-            f"({len(drops)} raw drops total)",
+            f"{len(stutter_drops)} stutters, {len(false_start_drops)} false-starts, "
+            f"{_n_pause} pause-excess ({len(drops)} raw drops total)",
             flush=True,
         )
 
@@ -398,23 +399,83 @@ def _log_stutter_near_misses(words: list[tuple[str, float, float]]) -> None:
             break  # one report per i position
 
 
-def _log_false_start_candidates(
-    words: list[tuple[str, float, float]],
-) -> None:
-    """Log potential false-start sequences for calibration. No cuts made.
+# French and English function words: determiners, prepositions, pronouns,
+# conjunctions, auxiliaries. Groups of only these words (+ symbols) are never
+# the start of a meaningful false-start — they carry no propositional content.
+_FALSE_START_FUNCTION_WORDS = frozenset({
+    # French articles / determiners
+    "le", "la", "les", "l", "un", "une", "des", "du", "au", "aux",
+    "ce", "cet", "cette", "ces", "mon", "ton", "son", "ma", "ta", "sa",
+    "nos", "vos", "leur", "leurs",
+    # French prepositions
+    "de", "à", "en", "dans", "sur", "sous", "par", "pour",
+    "avec", "sans", "entre", "vers", "chez", "dont", "où",
+    # French conjunctions
+    "et", "ou", "mais", "donc", "or", "ni", "car", "que", "quand",
+    "si", "comme", "lorsque", "bien",
+    # French pronouns / clitics
+    "il", "elle", "on", "nous", "vous", "ils", "elles",
+    "je", "tu", "me", "te", "se", "lui", "y", "en", "qui",
+    # French negation / particles
+    "ne", "pas", "plus", "jamais", "rien", "très", "aussi",
+    # English articles / determiners
+    "the", "a", "an", "this", "that", "these", "those", "my", "your",
+    "his", "her", "its", "our", "their",
+    # English prepositions
+    "of", "in", "on", "at", "to", "for", "with", "by", "from",
+    "up", "out", "as", "about", "into", "over", "after",
+    # English conjunctions / pronouns
+    "and", "or", "but", "so", "yet", "nor",
+    "i", "you", "he", "she", "it", "we", "they",
+    # English auxiliaries
+    "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did",
+    "will", "would", "can", "could", "shall", "should", "may", "might",
+    "not",
+})
 
-    Looks for a bigram that reappears within WINDOW_S seconds after a pause or
-    filler, indicating the speaker abandoned the phrase and restarted it.
-    Activate cuts only after reviewing [FALSE-START] output on production renders.
+
+def _has_lexical_word(bigram_words: list[str]) -> bool:
+    """Return True if the bigram contains at least one full lexical word.
+
+    Symbols (%, #, $, …) and function words (determiners, prepositions, etc.)
+    don't count — a phrase made only of these is never a meaningful false-start.
+    """
+    for w in bigram_words:
+        norm = _normalize_word(w)
+        if not norm or not norm[0].isalpha():
+            continue
+        if norm in _FALSE_START_FUNCTION_WORDS:
+            continue
+        return True
+    return False
+
+
+def _find_false_start_drops(
+    words: list[tuple[str, float, float]],
+) -> list[DropSegment]:
+    """Detect false-start phrases and return them as physical drop segments.
+
+    A false-start is a bigram [A B] abandoned mid-phrase (followed by a pause
+    or filler) and then restarted. Guards:
+      (a) First occurrence contains no sentence-ending punctuation (. ? !)
+      (b) Bridge between first occurrence and restart < 2.0s
+      (c) Restart must extend beyond the bigram (word at j+MIN_NGRAM exists)
+      (d) No two adjacent false-start cuts
+      (e) First occurrence must contain at least one lexical word
     """
     if len(words) < 4:
-        return
+        return []
 
-    WINDOW_S    = 10.0  # max time between first and second occurrence
-    MIN_NGRAM   = 2     # words in the repeated sequence
-    GAP_TRIGGER = 0.35  # pause threshold signalling an abandoned phrase
+    WINDOW_S    = 10.0  # max gap first→restart (s)
+    MIN_NGRAM   = 2
+    GAP_TRIGGER = 0.35  # pause threshold for bridge detection (s)
+    MAX_BRIDGE  = 2.0   # guard (b): reject if bridge ≥ this (s)
 
     norms = [_normalize_word(w[0]) for w in words]
+
+    drops: list[DropSegment] = []
+    last_cut_end = -1.0  # guard (d): end timestamp of most recent false-start cut
 
     for i in range(len(words) - MIN_NGRAM):
         if not norms[i]:
@@ -423,39 +484,78 @@ def _log_false_start_candidates(
         for j in range(i + MIN_NGRAM, len(words) - MIN_NGRAM + 1):
             if words[j][1] - words[i][1] > WINDOW_S:
                 break
-            # Require bigram match.
             if norms[j] != norms[i]:
                 continue
             if norms[j + 1] != norms[i + 1]:
                 continue
 
-            # Found matching bigram at positions i and j.
-            # Check: is there a pause or filler in the bridge between them?
+            # Matching bigram at i and j.
             bridge_gap = words[j][1] - words[i + MIN_NGRAM - 1][2]
-            has_filler = any(
-                _is_filler(words[k][0])
-                for k in range(i + MIN_NGRAM, j)
-            )
+            has_filler = any(_is_filler(words[k][0]) for k in range(i + MIN_NGRAM, j))
             has_pause = bridge_gap > GAP_TRIGGER or any(
                 words[k + 1][1] - words[k][2] > GAP_TRIGGER
                 for k in range(i + MIN_NGRAM - 1, min(j, i + MIN_NGRAM + 3))
                 if k + 1 < j
             )
 
-            if has_filler or has_pause:
-                first_phrase = " ".join(w[0] for w in words[i: i + MIN_NGRAM])
-                filler_note = (
-                    f", filler={words[i + MIN_NGRAM][0]!r}"
-                    if has_filler and i + MIN_NGRAM < j
-                    else ""
-                )
+            if not (has_filler or has_pause):
+                break
+
+            first_phrase = " ".join(w[0] for w in words[i: i + MIN_NGRAM])
+
+            # Guard (a): no sentence-ending punctuation in first occurrence
+            if any(re.search(r"[.?!]", words[k][0]) for k in range(i, i + MIN_NGRAM)):
                 print(
-                    f"[FALSE-START] candidate: '{first_phrase}' at {words[i][1]:.2f}s"
-                    f" -> restarts at {words[j][1]:.2f}s"
-                    f" (bridge={bridge_gap:.2f}s{filler_note})",
+                    f"[FALSE-START] rejected '{first_phrase}' at {words[i][1]:.2f}s"
+                    f" — sentence boundary in first occurrence",
                     flush=True,
                 )
-            break  # one report per i position
+                break
+
+            # Guard (b): bridge < 2.0s
+            if bridge_gap >= MAX_BRIDGE:
+                print(
+                    f"[FALSE-START] rejected '{first_phrase}' at {words[i][1]:.2f}s"
+                    f" — bridge={bridge_gap:.2f}s >= {MAX_BRIDGE:.1f}s",
+                    flush=True,
+                )
+                break
+
+            # Guard (c): restart extends beyond the repeated bigram
+            if j + MIN_NGRAM >= len(words):
+                break
+
+            # Guard (d): no adjacent false-start cuts
+            if words[i][1] < last_cut_end:
+                print(
+                    f"[FALSE-START] rejected '{first_phrase}' at {words[i][1]:.2f}s"
+                    f" — adjacent to previous cut (last_cut_end={last_cut_end:.2f}s)",
+                    flush=True,
+                )
+                break
+
+            # Guard (e): must contain at least one lexical word
+            if not _has_lexical_word([words[k][0] for k in range(i, i + MIN_NGRAM)]):
+                print(
+                    f"[FALSE-START] rejected '{first_phrase}' at {words[i][1]:.2f}s"
+                    f" — no lexical word (pure function-word group)",
+                    flush=True,
+                )
+                break
+
+            # All guards passed — cut first occurrence + bridge up to restart.
+            cut_start = words[i][1]
+            cut_end   = words[j][1]
+            last_cut_end = cut_end
+            print(
+                f"[FALSE-START] cut: '{first_phrase}' at {words[i][1]:.2f}s"
+                f" -> restart at {words[j][1]:.2f}s (bridge={bridge_gap:.2f}s)",
+                flush=True,
+            )
+            drops.append(DropSegment(cut_start, cut_end, f"false_start:{first_phrase}"))
+            break  # one cut per i position
+
+    return drops
 
 
 def _is_comparison_like(preceding_word: str) -> bool:
