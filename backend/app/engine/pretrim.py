@@ -112,6 +112,10 @@ def _pretrim_passthrough(
     return final_path, timing_map
 
 
+_LEAD_IN_THRESHOLD = 1.0   # seconds: trigger lead-in cut if first word starts later than this
+_LEAD_IN_KEEP_S    = 0.5   # seconds: amount of lead-in to preserve before the first word
+
+
 def _smart_pause_cuts(
     words: list[WordTiming],
 ) -> list[tuple[float, float]]:
@@ -122,6 +126,20 @@ def _smart_pause_cuts(
     Mirrors the virtual-drop logic in RhythmAwareSilenceRemover.process().
     """
     cuts: list[tuple[float, float]] = []
+
+    # Lead-in: if the first word starts after _LEAD_IN_THRESHOLD seconds in the
+    # trimmed output, shorten the opening silence to _LEAD_IN_KEEP_S seconds.
+    if words and words[0].start > _LEAD_IN_THRESHOLD:
+        cut_start = _LEAD_IN_KEEP_S
+        cut_end   = words[0].start
+        if cut_end > cut_start + 0.05:
+            cuts.append((cut_start, cut_end))
+            print(
+                f"[PRETRIM] lead-in {words[0].start:.2f}s -> kept {_LEAD_IN_KEEP_S:.2f}s "
+                f"(cut {cut_end - cut_start:.2f}s)",
+                flush=True,
+            )
+
     for i in range(len(words) - 1):
         gap_start = words[i].end
         gap_end   = words[i + 1].start
@@ -148,6 +166,18 @@ def _smart_pause_cuts(
         excess_start = gap_start + keep_s
         if excess_start < gap_end - 0.05:
             cuts.append((excess_start, gap_end))
+            print(
+                f"[PRETRIM] pause cut: {gap_dur:.2f}s at {gap_start:.2f}s"
+                f" ({'EOS' if is_sentence_end else 'mid'})"
+                f" -> keep {keep_s:.2f}s, cut {gap_end - excess_start:.2f}s",
+                flush=True,
+            )
+
+    if not cuts:
+        print("[PRETRIM] pause cuts: none (all gaps below threshold or protected)", flush=True)
+    else:
+        total_cut = sum(e - s for s, e in cuts)
+        print(f"[PRETRIM] pause cuts: {len(cuts)} interval(s), {total_cut:.2f}s total", flush=True)
 
     return cuts
 
