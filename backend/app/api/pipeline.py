@@ -348,7 +348,46 @@ def run_job(
         print(f"[TIMING] planning: {time.perf_counter()-_t:.1f}s", flush=True)
 
         # ── Semantic guard: reject drops that overlap key_line words ───────
+        _pre_guard_ranges = {(d.start, d.end) for d in filler_drops}
         filler_drops = _guard_drops_against_key_content(filler_drops, plan, transcript)
+        _post_guard_ranges = {(d.start, d.end) for d in filler_drops}
+        _rejected_ranges = _pre_guard_ranges - _post_guard_ranges
+
+        if _rejected_ranges:
+            # Guard removed physical drop(s). Remove the matching virtual drops
+            # too and rebuild transcript_clean so captions and video stay in sync.
+            # Without this, transcript_clean would be compressed by the rejected
+            # drop but the video wouldn't be cut → 2s+ caption/video desync.
+            #
+            # Handles two cases:
+            # (A) exact match: drop (rs, re) is exactly the rejected interval
+            # (B) merge case: a pause was merged by _merge_drops with the false-start
+            #     → keep only the pause portion [d.start, rs), drop the rest
+            from app.engine.silence_remover import DropSegment as _DS
+            drops_filtered = []
+            n_removed = 0
+            for d in drops:
+                absorbed = False
+                for rs, re in _rejected_ranges:
+                    if abs(d.start - rs) < 0.01 and abs(d.end - re) < 0.01:
+                        # Case A: exact match — drop entirely
+                        absorbed = True
+                        n_removed += 1
+                        break
+                    if abs(d.end - re) < 0.01 and d.start < rs - 0.01:
+                        # Case B: merged drop — keep the leading pause portion
+                        drops_filtered.append(_DS(d.start, rs, d.reason))
+                        absorbed = True
+                        n_removed += 1
+                        break
+                if not absorbed:
+                    drops_filtered.append(d)
+            transcript_clean = apply_drops_to_transcript(transcript, drops_filtered)
+            print(
+                f"[CUT-GUARD] rebuilt transcript_clean: {n_removed} virtual drop(s) adjusted "
+                f"for {len(_rejected_ranges)} rejected physical cut(s)",
+                flush=True,
+            )
 
         # ── Step 7: Hook rewrite (Feature 3) ──────────────────────────────
         _t = time.perf_counter()
