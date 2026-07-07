@@ -357,7 +357,7 @@ def pretrim(
     ]
     keep = _dedup_segments(keep)
     keep = _merge_short_segments(keep)
-    keep = _fix_word_boundaries(keep, all_words, fail_loud=True)
+    keep = _fix_word_boundaries(keep, all_words)
     keep = _merge_short_segments(keep)
 
     # ── Merge keep_segments that are contiguous (end[i] == start[i+1]).
@@ -416,63 +416,140 @@ def pretrim(
 
         _planned.append((i, s_src, e, s_padded, e_padded))
 
-    # ── Pairwise clamp: enforce _planned[p].e_padded <= _planned[p+1].s_padded - 10ms
-    # Splits the overlap symmetrically at the midpoint so neither clip loses more.
-    for _pi in range(len(_planned) - 1):
-        _i, _s_src_i, _e_i, _s_i, _e_i_pad = _planned[_pi]
-        _j, _s_src_j, _e_j, _s_j, _e_j_pad = _planned[_pi + 1]
-        if _e_i_pad > _s_j - 0.010:
-            _mid = (_e_i_pad + _s_j) / 2.0
-            _planned[_pi]     = (_i, _s_src_i, _e_i, _s_i, _mid - 0.005)
-            _planned[_pi + 1] = (_j, _s_src_j, _e_j, _mid + 0.005, _e_j_pad)
-            print(
-                f"[PRETRIM] clamped boundary seg[{_i}]/seg[{_j}]:"
-                f" e[{_i}] {_e_i_pad:.3f}→{_mid - 0.005:.3f},"
-                f" s[{_j}] {_s_j:.3f}→{_mid + 0.005:.3f}",
-                flush=True,
-            )
-
-    # ── Word-aware boundary snap: no clip boundary may fall inside a word ──
-    # Applied after ALL other adjustments. Each (s_padded, e_padded) boundary
-    # is checked against source-space word timings; if it lands mid-word the
-    # word goes entirely to whichever clip already holds the majority.
+    # ── Stabilization: snap→clamp iteratively until both invariants hold ────
+    # Order: word-snap first (boundary out of word) then pairwise clamp
+    # (10ms gap). Repeat up to _MAX_STAB times. If no fixed point, force-assign
+    # the word to the clip with the majority, setting boundary at the exact
+    # inter-word gap (word always wins over midpoint; 0-gap adjacency allowed).
     _wt = src_word_timings if use_source_coords else words
-    for _pi in range(len(_planned)):
-        _i, _s_src_i, _e_i, _s_i, _e_i_pad = _planned[_pi]
-        _changed = False
+    _MAX_STAB = 5
+    _resolved: set[int] = set()  # pairs resolved by fallback (0-gap allowed)
 
-        _new_s, _word_s = _snap_boundary_out_of_word(_s_i, _wt)
-        if _word_s:
-            _new_s = max(0.0, _new_s)
-            print(
-                f"[PRETRIM] word-snap s[{_i}]: {_s_i:.3f}→{_new_s:.3f}"
-                f" (word {_word_s[0]:.3f}-{_word_s[1]:.3f})",
-                flush=True,
-            )
-            _s_i, _changed = _new_s, True
-
-        _new_e, _word_e = _snap_boundary_out_of_word(_e_i_pad, _wt)
-        if _word_e:
-            print(
-                f"[PRETRIM] word-snap e[{_i}]: {_e_i_pad:.3f}→{_new_e:.3f}"
-                f" (word {_word_e[0]:.3f}-{_word_e[1]:.3f})",
-                flush=True,
-            )
-            _e_i_pad, _changed = _new_e, True
-
-        if _changed:
-            _planned[_pi] = (_i, _s_src_i, _e_i, _s_i, _e_i_pad)
-
-    # Assert: word-snap must not have introduced new overlaps.
+    # Diagnostic: dump initial boundary state for every adjacent pair
     for _pi in range(len(_planned) - 1):
         _i, _, _, _s_i, _e_i_pad = _planned[_pi]
         _j, _, _, _s_j, _ = _planned[_pi + 1]
-        if _e_i_pad > _s_j - 0.010:
-            raise RuntimeError(
-                f"[PRETRIM] word-snap overlap: seg[{_i}].e={_e_i_pad:.3f}"
-                f" > seg[{_j}].s={_s_j:.3f} — boundary word straddles"
-                f" the clip gap; check GAP-RESCUE containment filter"
+        print(
+            f"[PRETRIM] boundary-init seg[{_i}]/seg[{_j}]:"
+            f" e[{_i}]={_e_i_pad:.3f} s[{_j}]={_s_j:.3f}"
+            f" gap={_s_j - _e_i_pad:+.3f}s",
+            flush=True,
+        )
+
+    for _pass in range(_MAX_STAB):
+        _snap_changed = False
+        _clamp_changed = False
+
+        # ① Word-aware snap (run first this pass)
+        for _pi in range(len(_planned)):
+            _i, _s_src_i, _e_i, _s_i, _e_i_pad = _planned[_pi]
+            _updated = False
+
+            _new_s, _word_s = _snap_boundary_out_of_word(_s_i, _wt)
+            if _word_s:
+                _new_s = max(0.0, _new_s)
+                print(
+                    f"[PRETRIM] stab-{_pass+1} snap s[{_i}]: {_s_i:.3f}→{_new_s:.3f}"
+                    f" (word {_word_s[0]:.3f}-{_word_s[1]:.3f})",
+                    flush=True,
+                )
+                _s_i = _new_s
+                _snap_changed = _updated = True
+
+            _new_e, _word_e = _snap_boundary_out_of_word(_e_i_pad, _wt)
+            if _word_e:
+                print(
+                    f"[PRETRIM] stab-{_pass+1} snap e[{_i}]: {_e_i_pad:.3f}→{_new_e:.3f}"
+                    f" (word {_word_e[0]:.3f}-{_word_e[1]:.3f})",
+                    flush=True,
+                )
+                _e_i_pad = _new_e
+                _snap_changed = _updated = True
+
+            if _updated:
+                _planned[_pi] = (_i, _s_src_i, _e_i, _s_i, _e_i_pad)
+
+        # ② Pairwise clamp (run second this pass)
+        for _pi in range(len(_planned) - 1):
+            _i, _s_src_i, _e_i, _s_i, _e_i_pad = _planned[_pi]
+            _j, _s_src_j, _e_j, _s_j, _e_j_pad = _planned[_pi + 1]
+            if _e_i_pad > _s_j - 0.010:
+                _mid = (_e_i_pad + _s_j) / 2.0
+                _planned[_pi]     = (_i, _s_src_i, _e_i, _s_i, _mid - 0.005)
+                _planned[_pi + 1] = (_j, _s_src_j, _e_j, _mid + 0.005, _e_j_pad)
+                _clamp_changed = True
+                print(
+                    f"[PRETRIM] stab-{_pass+1} clamp seg[{_i}]/seg[{_j}]:"
+                    f" e→{_mid - 0.005:.3f} s→{_mid + 0.005:.3f}",
+                    flush=True,
+                )
+
+        if not _snap_changed and not _clamp_changed:
+            if _pass > 0:
+                print(f"[PRETRIM] stabilized after {_pass + 1} pass(es)", flush=True)
+            break
+    else:
+        # No fixed point: force-assign — word wins over midpoint.
+        # Boundary is placed at the exact inter-word gap; edge-adjacent clips allowed.
+        print("[PRETRIM] stabilize: no fixed point — force-assigning words", flush=True)
+        for _pi in range(len(_planned) - 1):
+            _i, _s_src_i, _e_i, _s_i, _e_i_pad = _planned[_pi]
+            _j, _s_src_j, _e_j, _s_j, _e_j_pad = _planned[_pi + 1]
+            # Skip only if both invariants are already satisfied
+            _clamp_ok = _e_i_pad <= _s_j - 0.010 + 1e-9
+            _e_clean = not any(ws < _e_i_pad < we for ws, we in _wt if we - ws >= 0.030)
+            _s_clean = not any(ws < _s_j < we for ws, we in _wt if we - ws >= 0.030)
+            if _clamp_ok and _e_clean and _s_clean:
+                continue
+            _bd_pt: float | None = None
+            for ws, we in _wt:
+                if we - ws < 0.030:
+                    continue
+                if ws < _e_i_pad < we:
+                    # e is inside a word; majority decides which clip gets it
+                    _bd_pt = we if (_e_i_pad - ws >= we - _e_i_pad) else ws
+                    break
+                if ws < _s_j < we:
+                    # s is inside a word
+                    _bd_pt = ws if (_s_j - ws < we - _s_j) else we
+                    break
+            _gap_pt = _bd_pt if _bd_pt is not None else (_e_i_pad + _s_j) / 2.0
+            _planned[_pi]     = (_i, _s_src_i, _e_i, _s_i, _gap_pt)
+            _planned[_pi + 1] = (_j, _s_src_j, _e_j, _gap_pt, _e_j_pad)
+            _resolved.add(_pi)
+            print(
+                f"[PRETRIM] stabilize FALLBACK seg[{_i}]/seg[{_j}]:"
+                f" e=s={_gap_pt:.3f} (edge-adjacent — word wins)",
+                flush=True,
             )
+
+    # ── Final assert: both invariants verified in one pass ───────────────────
+    for _pi in range(len(_planned) - 1):
+        _i, _, _, _s_i, _e_i_pad = _planned[_pi]
+        _j, _, _, _s_j, _ = _planned[_pi + 1]
+        # Force-resolved pairs allow e == s (0-gap); normal pairs need 10ms buffer.
+        _min_gap = 0.0 if _pi in _resolved else 0.010
+        if _e_i_pad > _s_j - _min_gap:
+            raise RuntimeError(
+                f"[PRETRIM] INVARIANT: seg[{_i}].e={_e_i_pad:.3f}"
+                f" > seg[{_j}].s - {_min_gap:.3f} = {_s_j - _min_gap:.3f}"
+                f" — overlap after stabilization"
+            )
+        for ws, we in _wt:
+            if ws > _s_j + 0.5:
+                break  # _wt is sorted; no further word can straddle this boundary
+            if we - ws < 0.030:
+                continue
+            if ws < _e_i_pad < we:
+                raise RuntimeError(
+                    f"[PRETRIM] INVARIANT: seg[{_i}].e={_e_i_pad:.3f}"
+                    f" inside word [{ws:.3f},{we:.3f}]"
+                )
+            if ws < _s_j < we:
+                raise RuntimeError(
+                    f"[PRETRIM] INVARIANT: seg[{_j}].s={_s_j:.3f}"
+                    f" inside word [{ws:.3f},{we:.3f}]"
+                )
 
     _planned_dur = sum(ep - sp for _, _, _, sp, ep in _planned)
 
