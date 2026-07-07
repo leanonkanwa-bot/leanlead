@@ -278,11 +278,29 @@ def pretrim(
     keep = _fix_word_boundaries(keep, all_words)
     keep = _merge_short_segments(keep)
 
-    # ── Cut each segment with word-boundary snapping ─────────────────
-    parts: list[Path] = []
-    source_intervals: list[tuple[float, float]] = []
-    remapped_words: list[WordTiming] = []
-    cum = 0.0
+    # ── Merge keep_segments that are contiguous (end[i] == start[i+1]).
+    # A cut into the middle of continuous speech produces an audible glitch.
+    _merged_keep: list[dict] = []
+    for _seg in keep:
+        if _merged_keep and abs(float(_merged_keep[-1]["end"]) - float(_seg["start"])) < 0.005:
+            _p = _merged_keep[-1]
+            print(
+                f"[PRETRIM] merged contiguous segs:"
+                f" {float(_p['start']):.3f}-{float(_p['end']):.3f}"
+                f" + {float(_seg['start']):.3f}-{float(_seg['end']):.3f}"
+                f" → {float(_p['start']):.3f}-{float(_seg['end']):.3f}",
+                flush=True,
+            )
+            _merged_keep[-1] = {**_p, "end": _seg["end"]}
+        else:
+            _merged_keep.append(_seg)
+    keep = _merged_keep
+
+    # ── Pass 1: compute source intervals (snap + pad) for every segment ─
+    # Separating computation from FFmpeg lets us apply a pairwise clamp
+    # to eliminate padding overlaps before any frame is read.
+    # Tuple: (keep_index, s_src, e_snapped, s_padded, e_padded)
+    _planned: list[tuple[int, float, float, float, float]] = []
 
     for i, seg in enumerate(keep):
         s_raw = float(seg["start"])
@@ -314,6 +332,31 @@ def pretrim(
         if e_padded - s_padded < 0.15:
             continue
 
+        _planned.append((i, s_src, e, s_padded, e_padded))
+
+    # ── Pairwise clamp: enforce _planned[p].e_padded <= _planned[p+1].s_padded - 10ms
+    # Splits the overlap symmetrically at the midpoint so neither clip loses more.
+    for _pi in range(len(_planned) - 1):
+        _i, _s_src_i, _e_i, _s_i, _e_i_pad = _planned[_pi]
+        _j, _s_src_j, _e_j, _s_j, _e_j_pad = _planned[_pi + 1]
+        if _e_i_pad > _s_j - 0.010:
+            _mid = (_e_i_pad + _s_j) / 2.0
+            _planned[_pi]     = (_i, _s_src_i, _e_i, _s_i, _mid - 0.005)
+            _planned[_pi + 1] = (_j, _s_src_j, _e_j, _mid + 0.005, _e_j_pad)
+            print(
+                f"[PRETRIM] clamped boundary seg[{_i}]/seg[{_j}]:"
+                f" e[{_i}] {_e_i_pad:.3f}→{_mid - 0.005:.3f},"
+                f" s[{_j}] {_s_j:.3f}→{_mid + 0.005:.3f}",
+                flush=True,
+            )
+
+    # ── Pass 2: FFmpeg cuts and word remapping ───────────────────────
+    parts: list[Path] = []
+    source_intervals: list[tuple[float, float]] = []
+    remapped_words: list[WordTiming] = []
+    cum = 0.0
+
+    for _pi, (i, s_src, e, s_padded, e_padded) in enumerate(_planned):
         # Split this segment around any filler drops that fall within it.
         sub_intervals = _subtract_fillers(s_padded, e_padded, filler_drops or [])
 
@@ -413,17 +456,16 @@ def pretrim(
             flush=True,
         )
 
-    # Overlap check: end of segment N must not exceed start of segment N+1.
-    _all_ints = source_intervals  # flat list of all sub-interval (start, end) tuples
-    for _oi in range(len(_all_ints) - 1):
-        _oi_end = _all_ints[_oi][1]
-        _oi1_start = _all_ints[_oi + 1][0]
+    # Invariant: pairwise clamp guarantees no overlap — if this fires it's a bug.
+    for _oi in range(len(source_intervals) - 1):
+        _oi_end = source_intervals[_oi][1]
+        _oi1_start = source_intervals[_oi + 1][0]
         if _oi_end > _oi1_start + 0.005:
-            print(
-                f"[PRETRIM-OVERLAP] interval[{_oi}].end={_oi_end:.3f}"
+            raise RuntimeError(
+                f"[PRETRIM-OVERLAP] BUG: interval[{_oi}].end={_oi_end:.3f}"
                 f" > interval[{_oi + 1}].start={_oi1_start:.3f}"
-                f" (overlap={_oi_end - _oi1_start:.3f}s)",
-                flush=True,
+                f" (overlap={_oi_end - _oi1_start:.3f}s)"
+                f" — invariant violated after pairwise clamp"
             )
 
     if not parts:
