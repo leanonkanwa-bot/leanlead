@@ -284,18 +284,29 @@ def _output_verify(
     def _norm(t: str) -> str:
         return re.sub(r"[^\w]", "", t.lower(), flags=re.UNICODE)
 
+    def _wtext(w) -> str:
+        return w.text if isinstance(w.text, str) else getattr(w, "text", "")
+
+    def _wprob(w) -> float:
+        return float(getattr(w, "probability", getattr(w, "score", 1.0)))
+
+    _LOW_CONF = 0.50  # re-transcribed words below this probability are "uncertain"
+
     try:
         from app.engine.transcribe import transcribe, unload_model
         result = transcribe(video_path)
         unload_model()
 
+        act_words_all = [w for seg in result.segments for w in (seg.words or [])]
+
         exp_toks = [_norm(w.text) for w in expected_words if _norm(w.text)]
-        act_toks = [
-            _norm(w.text)
-            for seg in result.segments
-            for w in seg.words
-            if _norm(w.text if isinstance(w.text, str) else getattr(w, "text", ""))
-        ]
+        # Compare against ALL re-transcribed words; confidence filter causes false missing
+        act_toks = [_norm(_wtext(w)) for w in act_words_all if _norm(_wtext(w))]
+        # Low-conf tokens: may explain "missing" that are actually present but uncertain
+        act_uncertain: set[str] = {
+            _norm(_wtext(w)) for w in act_words_all
+            if _wprob(w) < _LOW_CONF and _norm(_wtext(w))
+        }
 
         matcher = difflib.SequenceMatcher(None, exp_toks, act_toks, autojunk=False)
         missing, extra = [], []
@@ -308,15 +319,37 @@ def _output_verify(
                 missing.extend(exp_toks[i1:i2])
                 extra.extend(act_toks[j1:j2])
 
+        # Separate confirmed missing from uncertain (re-transcribed at low confidence)
+        missing_cert   = [t for t in missing if t not in act_uncertain]
+        missing_uncert = [t for t in missing if t in act_uncertain]
+
         ratio = matcher.ratio()
-        if not missing and not extra:
-            print(f"[OUTPUT-VERIFY] PASS — {len(exp_toks)} words | ratio={ratio:.3f}", flush=True)
+
+        # ── Long-pause diagnostic: 5 longest inter-word gaps in trimmed output ──
+        if len(act_words_all) > 1:
+            _iw_gaps = []
+            for _wi in range(len(act_words_all) - 1):
+                _wa, _wb = act_words_all[_wi], act_words_all[_wi + 1]
+                _g = float(getattr(_wb, "start", 0)) - float(getattr(_wa, "end", 0))
+                if _g > 0:
+                    _iw_gaps.append((_g, _norm(_wtext(_wa)), _norm(_wtext(_wb))))
+            _iw_gaps.sort(reverse=True)
+            if _iw_gaps:
+                print(
+                    "[OUTPUT-VERIFY] top-5 gaps: "
+                    + " | ".join(f"{d:.2f}s({a}→{b})" for d, a, b in _iw_gaps[:5]),
+                    flush=True,
+                )
+
+        _unc = f" | uncertain({len(missing_uncert)}): {missing_uncert[:5]}" if missing_uncert else ""
+        if not missing_cert and not extra:
+            print(f"[OUTPUT-VERIFY] PASS — {len(exp_toks)} words | ratio={ratio:.3f}{_unc}", flush=True)
         else:
-            sev = "CRITICAL" if (len(missing) > 3 or len(extra) > 3) else "WARNING"
+            sev = "CRITICAL" if (len(missing_cert) > 3 or len(extra) > 3) else "WARNING"
             print(
                 f"[OUTPUT-VERIFY] {sev} — ratio={ratio:.3f}"
-                f" | missing({len(missing)}): {missing[:10]}"
-                f" | extra({len(extra)}): {extra[:10]}",
+                f" | missing({len(missing_cert)}): {missing_cert[:10]}"
+                f" | extra({len(extra)}): {extra[:10]}{_unc}",
                 flush=True,
             )
     except Exception as _e:
@@ -536,6 +569,16 @@ def pretrim(
             if _src_gap > 0.300:
                 _e_new = _e_i + 0.010
                 _s_new = _planned_padded_orig[_pi + 1][0]
+                # Snap restored s_new: original s_padded may land inside a word
+                _s_new_snapped, _snap_w = _snap_boundary_out_of_word(_s_new, _wt)
+                if _snap_w:
+                    print(
+                        f"[PRETRIM] stabilize FALLBACK snap s[{_j}]:"
+                        f" {_s_new:.3f}→{_s_new_snapped:.3f}"
+                        f" (word {_snap_w[0]:.3f}-{_snap_w[1]:.3f})",
+                        flush=True,
+                    )
+                    _s_new = _s_new_snapped
                 if _e_new <= _s_new - 0.010:
                     _planned[_pi]     = (_i, _s_src_i, _e_i, _s_i, _e_new)
                     _planned[_pi + 1] = (_j, _s_src_j, _e_j, _s_new, _e_j_pad)
@@ -568,10 +611,51 @@ def pretrim(
                 flush=True,
             )
 
-    # ── Final assert: both invariants verified in one pass ───────────────────
+    # ── ③ Orphan repair: words entirely in gap [e_i_pad, s_j] belong to no clip ─
+    # Assign each orphaned word to the nearer segment; snap boundaries afterward.
+    # Skip pairs with a large source gap: words between e_i and s_src_j are
+    # intentionally excluded source content, not accidental orphans.
     for _pi in range(len(_planned) - 1):
-        _i, _, _, _s_i, _e_i_pad = _planned[_pi]
-        _j, _, _, _s_j, _ = _planned[_pi + 1]
+        _i, _s_src_i, _e_i, _s_i, _e_i_pad = _planned[_pi]
+        _j, _s_src_j, _e_j, _s_j, _e_j_pad = _planned[_pi + 1]
+        if _s_src_j - _e_i > 0.300:
+            continue  # source gap: excluded words are intentional, not orphans
+        _orphan_fixed = False
+        for _ws, _we in _wt:
+            if _ws > _s_j: break
+            if _we - _ws < 0.030: continue
+            if not (_e_i_pad <= _ws and _we <= _s_j): continue
+            # Orphan word: assign to whichever segment it's closest to
+            _d_i = _ws - _e_i_pad  # gap from e[i] to word start
+            _d_j = _s_j - _we      # gap from word end to s[j]
+            if _d_i < _d_j:        # closer to seg[i] → give to seg[i]
+                _e_i_pad = _we + 0.010
+                _s_j = max(_s_j, _e_i_pad)
+            else:                   # closer to seg[j] (or tie) → give to seg[j]
+                _s_j = _ws - 0.010
+                _e_i_pad = min(_e_i_pad, _s_j)
+            print(
+                f"[PRETRIM] orphan-repair seg[{_i}]/seg[{_j}]:"
+                f" word [{_ws:.3f},{_we:.3f}]"
+                f" → seg[{_i if _d_i < _d_j else _j}]"
+                f" e={_e_i_pad:.3f} s={_s_j:.3f}",
+                flush=True,
+            )
+            _orphan_fixed = True
+        if _orphan_fixed:
+            # Snap repaired boundaries to ensure word-safety
+            _e_i_pad_r, _ = _snap_boundary_out_of_word(_e_i_pad, _wt)
+            _s_j_r, _     = _snap_boundary_out_of_word(_s_j, _wt)
+            _e_i_pad, _s_j = _e_i_pad_r, _s_j_r
+            if _e_i_pad >= _s_j - 1e-9:
+                _resolved.add(_pi)
+            _planned[_pi]     = (_i, _s_src_i, _e_i, _s_i, _e_i_pad)
+            _planned[_pi + 1] = (_j, _s_src_j, _e_j, _s_j, _e_j_pad)
+
+    # ── Final assert: overlap, word-clean, and orphan invariants ─────────────
+    for _pi in range(len(_planned) - 1):
+        _i, _, _e_i, _s_i, _e_i_pad = _planned[_pi]
+        _j, _s_src_j, _, _s_j, _ = _planned[_pi + 1]
         # Force-resolved pairs allow e == s (0-gap); normal pairs need 10ms buffer.
         _min_gap = 0.0 if _pi in _resolved else 0.010
         if _e_i_pad > _s_j - _min_gap:
@@ -594,6 +678,13 @@ def pretrim(
                 raise RuntimeError(
                     f"[PRETRIM] INVARIANT: seg[{_j}].s={_s_j:.3f}"
                     f" inside word [{ws:.3f},{we:.3f}]"
+                )
+            # Orphan: word entirely in the gap [e_i_pad, s_j]
+            # Skip for pairs with a large source gap — excluded words are intentional.
+            if _s_src_j - _e_i <= 0.300 and _e_i_pad <= ws and we <= _s_j:
+                raise RuntimeError(
+                    f"[PRETRIM] INVARIANT: word [{ws:.3f},{we:.3f}] orphaned"
+                    f" between seg[{_i}].e={_e_i_pad:.3f} and seg[{_j}].s={_s_j:.3f}"
                 )
 
     _planned_dur = sum(ep - sp for _, _, _, sp, ep in _planned)

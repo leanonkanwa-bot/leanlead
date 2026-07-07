@@ -24,13 +24,18 @@ def _simulate_stabilization(
     min_dur: float = 0.030,
     gap_s: float = 0.010,
     src_gap_threshold: float = 0.300,
-) -> tuple[list[tuple], set[int]]:
+) -> tuple[list[tuple], set[int], set[int]]:
     """Simulate the snap→clamp stabilization loop + fallback from pretrim().
 
     Gap check mirrors production: uses planned[pi+1][1] - planned[pi][2]
     (= _s_src_j - _e_i in source space) to detect planned gaps > src_gap_threshold.
+
+    Returns (planned, resolved, gap_preserved).
+    gap_preserved: pair indices where the gap-preserving path ran — orphan words
+    in those pairs are intentionally excluded and must NOT be flagged.
     """
     resolved: set[int] = set()
+    gap_preserved: set[int] = set()
     planned_padded_orig = [(sp, ep) for _, _, _, sp, ep in planned]
 
     for pass_n in range(max_passes):
@@ -79,9 +84,14 @@ def _simulate_stabilization(
             if src_gap > src_gap_threshold:
                 e_new = e_i + 0.010
                 s_new = planned_padded_orig[pi + 1][0]
+                # Snap restored s_new to ensure word-safety (fix 2 universal snap)
+                s_new_snapped, snap_w = _snap_boundary_out_of_word(s_new, wt)
+                if snap_w:
+                    s_new = s_new_snapped
                 if e_new <= s_new - 0.010:
                     planned[pi]     = (i, s_src_i, e_i, s_i, e_new)
                     planned[pi + 1] = (j, s_src_j, e_j, s_new, e_pad_j)
+                    gap_preserved.add(pi)
                     continue  # NOT in resolved; 10ms gap required
             # Contiguous: contact-point assignment
             bd_pt = None
@@ -99,17 +109,49 @@ def _simulate_stabilization(
             planned[pi + 1] = (j, s_src_j, e_j, gap_pt, e_pad_j)
             resolved.add(pi)
 
-    return planned, resolved
-
-
-def _assert_invariants(planned, wt, resolved):
+    # ③ Orphan repair (mirrors pretrim.py)
+    # Skip pairs where there is a large source gap: words between e_i and s_src_j
+    # are intentionally excluded source content, not accidental orphans.
     for pi in range(len(planned) - 1):
-        i, _, _, s_i, e_pad_i = planned[pi]
-        j, _, _, s_j, _ = planned[pi + 1]
+        i, s_src_i, e_i, s_i, e_pad_i = planned[pi]
+        j, s_src_j, e_j, s_j, e_pad_j = planned[pi + 1]
+        if s_src_j - e_i > src_gap_threshold:
+            continue
+        orphan_fixed = False
+        for ws, we in wt:
+            if ws > s_j: break
+            if we - ws < min_dur: continue
+            if not (e_pad_i <= ws and we <= s_j): continue
+            d_i = ws - e_pad_i
+            d_j = s_j - we
+            if d_i < d_j:
+                e_pad_i = we + 0.010
+                s_j = max(s_j, e_pad_i)
+            else:
+                s_j = ws - 0.010
+                e_pad_i = min(e_pad_i, s_j)
+            orphan_fixed = True
+        if orphan_fixed:
+            e_pad_i, _ = _snap_boundary_out_of_word(e_pad_i, wt)
+            s_j, _     = _snap_boundary_out_of_word(s_j, wt)
+            if e_pad_i >= s_j - 1e-9:
+                resolved.add(pi)
+            planned[pi]     = (i, s_src_i, e_i, s_i, e_pad_i)
+            planned[pi + 1] = (j, s_src_j, e_j, s_j, e_pad_j)
+
+    return planned, resolved, gap_preserved
+
+
+def _assert_invariants(planned, wt, resolved, gap_preserved=None,
+                       src_gap_threshold: float = 0.300):
+    for pi in range(len(planned) - 1):
+        i, _, e_i, s_i, e_pad_i = planned[pi]
+        j, s_src_j, _, s_j, _ = planned[pi + 1]
         min_gap = 0.0 if pi in resolved else 0.010
         assert e_pad_i <= s_j - min_gap + 1e-9, (
             f"seg[{i}].e={e_pad_i:.3f} > seg[{j}].s - {min_gap} = {s_j - min_gap:.3f}"
         )
+        _has_src_gap = (s_src_j - e_i) > src_gap_threshold
         for ws, we in wt:
             if ws > s_j + 0.5:
                 break
@@ -121,6 +163,13 @@ def _assert_invariants(planned, wt, resolved):
             assert not (ws < s_j < we), (
                 f"seg[{j}].s={s_j:.3f} inside word [{ws:.3f},{we:.3f}]"
             )
+            # Orphan: word entirely between e[i] and s[j]
+            # Skip for large source gaps: excluded words are intentional.
+            if not _has_src_gap:
+                assert not (e_pad_i <= ws and we <= s_j), (
+                    f"word [{ws:.3f},{we:.3f}] orphaned between seg[{i}].e={e_pad_i:.3f}"
+                    f" and seg[{j}].s={s_j:.3f}"
+                )
 
 
 # ── Unit tests for _snap_boundary_out_of_word ──────────────────────────────
@@ -200,8 +249,8 @@ def test_clean_no_overlap():
         (0, 9.0, 10.5, 9.85, 10.65),   # e_pad = 10.65
         (1, 10.7, 11.0, 10.75, 11.10), # s = 10.75 — gap = 0.10 > 0.010 ✓
     ]
-    result, resolved = _simulate_stabilization([t for t in planned], wt)
-    _assert_invariants(result, wt, resolved)
+    result, resolved, gap_pres = _simulate_stabilization([t for t in planned], wt)
+    _assert_invariants(result, wt, resolved, gap_pres)
     print("PASS  test_clean_no_overlap")
 
 
@@ -212,8 +261,8 @@ def test_standard_overlap_clamp():
         (0, 8.0, 9.5, 8.85, 10.65),   # e_pad = 10.65
         (1, 10.0, 10.5, 9.85, 11.15), # s = 9.85 — overlap!
     ]
-    result, resolved = _simulate_stabilization([t for t in planned], wt)
-    _assert_invariants(result, wt, resolved)
+    result, resolved, gap_pres = _simulate_stabilization([t for t in planned], wt)
+    _assert_invariants(result, wt, resolved, gap_pres)
     print("PASS  test_standard_overlap_clamp")
 
 
@@ -237,10 +286,10 @@ def test_jamais_adjacent_words():
         (3, 14.0, 16.73, 14.85, 16.75),  # e_i=16.73, s_src=14.0
         (4, 16.73, 17.20, 16.73, 17.35), # s_src=16.73 → src_gap = 16.73 - 16.73 = 0
     ]
-    result, resolved = _simulate_stabilization([t for t in planned], wt)
+    result, resolved, gap_pres = _simulate_stabilization([t for t in planned], wt)
 
     # Both invariants must hold
-    _assert_invariants(result, wt, resolved)
+    _assert_invariants(result, wt, resolved, gap_pres)
 
     e_final = result[0][4]
     s_final = result[1][3]
@@ -275,9 +324,9 @@ def test_planned_gap_preserved_in_fallback():
         (3, 14.0, 16.73, 14.85, 16.85),  # e_i=16.73, e_pad=16.85 (inside jamais2)
         (4, 18.13, 19.50, 18.01, 19.62), # s_src=18.13, s_pad_orig=18.01
     ]
-    result, resolved = _simulate_stabilization([t for t in planned], wt)
+    result, resolved, gap_pres = _simulate_stabilization([t for t in planned], wt)
 
-    _assert_invariants(result, wt, resolved)
+    _assert_invariants(result, wt, resolved, gap_pres)
 
     e_final = result[0][4]
     s_final = result[1][3]
@@ -301,6 +350,86 @@ def test_planned_gap_preserved_in_fallback():
     print("PASS  test_planned_gap_preserved_in_fallback")
 
 
+def test_orphan_word_between_segments():
+    """
+    Fix 3 (orphan repair): a word [ws, we] fully between e_pad_i and s_j
+    must be assigned to the closer segment. Two sub-cases:
+      A) word closer to seg[i] → e[i] extends to we+gap_s
+      B) word closer to seg[j] → s[j] pulls back to ws-gap_s
+    """
+    # Case A: word [13.08, 13.36] equally close to both sides
+    # e_pad_i=13.080, s_j=13.360 → word exactly fills the gap
+    # d_i = 13.08 - 13.08 = 0 < d_j = 13.36 - 13.36 = 0 → tie → seg[j] wins
+    wt_a = [
+        (12.50, 13.08),   # last word of seg[i]
+        (13.08, 13.36),   # ORPHAN word
+        (13.36, 13.90),   # first word of seg[j]
+    ]
+    planned_a = [
+        (1, 12.00, 13.08, 12.50, 13.08),   # e_pad = 13.08 (= ws)
+        (2, 13.36, 13.90, 13.36, 14.02),   # s_j   = 13.36 (= we)
+    ]
+    result_a, resolved_a, gap_pres_a = _simulate_stabilization(list(planned_a), wt_a)
+    _assert_invariants(result_a, wt_a, resolved_a, gap_pres_a)
+    print(f"      orphan-A: e={result_a[0][4]:.3f} s={result_a[1][3]:.3f}")
+    print("PASS  test_orphan_word_between_segments (case A)")
+
+    # Case B: word [21.74, 21.98] orphaned because e_pad_i == ws and s_j == we
+    # (strict-inequality snap doesn't fire at exact boundaries).
+    # source gap = 21.98 - 21.70 = 0.28s < 300ms → orphan repair applies.
+    # d_i = 21.74 - 21.74 = 0 (tie), d_j = 21.98 - 21.98 = 0 → seg[j] wins.
+    wt_b = [
+        (20.80, 21.50),   # last word of seg[i]
+        (21.74, 21.98),   # ORPHAN — e_pad_i exactly at ws, s_j exactly at we
+        (22.10, 22.60),   # first word of seg[j]
+    ]
+    planned_b = [
+        (3, 20.00, 21.70, 20.50, 21.74),   # e_i=21.70, e_pad=21.74 (=ws, no strict snap)
+        (4, 21.98, 22.60, 21.98, 22.72),   # s_src=21.98, s_j=21.98 (=we, no strict snap)
+    ]
+    result_b, resolved_b, gap_pres_b = _simulate_stabilization(list(planned_b), wt_b)
+    _assert_invariants(result_b, wt_b, resolved_b, gap_pres_b)
+    e_b = result_b[0][4]
+    s_b = result_b[1][3]
+    print(f"      orphan-B: e={e_b:.3f} s={s_b:.3f}")
+    # s[j] must be pulled before orphan word (21.74) or to contact point
+    assert s_b <= 21.74, f"s[j]={s_b:.3f} should be <= 21.74 (before orphan)"
+    # e[i] must stay before or at s[j]
+    assert e_b < s_b + 1e-9, f"e[i]={e_b:.3f} must be < s[j]={s_b:.3f}"
+    print("PASS  test_orphan_word_between_segments (case B)")
+
+
+def test_gap_fallback_snaps_restored_s():
+    """
+    Fix 4 (universal snap): when the gap-preserving fallback restores the
+    original s_padded for seg[j], it must snap that value out of any word.
+    Here s_padded_orig = 27.52 falls inside 'retiens' [27.40, 27.80].
+    After fallback + snap, s[j] must be outside that word.
+    """
+    wt = [
+        (25.00, 25.60),   # last word of seg[i]
+        (26.20, 26.70),   # word in gap (excluded)
+        (27.40, 27.80),   # 'retiens' — s_padded_orig lands inside this
+        (28.00, 28.50),   # first word of seg[j]'s clip
+    ]
+    # Source gap = s_src_j - e_i = 27.50 - 25.60 = 1.90s > 300ms → GAP-PRESERVING
+    # s_padded_orig = 27.52 (inside 'retiens')
+    planned = [
+        (4, 24.00, 25.60, 24.50, 25.72),   # e_i=25.60
+        (5, 27.50, 28.50, 27.52, 28.62),   # s_src=27.50, s_pad_orig=27.52
+    ]
+    result, resolved, gap_pres = _simulate_stabilization(list(planned), wt)
+    _assert_invariants(result, wt, resolved, gap_pres)
+
+    s_final = result[1][3]
+    print(f"      fallback-snap: s_final={s_final:.3f}")
+    # s[j] must NOT be inside 'retiens' [27.40, 27.80]
+    assert not (27.40 < s_final < 27.80), (
+        f"s_final={s_final:.3f} is inside 'retiens' [27.40,27.80] — snap failed"
+    )
+    print("PASS  test_gap_fallback_snaps_restored_s")
+
+
 if __name__ == "__main__":
     test_word_snap_out_of_word()
     test_adjacent_word_contact_point()
@@ -308,4 +437,6 @@ if __name__ == "__main__":
     test_standard_overlap_clamp()
     test_jamais_adjacent_words()
     test_planned_gap_preserved_in_fallback()
+    test_orphan_word_between_segments()
+    test_gap_fallback_snaps_restored_s()
     print("\nAll tests passed.")
