@@ -8,10 +8,15 @@ from __future__ import annotations
 
 import re
 import shutil
+import threading
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+# One heavy render at a time — prevents N concurrent Chrome worker pools from
+# exhausting cgroup RAM.  Phase-1 (transcription) is light enough to overlap.
+_RENDER_SEM = threading.Semaphore(1)
 
 from app.agent.planner import FormatHint, analyze_subject_position, plan_edit, rewrite_hook
 from app.api.jobs import store
@@ -731,6 +736,19 @@ def run_render_phase(job_id: str, src: Path) -> None:
     job = store.get(job_id)
     if not job:
         return
+    # Serialize heavy renders: Chrome worker pools (8+ processes × 700 MB each)
+    # exhaust the cgroup limit when two renders overlap.  The semaphore queues
+    # the second render until the first is complete — no job is dropped.
+    _sem_acquired = _RENDER_SEM.acquire(blocking=False)
+    if not _sem_acquired:
+        print(
+            f"[PIPELINE] job {job_id}: render semaphore busy — queuing"
+            " (another render is in progress)",
+            flush=True,
+        )
+        store.update(job_id, message="En file d'attente (rendu précédent en cours)…")
+        _RENDER_SEM.acquire(blocking=True)
+        print(f"[PIPELINE] job {job_id}: render semaphore acquired — starting", flush=True)
     try:
         _t_phase2 = time.perf_counter()
         plan_data   = job.plan_data or {}
@@ -810,8 +828,9 @@ def run_render_phase(job_id: str, src: Path) -> None:
             for bd in broll_specs_d
         ]
 
-        # Free Whisper RAM before FFmpeg.
+        # Free Whisper RAM before FFmpeg + HyperFrames Chrome workers.
         unload_model()
+        print("[PIPELINE] Whisper model unloaded — RAM freed before render", flush=True)
 
         store.update(job_id, status="rendering", progress=70,
                      message="Rendering with FFmpeg…")
@@ -906,6 +925,8 @@ def run_render_phase(job_id: str, src: Path) -> None:
             error=f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
             message="Phase 2 (render) failed.",
         )
+    finally:
+        _RENDER_SEM.release()
 
 
 def _build_instructions(

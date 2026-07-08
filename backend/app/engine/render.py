@@ -2102,7 +2102,7 @@ def _render_hyperframes(
         env = _os.environ.copy()
         env["DISPLAY"] = env.get("DISPLAY", ":99")
 
-        def _cgroup_mem_gb() -> float | None:
+        def _cgroup_mem_limit_gb() -> float | None:
             for _p in ["/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory/memory.limit_in_bytes"]:
                 try:
                     _v = Path(_p).read_text().strip()
@@ -2113,14 +2113,33 @@ def _render_hyperframes(
                     continue
             return None
 
-        _mem_gb = _cgroup_mem_gb() or 8.0
-        _mem_workers = int(_mem_gb / 1.0)
+        def _cgroup_mem_used_gb() -> float | None:
+            for _p in ["/sys/fs/cgroup/memory.current",
+                       "/sys/fs/cgroup/memory/memory.usage_in_bytes"]:
+                try:
+                    return int(Path(_p).read_text().strip()) / (1024 ** 3)
+                except (FileNotFoundError, ValueError):
+                    continue
+            return None
+
+        _mem_limit_gb = _cgroup_mem_limit_gb() or 8.0
+        _mem_used_gb  = _cgroup_mem_used_gb()
+        # Workers are sized on AVAILABLE memory (limit − current RSS), not the
+        # cgroup limit.  The limit is a ceiling; the process is already using
+        # 1.5–2 GB (Python + ctranslate2 residual + ffmpeg) before Chrome starts.
+        if _mem_used_gb is not None:
+            _mem_avail_gb = max(0.5, _mem_limit_gb - _mem_used_gb)
+        else:
+            _mem_avail_gb = _mem_limit_gb * 0.6   # conservative fallback
+        _mem_workers = min(24, max(4, int(_mem_avail_gb / 1.0)))
         _cpu_count = _os.cpu_count() or 8
         _cpu_workers = max(4, _cpu_count - 2)
         _n_workers = min(24, max(4, min(_mem_workers, _cpu_workers)))
         print(
-            f"[HF] workers: {_n_workers} "
-            f"(mem {_mem_gb:.1f}GB→{_mem_workers}, cpu {_cpu_count}→{_cpu_workers}, cap 24)",
+            f"[HF] workers: {_n_workers}"
+            f" (limit={_mem_limit_gb:.1f}GB used={_mem_used_gb:.1f}GB"
+            f" avail={_mem_avail_gb:.1f}GB→{_mem_workers},"
+            f" cpu {_cpu_count}→{_cpu_workers}, cap 24)",
             flush=True,
         )
 
