@@ -39,6 +39,10 @@ from app.core.config import settings
 #
 # On Linux / macOS we fall back to shutil.which() → bare name.
 # ---------------------------------------------------------------------------
+# Verbatim ASR: preserve disfluences (Euh, Bah, repetitions) for LLM editorial layer.
+# Set VERBATIM_ASR=false to revert to clean/beam mode.
+_VERBATIM_ASR = os.getenv("VERBATIM_ASR", "true").lower() != "false"
+
 if sys.platform == "win32":
     _WIN_CANDIDATES = [
         r"C:\Users\KANWAGI\Downloads\ffmpeg-master-latest-win64-gpl-shared\ffmpeg-master-latest-win64-gpl-shared\bin",
@@ -206,21 +210,48 @@ def transcribe(video_path: Path) -> Transcript:
         _extract_audio_wav(video_path, wav_path)
 
         model = _load_model()
+
+        # Select transcription params based on mode.
+        # VERBATIM: suppresses Whisper's built-in cleaning so fillers/repetitions are preserved.
+        # CLEAN:    deterministic beam search, high-conf output (legacy behaviour).
+        if _VERBATIM_ASR:
+            _transcribe_kwargs: dict = dict(
+                beam_size=5,
+                best_of=5,
+                # Fallback chain: deterministic first, stochastic if compression_ratio too high.
+                temperature=[0.0, 0.2, 0.4],
+                condition_on_previous_text=False,   # no context carry-over → each segment fresh
+                suppress_tokens=[],                 # keep ALL tokens incl. hesitation sounds
+                initial_prompt=(
+                    "Euh, bah, ben, hein, ouais, hm, enfin voilà. "
+                    "Je je pense, il il faut, parce que parce que, c'est c'est."
+                ),
+                no_speech_threshold=0.6,
+                compression_ratio_threshold=2.4,    # tolerate repetition (stutters are repetition)
+            )
+            _MIN_WORD_DUR = 0.010
+            _MIN_WORD_PROB = 0.15   # fillers score low (suppress_tokens=[]) but are real
+            print("[WHISPER] mode=VERBATIM (VERBATIM_ASR=true)", flush=True)
+        else:
+            _transcribe_kwargs = dict(
+                beam_size=10,
+                best_of=10,
+                temperature=[0.0],
+                condition_on_previous_text=True,
+                no_speech_threshold=0.4,
+                compression_ratio_threshold=2.0,
+            )
+            _MIN_WORD_DUR = 0.010
+            _MIN_WORD_PROB = 0.30
+            print("[WHISPER] mode=CLEAN (VERBATIM_ASR=false)", flush=True)
+
         seg_iter, info = model.transcribe(  # type: ignore[union-attr]
             str(wav_path),
             word_timestamps=True,
-            beam_size=10,                   # higher beam = fewer word errors
-            best_of=10,                     # pick best of N random samples
-            temperature=[0.0],              # deterministic — no hallucination variance
-            condition_on_previous_text=True,  # use context for proper nouns / numbers
-            no_speech_threshold=0.4,        # filter non-speech segments
-            compression_ratio_threshold=2.0,  # drop garbage repetition transcriptions
             vad_filter=False,               # silero-VAD adds ~60MB onnxruntime overhead
             language=None,                  # auto-detect: French, English, Spanish, Arabic
+            **_transcribe_kwargs,
         )
-
-        _MIN_WORD_DUR = 0.01   # 10ms — catches true artifacts but keeps quick function words
-        _MIN_WORD_PROB = 0.3   # 30% — short words often score low even when correct
 
         segments: list[Segment] = []
         last_end = 0.0

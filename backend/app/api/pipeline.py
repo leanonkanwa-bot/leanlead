@@ -156,6 +156,123 @@ def _guard_drops_against_key_content(
     return filtered
 
 
+def _llm_editorial_cuts(
+    transcript: dict,
+    key_lines: list[str],
+) -> list:
+    """Call Claude Haiku with the verbatim numbered transcript → list of DropSegments to cut.
+
+    Rules encoded in the prompt:
+    - Fillers (Euh, Bah, Ben, Hein, Hm), accidental repetitions, false starts → cut
+    - Rhetorical repetitions (3+ identical consecutive) → keep
+    - Last occurrence of a stutter repetition → keep, cut the earlier ones
+    - Never touch key_lines content → passed explicitly in prompt
+    - When in doubt → do NOT cut
+    """
+    import json as _json
+    import re as _re
+    import time as _time
+
+    from anthropic import Anthropic as _Anthropic
+    from app.engine.silence_remover import DropSegment as _DS
+
+    words = [w for seg in transcript.get("segments", []) for w in seg.get("words", [])]
+    if not words:
+        return []
+
+    # Build numbered transcript (cap at 400 words to stay within Haiku context)
+    _MAX_WORDS = 400
+    numbered = "\n".join(
+        f"[{i}] {str(w.get('text', '')).strip()}"
+        for i, w in enumerate(words[:_MAX_WORDS])
+    )
+    _truncated = len(words) > _MAX_WORDS
+
+    key_lines_str = "\n".join(f"- {l}" for l in key_lines[:10]) if key_lines else "(aucun)"
+
+    prompt = f"""Tu es un éditeur vidéo expert. Transcription VERBATIM numérotée (un indice par mot) :
+
+{numbered}{"...(tronqué)" if _truncated else ""}
+
+CONSIGNES :
+1. Coupe uniquement : fillers isolés (Euh, Bah, Ben, Hein, Hm, ouais isolé), répétitions accidentelles (même mot/groupe répété consécutivement), faux départs (phrase relancée immédiatement)
+2. Répétitions : garde LA DERNIÈRE occurrence, coupe les précédentes (ex: "il il faut" → coupe indice 0 "il", garde indice 1 "il faut")
+3. Répétitions rhétoriques volontaires (3+ fois identiques) = NE PAS TOUCHER
+4. NE JAMAIS toucher ces extraits clés :
+{key_lines_str}
+5. En cas de doute → NE PAS COUPER
+
+Réponds UNIQUEMENT en JSON strict (aucun texte avant/après) :
+{{"cuts": [{{"indices": [debut, fin_inclus], "reason": "filler|repetition|false_start|premature_conclusive"}}]}}
+
+Exemple — si [2] est "Euh" et [5]-[6] sont "il il" (répétition de "il") :
+{{"cuts": [{{"indices": [2, 2], "reason": "filler"}}, {{"indices": [5, 5], "reason": "repetition"}}]}}
+
+Si rien à couper : {{"cuts": []}}"""
+
+    _t0 = _time.perf_counter()
+    try:
+        client = _Anthropic()
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+    except Exception as e:
+        print(f"[LLM-EDIT] API error: {e}", flush=True)
+        return []
+
+    _latency = _time.perf_counter() - _t0
+    _in_tok = response.usage.input_tokens
+    _out_tok = response.usage.output_tokens
+    # Haiku 4.5: $0.80/1M input, $4.00/1M output
+    _cost = (_in_tok * 0.80 + _out_tok * 4.00) / 1_000_000
+    print(
+        f"[LLM-EDIT] latency={_latency:.1f}s tokens={_in_tok}in+{_out_tok}out cost=${_cost:.4f}",
+        flush=True,
+    )
+
+    raw = response.content[0].text.strip()
+    m = _re.search(r'\{.*\}', raw, _re.DOTALL)
+    if not m:
+        print(f"[LLM-EDIT] no JSON in response: {raw[:200]}", flush=True)
+        return []
+
+    try:
+        data = _json.loads(m.group())
+    except _json.JSONDecodeError as e:
+        print(f"[LLM-EDIT] JSON parse error: {e} | raw: {raw[:200]}", flush=True)
+        return []
+
+    drops = []
+    for cut in data.get("cuts", []):
+        idx = cut.get("indices", [])
+        reason = cut.get("reason", "llm_editorial")
+        if len(idx) != 2:
+            continue
+        i0, i1 = int(idx[0]), int(idx[1])
+        if i0 < 0 or i1 >= len(words) or i0 > i1:
+            print(f"[LLM-EDIT] skip invalid indices [{i0},{i1}] (words={len(words)})", flush=True)
+            continue
+        t_start = float(words[i0].get("start", 0))
+        t_end   = float(words[i1].get("end", 0))
+        if t_end <= t_start:
+            continue
+        cut_text = " ".join(str(words[k].get("text", "")).strip() for k in range(i0, i1 + 1))
+        print(
+            f"[LLM-EDIT] cut [{i0},{i1}] t={t_start:.2f}-{t_end:.2f}s "
+            f"reason={reason} text={cut_text!r}",
+            flush=True,
+        )
+        drops.append(_DS(start=t_start, end=t_end, reason=f"llm_{reason}"))
+
+    print(
+        f"[LLM-EDIT] {len(drops)} cut(s) from {len(data.get('cuts', []))} suggestion(s)",
+        flush=True,
+    )
+    return drops
+
+
 def run_job(
     job_id: str,
     src: Path,
@@ -351,6 +468,25 @@ def run_job(
             editing_style=editing_style,
         )
         print(f"[TIMING] planning: {time.perf_counter()-_t:.1f}s", flush=True)
+
+        # ── Step 6.5: LLM editorial layer ────────────────────────────────────
+        # Claude receives the verbatim transcript numbered word-by-word and returns
+        # the indices to cut (fillers, accidental repetitions, false starts).
+        # Runs AFTER planning so key_lines can be passed to the prompt.
+        # The CUT-GUARD below is a second safety net in case the LLM overshoots.
+        _t = time.perf_counter()
+        try:
+            _llm_drops = _llm_editorial_cuts(transcript, plan.key_lines or [])
+            if _llm_drops:
+                filler_drops = filler_drops + _llm_drops
+                print(
+                    f"[LLM-EDIT] merged {len(_llm_drops)} cut(s) into filler_drops "
+                    f"(total now {len(filler_drops)})",
+                    flush=True,
+                )
+        except Exception as _llm_exc:
+            print(f"[LLM-EDIT] error (skipping): {_llm_exc}", flush=True)
+        print(f"[TIMING] llm_editorial: {time.perf_counter()-_t:.1f}s", flush=True)
 
         # ── Semantic guard: reject drops that overlap key_line words ───────
         _pre_guard_ranges = {(d.start, d.end) for d in filler_drops}
