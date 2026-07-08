@@ -756,7 +756,7 @@ def pretrim(
         for _pi in range(len(_planned) - 1):
             _i, _s_src_i, _e_i, _s_i, _e_i_pad = _planned[_pi]
             _j, _s_src_j, _e_j, _s_j, _e_j_pad = _planned[_pi + 1]
-            if _e_i_pad > _s_j - 0.010:
+            if round(_e_i_pad, 3) > round(_s_j - 0.010, 3):
                 _mid = (_e_i_pad + _s_j) / 2.0
                 _planned[_pi]     = (_i, _s_src_i, _e_i, _s_i, _mid - 0.005)
                 _planned[_pi + 1] = (_j, _s_src_j, _e_j, _mid + 0.005, _e_j_pad)
@@ -923,7 +923,7 @@ def pretrim(
         for _pi in range(len(_planned) - 1):
             _i, _s_src_i, _e_i, _s_i, _e_i_pad = _planned[_pi]
             _j, _s_src_j, _e_j, _s_j, _e_j_pad = _planned[_pi + 1]
-            if _e_i_pad > _s_j - 0.010 and _pi not in _resolved:
+            if round(_e_i_pad, 3) > round(_s_j - 0.010, 3) and _pi not in _resolved:
                 _mid = (_e_i_pad + _s_j) / 2.0
                 _planned[_pi]     = (_i, _s_src_i, _e_i, _s_i, _mid - 0.005)
                 _planned[_pi + 1] = (_j, _s_src_j, _e_j, _mid + 0.005, _e_j_pad)
@@ -934,12 +934,19 @@ def pretrim(
                 )
 
     # ── Final assert: overlap, word-clean, and orphan invariants ─────────────
+    # All comparisons use round(x, 3) — we work in milliseconds; comparing raw
+    # float64 triggers false positives (e.g. 20.685 - 0.010 = 20.674999...997
+    # when the mathematically correct result is 20.675, causing a spurious assert).
+    _R = 3  # shared rounding precision (ms)
     for _pi in range(len(_planned) - 1):
         _i, _, _e_i, _s_i, _e_i_pad = _planned[_pi]
         _j, _s_src_j, _, _s_j, _ = _planned[_pi + 1]
         # Force-resolved pairs allow e == s (0-gap); normal pairs need 10ms buffer.
         _min_gap = 0.0 if _pi in _resolved else 0.010
-        if _e_i_pad > _s_j - _min_gap:
+        _e_r = round(_e_i_pad, _R)
+        _s_r = round(_s_j, _R)
+        _thresh_r = round(_s_j - _min_gap, _R)
+        if _e_r > _thresh_r:
             raise RuntimeError(
                 f"[PRETRIM] INVARIANT: seg[{_i}].e={_e_i_pad:.3f}"
                 f" > seg[{_j}].s - {_min_gap:.3f} = {_s_j - _min_gap:.3f}"
@@ -950,19 +957,21 @@ def pretrim(
                 break  # _wt is sorted; no further word can straddle this boundary
             if we - ws < 0.030:
                 continue
-            if ws < _e_i_pad < we:
+            _ws_r = round(ws, _R)
+            _we_r = round(we, _R)
+            if _ws_r < _e_r < _we_r:
                 raise RuntimeError(
                     f"[PRETRIM] INVARIANT: seg[{_i}].e={_e_i_pad:.3f}"
                     f" inside word [{ws:.3f},{we:.3f}]"
                 )
-            if ws < _s_j < we:
+            if _ws_r < _s_r < _we_r:
                 raise RuntimeError(
                     f"[PRETRIM] INVARIANT: seg[{_j}].s={_s_j:.3f}"
                     f" inside word [{ws:.3f},{we:.3f}]"
                 )
             # Orphan: word entirely in the gap [e_i_pad, s_j]
             # Skip for pairs with a large source gap — excluded words are intentional.
-            if _s_src_j - _e_i <= 0.300 and _e_i_pad <= ws and we <= _s_j:
+            if _s_src_j - _e_i <= 0.300 and _e_r <= _ws_r and _we_r <= _s_r:
                 raise RuntimeError(
                     f"[PRETRIM] INVARIANT: word [{ws:.3f},{we:.3f}] orphaned"
                     f" between seg[{_i}].e={_e_i_pad:.3f} and seg[{_j}].s={_s_j:.3f}"
