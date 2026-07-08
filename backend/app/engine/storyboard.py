@@ -494,6 +494,27 @@ def generate_storyboard(
         language=language,
     )
 
+    # Fix 5: Timing audit — graphic card startSec must land near actual speech.
+    # A card that starts >1.0s before any word is spoken is spoiling speech.
+    for _gc in graphic_cards:
+        _start = float(_gc.get("startSec", 0))
+        _near = [w for w in remapped_words if _start - 0.3 <= w.start <= _start + 1.0]
+        if not _near:
+            _closest = min(remapped_words, key=lambda w: abs(w.start - _start), default=None)
+            _cl_str = (f"nearest='{_closest.text}'@{_closest.start:.2f}s"
+                       if _closest else "no words")
+            print(
+                f"[STORYBOARD] CRITICAL card {_gc.get('id','?')} startSec={_start:.2f}s "
+                f"has NO speech in [{_start-0.3:.2f},{_start+1.0:.2f}] — {_cl_str}",
+                flush=True,
+            )
+        else:
+            print(
+                f"[STORYBOARD] card {_gc.get('id','?')} startSec={_start:.2f}s "
+                f"first nearby word='{_near[0].text}'@{_near[0].start:.2f}s",
+                flush=True,
+            )
+
     # Generate caption cards mechanically
     caption_cards = _segment_captions(
         remapped_words=remapped_words,

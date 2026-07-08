@@ -664,31 +664,47 @@ def word_safe_drops(
             continue
 
         # There are collateral words: try to shrink to avoid them.
-        before = [w for w in real_words if float(w["end"]) <= ce - 0.005]
-        after  = [w for w in real_words if float(w["start"]) >= cs + 0.005]
+        # Bound both lists to words whose relevant edge is WITHIN [cs, ce] so
+        # that before[-1] and after[0] always point to a word inside the drop —
+        # words outside [cs, ce] would push new_start/new_end beyond the bounds.
+        before = [w for w in real_words
+                  if float(w["end"]) > cs and float(w["end"]) <= ce - 0.005]
+        after  = [w for w in real_words
+                  if float(w["start"]) >= cs + 0.005 and float(w["start"]) < ce]
         if not before or not after:
             txt = " ".join(str(w.get("text", "")).strip() for w in collateral[:5])
             print(
                 f"[WORD-SAFE] cancelled drop {cs:.2f}-{ce:.2f}"
-                f" (no real silence; collateral: '{txt}')",
+                f" (no real silence within bounds; collateral: '{txt}')",
                 flush=True,
             )
             continue
 
         new_start = float(before[-1]["end"]) + pad_s
         new_end   = float(after[0]["start"]) - pad_s
-        # If the computed silence window escapes the original drop interval the
-        # "silence" is outside [cs, ce] — the drop is sitting entirely over speech
-        # with no usable internal silence.  Cancel rather than relocate the cut.
-        if new_start >= ce - 0.005 or new_end <= cs + 0.005:
+
+        # A shrunk interval that escapes [cs, ce] means the only "silence"
+        # found is outside the drop — relocating the cut is never correct.
+        # Cancel rather than expand or shift the original drop.
+        _escapes = (new_start >= ce - 0.005 or new_end <= cs + 0.005
+                    or new_start < cs - 0.005 or new_end > ce + 0.005)
+        if _escapes:
             txt = " ".join(str(w.get("text", "")).strip() for w in collateral[:5])
             print(
                 f"[WORD-SAFE] cancelled drop {cs:.2f}-{ce:.2f}"
-                f" (silence {new_start:.2f}-{new_end:.2f} escapes drop bounds;"
+                f" (shrunk [{new_start:.2f},{new_end:.2f}] escapes bounds;"
                 f" collateral: '{txt}')",
                 flush=True,
             )
             continue
+
+        # Hard clamp — belt-and-suspenders after the escape check.
+        new_start = max(cs, new_start)
+        new_end   = min(ce, new_end)
+        assert new_start >= cs - 1e-6 and new_end <= ce + 1e-6, (
+            f"word_safe: [{new_start:.3f},{new_end:.3f}] outside original [{cs:.3f},{ce:.3f}]"
+        )
+
         if new_end - new_start < min_cut_s:
             txt = " ".join(str(w.get("text", "")).strip() for w in collateral[:5])
             print(

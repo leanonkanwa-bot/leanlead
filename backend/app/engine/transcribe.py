@@ -293,6 +293,12 @@ def transcribe(video_path: Path) -> Transcript:
         else:
             print(f"[WHISPER] Kept all {_total_words} words (0 dropped)")
 
+        # Fix 3: first-10-words diagnostic — show timestamps + text so we can audit
+        # whether disfluences (Euh, Bah…) were captured or silently dropped.
+        _all_flat = [(w.text, round(w.start, 2), round(w.end, 2))
+                     for s in segments for w in s.words]
+        print(f"[WHISPER] First 10 words: {_all_flat[:10]}", flush=True)
+
         # Diagnostic: audio duration vs transcript coverage
         try:
             _wav_probe = subprocess.run(

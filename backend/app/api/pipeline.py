@@ -156,6 +156,51 @@ def _guard_drops_against_key_content(
     return filtered
 
 
+def _dedup_drops(drops: list) -> list:
+    """Merge drops with >50% overlap — keep the narrower (more precise) interval.
+
+    Called after LLM + lexical drops are merged to prevent double-cuts where
+    both layers identify the same filler word (e.g. 'Bah' by LLM and regex).
+    """
+    from app.engine.silence_remover import DropSegment as _DS
+    if len(drops) <= 1:
+        return drops
+    ordered = sorted(drops, key=lambda d: d.start)
+    result: list = []
+    for d in ordered:
+        if not result:
+            result.append(d)
+            continue
+        prev = result[-1]
+        overlap = min(prev.end, d.end) - max(prev.start, d.start)
+        if overlap <= 0:
+            result.append(d)
+            continue
+        span_prev = prev.end - prev.start
+        span_d    = d.end - d.start
+        threshold = 0.5 * min(span_prev, span_d)
+        if overlap > threshold:
+            # >50% overlap relative to the smaller drop → dedup, keep narrower
+            if span_d < span_prev:
+                print(
+                    f"[DEDUP] {prev.reason} [{prev.start:.2f}-{prev.end:.2f}]"
+                    f" superseded by narrower {d.reason} [{d.start:.2f}-{d.end:.2f}]"
+                    f" (overlap={overlap:.3f}s)",
+                    flush=True,
+                )
+                result[-1] = d
+            else:
+                print(
+                    f"[DEDUP] {d.reason} [{d.start:.2f}-{d.end:.2f}]"
+                    f" merged into {prev.reason} [{prev.start:.2f}-{prev.end:.2f}]"
+                    f" (overlap={overlap:.3f}s)",
+                    flush=True,
+                )
+        else:
+            result.append(d)
+    return result
+
+
 def _llm_editorial_cuts(
     transcript: dict,
     key_lines: list[str],
@@ -170,6 +215,7 @@ def _llm_editorial_cuts(
     - When in doubt → do NOT cut
     """
     import json as _json
+    import os as _os
     import re as _re
     import time as _time
 
@@ -180,42 +226,49 @@ def _llm_editorial_cuts(
     if not words:
         return []
 
-    # Build numbered transcript (cap at 400 words to stay within Haiku context)
-    _MAX_WORDS = 400
+    # Build numbered transcript (cap at 600 words — Haiku context is large)
+    _MAX_WORDS = 600
     numbered = "\n".join(
         f"[{i}] {str(w.get('text', '')).strip()}"
         for i, w in enumerate(words[:_MAX_WORDS])
     )
     _truncated = len(words) > _MAX_WORDS
+    _max_idx = min(len(words), _MAX_WORDS) - 1
 
     key_lines_str = "\n".join(f"- {l}" for l in key_lines[:10]) if key_lines else "(aucun)"
 
-    prompt = f"""Tu es un éditeur vidéo expert. Transcription VERBATIM numérotée (un indice par mot) :
+    prompt = f"""Tu es un éditeur vidéo expert. Transcription VERBATIM numérotée (un indice = un mot) :
 
-{numbered}{"...(tronqué)" if _truncated else ""}
+{numbered}{"...(tronqué après [{_max_idx}])" if _truncated else ""}
 
 CONSIGNES :
-1. Coupe uniquement : fillers isolés (Euh, Bah, Ben, Hein, Hm, ouais isolé), répétitions accidentelles (même mot/groupe répété consécutivement), faux départs (phrase relancée immédiatement)
-2. Répétitions : garde LA DERNIÈRE occurrence, coupe les précédentes (ex: "il il faut" → coupe indice 0 "il", garde indice 1 "il faut")
-3. Répétitions rhétoriques volontaires (3+ fois identiques) = NE PAS TOUCHER
-4. NE JAMAIS toucher ces extraits clés :
+0. SCAN SYSTÉMATIQUE : examine CHAQUE indice de [0] à [{_max_idx}] sans en sauter aucun.
+1. Coupe uniquement : fillers isolés (Euh, Bah, Ben, Hein, Hm, ouais isolé), répétitions accidentelles (même mot/groupe répété consécutivement), faux départs (phrase relancée immédiatement).
+2. Répétitions simples : garde LA DERNIÈRE occurrence, coupe les précédentes. Ex : "[5] il [6] il [7] faut" → coupe [5,5], garde [6,7].
+3. Répétitions multi-mots : identifie les groupes de mots répétés. Ex : "[12] parce [13] qu'ils [14] parce [15] qu'ils" → coupe [12,13] (premier groupe), garde [14,15].
+4. Répétitions rhétoriques VOLONTAIRES (3+ occurrences identiques, effet stylistique) = NE PAS TOUCHER.
+5. NE JAMAIS toucher ces extraits clés :
 {key_lines_str}
-5. En cas de doute → NE PAS COUPER
+6. En cas de doute → NE PAS COUPER.
 
-Réponds UNIQUEMENT en JSON strict (aucun texte avant/après) :
-{{"cuts": [{{"indices": [debut, fin_inclus], "reason": "filler|repetition|false_start|premature_conclusive"}}]}}
+Réponds UNIQUEMENT en JSON strict (aucun texte avant ni après).
+"cuts" = ce qui doit être coupé. "kept" = candidats que tu as examinés mais décidé de GARDER (liste tous pour audit) :
+{{"cuts": [{{"indices": [debut, fin_inclus], "reason": "filler|repetition|false_start|premature_conclusive"}}], "kept": [{{"indices": [i, j], "reason": "kept — explication"}}]}}
 
-Exemple — si [2] est "Euh" et [5]-[6] sont "il il" (répétition de "il") :
-{{"cuts": [{{"indices": [2, 2], "reason": "filler"}}, {{"indices": [5, 5], "reason": "repetition"}}]}}
+Exemple — [2]="Euh", [5]-[6]="il il", [12]-[15]="parce qu'ils parce qu'ils", [20]-[22] répétition rhétorique gardée :
+{{"cuts": [{{"indices": [2, 2], "reason": "filler"}}, {{"indices": [5, 5], "reason": "repetition"}}, {{"indices": [12, 13], "reason": "repetition"}}], "kept": [{{"indices": [20, 22], "reason": "kept — répétition rhétorique volontaire 3× stylistique"}}]}}
 
-Si rien à couper : {{"cuts": []}}"""
+Si rien à couper : {{"cuts": [], "kept": []}}"""
+
+    # Model: default Haiku, override with LLM_EDITORIAL_MODEL for deeper analysis
+    _model = _os.getenv("LLM_EDITORIAL_MODEL", "claude-haiku-4-5-20251001")
 
     _t0 = _time.perf_counter()
     try:
         client = _Anthropic()
         response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
+            model=_model,
+            max_tokens=1500,
             messages=[{"role": "user", "content": prompt}],
         )
     except Exception as e:
@@ -225,10 +278,14 @@ Si rien à couper : {{"cuts": []}}"""
     _latency = _time.perf_counter() - _t0
     _in_tok = response.usage.input_tokens
     _out_tok = response.usage.output_tokens
-    # Haiku 4.5: $0.80/1M input, $4.00/1M output
-    _cost = (_in_tok * 0.80 + _out_tok * 4.00) / 1_000_000
+    # Haiku 4.5: $0.80/1M input, $4.00/1M output  |  Sonnet 4.5: $3/$15
+    if "haiku" in _model:
+        _cost = (_in_tok * 0.80 + _out_tok * 4.00) / 1_000_000
+    else:
+        _cost = (_in_tok * 3.00 + _out_tok * 15.00) / 1_000_000
     print(
-        f"[LLM-EDIT] latency={_latency:.1f}s tokens={_in_tok}in+{_out_tok}out cost=${_cost:.4f}",
+        f"[LLM-EDIT] model={_model} latency={_latency:.1f}s "
+        f"tokens={_in_tok}in+{_out_tok}out cost=${_cost:.4f}",
         flush=True,
     )
 
@@ -243,6 +300,16 @@ Si rien à couper : {{"cuts": []}}"""
     except _json.JSONDecodeError as e:
         print(f"[LLM-EDIT] JSON parse error: {e} | raw: {raw[:200]}", flush=True)
         return []
+
+    # Log "kept" items for exhaustiveness audit
+    for kept in data.get("kept", []):
+        k_idx = kept.get("indices", [])
+        k_reason = kept.get("reason", "")
+        if len(k_idx) == 2:
+            k0, k1 = int(k_idx[0]), int(k_idx[1])
+            if 0 <= k0 <= k1 < len(words):
+                k_text = " ".join(str(words[k].get("text", "")).strip() for k in range(k0, k1 + 1))
+                print(f"[LLM-EDIT] kept [{k0},{k1}] text={k_text!r} reason={k_reason!r}", flush=True)
 
     drops = []
     for cut in data.get("cuts", []):
@@ -267,7 +334,8 @@ Si rien à couper : {{"cuts": []}}"""
         drops.append(_DS(start=t_start, end=t_end, reason=f"llm_{reason}"))
 
     print(
-        f"[LLM-EDIT] {len(drops)} cut(s) from {len(data.get('cuts', []))} suggestion(s)",
+        f"[LLM-EDIT] {len(drops)} cut(s) from {len(data.get('cuts', []))} suggestion(s) "
+        f"| {len(data.get('kept', []))} kept item(s) audited",
         flush=True,
     )
     return drops
@@ -478,10 +546,12 @@ def run_job(
         try:
             _llm_drops = _llm_editorial_cuts(transcript, plan.key_lines or [])
             if _llm_drops:
-                filler_drops = filler_drops + _llm_drops
+                _pre_merge = len(filler_drops)
+                filler_drops = _dedup_drops(filler_drops + _llm_drops)
                 print(
-                    f"[LLM-EDIT] merged {len(_llm_drops)} cut(s) into filler_drops "
-                    f"(total now {len(filler_drops)})",
+                    f"[LLM-EDIT] merged {len(_llm_drops)} cut(s):"
+                    f" {_pre_merge} lexical + {len(_llm_drops)} LLM"
+                    f" → {len(filler_drops)} after dedup",
                     flush=True,
                 )
         except Exception as _llm_exc:
@@ -623,6 +693,14 @@ def run_job(
         # filler drop is "lost by non-selection".  Extend the preceding segment
         # to include it — after this point, a word can only vanish via an
         # explicit, word-safe-validated drop, never by a silent planning hole.
+
+        # Fix 6: build occurrence index so we can trace repeated words (e.g. 'jamais' x3)
+        from collections import Counter as _Counter
+        _src_word_counts = _Counter(
+            str(w.get("text", "")).strip().lower() for w in _source_words
+        )
+        _repeated_vocab = {t for t, c in _src_word_counts.items() if c > 1}
+
         _n_rescued = 0
         for _gi in range(len(_keep_raw) - 1):
             _gs_c = float(_keep_raw[_gi].get("end", 0))
@@ -680,6 +758,21 @@ def run_job(
                 f" (src {_gs_src:.2f}->{_last_w_end_src:.2f}): '{_wtxt}'",
                 flush=True,
             )
+            # Fix 6: flag repeated words being rescued so we can trace occurrences
+            _rep_rescued = [
+                (str(w.get("text", "")).strip(), round(float(w.get("start", 0)), 2))
+                for w in _gap_uncov
+                if str(w.get("text", "")).strip().lower() in _repeated_vocab
+            ]
+            if _rep_rescued:
+                _rep_detail = [
+                    f"'{t}'@{ts}s (×{_src_word_counts[t.lower()]} in transcript)"
+                    for t, ts in _rep_rescued
+                ]
+                print(
+                    f"[GAP-RESCUE] gap-{_gi} rescued REPEATED word(s): {_rep_detail}",
+                    flush=True,
+                )
         if _n_rescued:
             print(
                 f"[GAP-RESCUE] {_n_rescued} segment(s) extended to recover lost speech",
