@@ -126,7 +126,7 @@ def _acoustic_stutter_cuts(
     min_word_dur: float = 0.55,
     max_token_chars: int = 4,
     noise_db: float = -30.0,
-    detect_min_s: float = 0.15,
+    detect_min_s: float = 0.10,
     act_min_s: float = 0.20,
 ) -> list[tuple[float, float]]:
     """Return physical-cut intervals (output-space) for intra-word hesitations.
@@ -177,25 +177,67 @@ def _acoustic_stutter_cuts(
             flush=True,
         )
 
-        # Run silencedetect directly on the word's interval in the output video.
-        # -vn skips video decoding — audio-only for fast probe.
+        # ── Volume probe: measure peak level to compute adaptive silence threshold ──
+        # -30dB (the fixed default) is often too strict — breath/hesitation gaps
+        # may only dip to -22dB. We measure max_volume and set threshold 20dB below.
+        _adaptive_db = noise_db  # fallback
         try:
-            _sd = subprocess.run(
+            _vd = subprocess.run(
                 [
-                    FFMPEG_PATH, "-y", "-loglevel", "error",
+                    FFMPEG_PATH, "-y", "-loglevel", "info",
                     "-ss", f"{w.start:.6f}", "-accurate_seek",
                     "-i", str(video_path),
                     "-t", f"{dur:.6f}",
-                    "-vn",
-                    "-af", f"silencedetect=noise={noise_db}dB:d={detect_min_s}",
+                    "-vn", "-af", "volumedetect",
                     "-f", "null", "-",
                 ],
                 capture_output=True, text=True,
             )
+            _vd_out = _vd.stderr
+            _max_m  = re.search(r"max_volume:\s*([\-\d.]+)", _vd_out)
+            _mean_m = re.search(r"mean_volume:\s*([\-\d.]+)", _vd_out)
+            _max_vol  = float(_max_m.group(1))  if _max_m  else None
+            _mean_vol = float(_mean_m.group(1)) if _mean_m else None
+            if _max_vol is not None:
+                # 20 dB below speech peak → catches hesitation dips
+                _adaptive_db = max(-42.0, _max_vol - 20.0)
+            print(
+                f"[ACOUSTIC-STUTTER] volume '{w.text}':"
+                f" mean={_mean_vol}dB max={_max_vol}dB"
+                f" → noise_threshold={_adaptive_db:.1f}dB",
+                flush=True,
+            )
+        except Exception as _vexc:
+            print(
+                f"[ACOUSTIC-STUTTER] volume probe failed for '{w.text}': {_vexc}"
+                f" → using {_adaptive_db:.1f}dB",
+                flush=True,
+            )
+
+        # ── Silence probe ──────────────────────────────────────────────────────
+        _sd_cmd = [
+            FFMPEG_PATH, "-y", "-loglevel", "error",
+            "-ss", f"{w.start:.6f}", "-accurate_seek",
+            "-i", str(video_path),
+            "-t", f"{dur:.6f}",
+            "-vn",
+            "-af", f"silencedetect=noise={_adaptive_db:.1f}dB:d={detect_min_s}",
+            "-f", "null", "-",
+        ]
+        print(f"[ACOUSTIC-STUTTER] cmd: {' '.join(_sd_cmd)}", flush=True)
+        try:
+            _sd  = subprocess.run(_sd_cmd, capture_output=True, text=True)
             _out = _sd.stderr
         except Exception as _exc:
             print(f"[ACOUSTIC-STUTTER] probe failed for '{w.text}': {_exc}", flush=True)
             continue
+
+        # Log only silence-related lines so output stays readable.
+        _sil_lines = [ln for ln in _out.splitlines() if "silence" in ln.lower()]
+        print(
+            f"[ACOUSTIC-STUTTER] raw '{w.text}': {_sil_lines}",
+            flush=True,
+        )
 
         # Parse all silence_start / silence_end pairs (relative to start of word clip)
         _sil_starts = [float(m.group(1)) for m in re.finditer(r"silence_start: ([\d.]+)", _out)]
@@ -937,6 +979,52 @@ def pretrim(
     for _pi, (i, s_src, e, s_padded, e_padded) in enumerate(_planned):
         # Split this segment around any filler drops that fall within it.
         sub_intervals = _subtract_fillers(s_padded, e_padded, filler_drops or [])
+
+        # ── Snap internal sub-interval edges word-clean ───────────────────────
+        # _subtract_fillers cuts at filler drop boundaries (filler.start / filler.end).
+        # These edges can land inside words — the outer segment boundaries were
+        # protected by the universal snap, but the INTERNAL edges were not.
+        # Apply the same word-aware snap to each internal cut point.
+        if len(sub_intervals) > 1:
+            _sub_mut: list[list[float]] = [[si_s, si_e] for si_s, si_e in sub_intervals]
+            for _sk in range(len(_sub_mut)):
+                # Snap end of sub-interval k (internal edge — skip the last sub's end
+                # which is the outer segment boundary, already covered by universal snap).
+                if _sk < len(_sub_mut) - 1:
+                    _old_e = _sub_mut[_sk][1]
+                    _new_e, _sw = _snap_boundary_out_of_word(
+                        _old_e, _wt, debug_label=f"sub[{i}][{_sk}].e"
+                    )
+                    if _sw:
+                        # Clamp: can't extend past the start of the next sub-interval.
+                        _new_e = min(_new_e, _sub_mut[_sk + 1][0] - 0.001)
+                        _new_e = max(_new_e, _sub_mut[_sk][0] + 0.050)
+                        print(
+                            f"[PRETRIM] sub-part snap e[{i}][{_sk}]:"
+                            f" {_old_e:.3f}→{_new_e:.3f}"
+                            f" (word {_sw[0]:.3f}-{_sw[1]:.3f})",
+                            flush=True,
+                        )
+                        _sub_mut[_sk][1] = _new_e
+                # Snap start of sub-interval k (internal edge — skip the first sub's
+                # start which is the outer segment boundary).
+                if _sk > 0:
+                    _old_s = _sub_mut[_sk][0]
+                    _new_s, _sw = _snap_boundary_out_of_word(
+                        _old_s, _wt, debug_label=f"sub[{i}][{_sk}].s"
+                    )
+                    if _sw:
+                        # Clamp: can't retreat past the end of the previous sub-interval.
+                        _new_s = max(_new_s, _sub_mut[_sk - 1][1] + 0.001)
+                        _new_s = min(_new_s, _sub_mut[_sk][1] - 0.050)
+                        print(
+                            f"[PRETRIM] sub-part snap s[{i}][{_sk}]:"
+                            f" {_old_s:.3f}→{_new_s:.3f}"
+                            f" (word {_sw[0]:.3f}-{_sw[1]:.3f})",
+                            flush=True,
+                        )
+                        _sub_mut[_sk][0] = _new_s
+            sub_intervals = [(si_s, si_e) for si_s, si_e in _sub_mut]
 
         # Cut each sub-interval with the same fast lossless encoding used for segments.
         sub_parts: list[Path] = []
