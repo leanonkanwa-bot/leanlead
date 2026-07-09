@@ -201,6 +201,143 @@ def _dedup_drops(drops: list) -> list:
     return result
 
 
+def _stable_ts_refine_cuts(src: "Path", drops: list, transcript: dict) -> list:
+    """Re-analyse repetition-cut time windows with stable-ts to correct word boundaries.
+
+    Only runs when STABLE_TS_REPAIR=true (default: false — no RAM cost on normal path).
+    Unloads the main Whisper model first so stable-ts never double-loads it.
+    Only operates on drops whose reason starts with 'llm_repetition'.
+    """
+    import os as _os2
+    if _os2.getenv("STABLE_TS_REPAIR", "false").lower() != "true":
+        return drops
+
+    _rep = [d for d in drops if d.reason.startswith("llm_repetition")]
+    if not _rep:
+        return drops
+
+    import gc as _gc2, re as _re2, subprocess as _sp2, tempfile as _tmp2, time as _t2
+    from pathlib import Path as _Path2
+
+    print(f"[STABLE-TS] refining {len(_rep)} repetition cut(s)…", flush=True)
+    _t_start2 = _t2.perf_counter()
+
+    try:
+        import stable_whisper as _sw2
+    except ImportError:
+        print("[STABLE-TS] stable-ts not installed — skipping refinement", flush=True)
+        return drops
+
+    from app.engine.transcribe import unload_model as _unload2, FFMPEG_PATH as _FF2
+    from app.engine.silence_remover import DropSegment as _DS2
+
+    # Unload main Whisper before loading stable-ts (RAM constraint on 1 GB dyno).
+    # run_render_phase() will call unload_model() again — safe, already None.
+    _unload2()
+    print("[STABLE-TS] Whisper unloaded before stable-ts", flush=True)
+
+    _model_name = _os2.getenv("WHISPER_MODEL", "large-v3")
+    _stm = _sw2.load_faster_whisper(_model_name, device="cpu", compute_type="int8")
+
+    _all_words = [w for seg in transcript.get("segments", []) for w in seg.get("words", [])]
+    _lang = transcript.get("language") or "fr"
+    _nr = _re2.compile(r"\W")
+    def _n(t: str) -> str:
+        return _nr.sub("", t.lower())
+
+    result = list(drops)
+
+    for drop in _rep:
+        if not drop.target_intervals:
+            continue
+        _last_iv = drop.target_intervals[-1]
+        _ls, _le = float(_last_iv[0]), float(_last_iv[1])
+
+        # Text of the last cut word (for matching in stable-ts output)
+        _ltxt = next(
+            (str(w.get("text", "")).strip() for w in _all_words
+             if abs(float(w.get("start", 0)) - _ls) < 0.050),
+            "",
+        )
+        if not _ltxt:
+            continue
+
+        # Audio window: 1 s before cut → 2× cut-duration after drop end (kept occ)
+        _ws2 = max(0.0, drop.start - 1.0)
+        _we2 = drop.end + (drop.end - drop.start) + 2.0
+        _wav2 = _Path2(_tmp2.mktemp(suffix=".wav"))
+        try:
+            _sp2.run(
+                [_FF2, "-y", "-loglevel", "error",
+                 "-ss", str(_ws2), "-to", str(_we2),
+                 "-i", str(src),
+                 "-vn", "-ac", "1", "-ar", "16000", str(_wav2)],
+                check=True, timeout=30,
+            )
+        except Exception as _ex2:
+            print(f"[STABLE-TS] ffmpeg extract error: {_ex2}", flush=True)
+            _wav2.unlink(missing_ok=True)
+            continue
+
+        try:
+            _res2 = _stm.transcribe(
+                str(_wav2),
+                word_timestamps=True,
+                language=_lang,
+                temperature=[0.0],
+                beam_size=5,
+                condition_on_previous_text=False,
+            )
+            _stw = []
+            for _sg2 in _res2.segments:
+                for _ww in (getattr(_sg2, "words", None) or []):
+                    _tt = (getattr(_ww, "word", "") or "").strip()
+                    if _tt:
+                        _stw.append({
+                            "text":  _tt,
+                            "start": round(float(_ww.start) + _ws2, 3),
+                            "end":   round(float(_ww.end)   + _ws2, 3),
+                        })
+        except Exception as _ex2:
+            print(f"[STABLE-TS] transcribe error: {_ex2}", flush=True)
+            _wav2.unlink(missing_ok=True)
+            continue
+        finally:
+            _wav2.unlink(missing_ok=True)
+
+        # Match last cut word in stable-ts output by text + approximate start
+        _m = next(
+            (sw for sw in _stw
+             if _n(sw["text"]) == _n(_ltxt)
+             and abs(sw["start"] - _ls) < 0.200),
+            None,
+        )
+        if _m is None:
+            print(f"[STABLE-TS] no match for '{_ltxt}' ~{_ls:.3f}s in cut"
+                  f" {drop.start:.2f}-{drop.end:.2f}s", flush=True)
+            continue
+        if abs(_m["end"] - _le) <= 0.050:
+            continue  # no meaningful improvement
+
+        _new_end = _m["end"]
+        _new_ivs = drop.target_intervals[:-1] + ((_ls, _new_end),)
+        _idx = result.index(drop)
+        result[_idx] = _DS2(
+            start=drop.start, end=_new_end,
+            reason=drop.reason, target_intervals=_new_ivs,
+        )
+        print(
+            f"[STABLE-TS] REFINED '{_ltxt}' cut end"
+            f" {_le:.3f}->{_new_end:.3f}s (delta={_new_end-_le:+.3f}s)",
+            flush=True,
+        )
+
+    del _stm
+    _gc2.collect()
+    print(f"[STABLE-TS] done {_t2.perf_counter()-_t_start2:.1f}s, model unloaded", flush=True)
+    return result
+
+
 def _llm_editorial_cuts(
     transcript: dict,
     key_lines: list[str],
@@ -584,6 +721,8 @@ def run_job(
         _t = time.perf_counter()
         try:
             _llm_drops = _llm_editorial_cuts(transcript, plan.key_lines or [])
+            # Step 6.6: stable-ts targeted refinement (STABLE_TS_REPAIR=true only)
+            _llm_drops = _stable_ts_refine_cuts(src, _llm_drops, transcript)
             if _llm_drops:
                 _pre_merge = len(filler_drops)
                 filler_drops = _dedup_drops(filler_drops + _llm_drops)
