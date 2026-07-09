@@ -464,11 +464,23 @@ Si rien à couper : {{"cuts": [], "kept": []}}"""
             print(f"[LLM-EDIT] skip invalid indices [{i0},{i1}] (words={len(words)})", flush=True)
             continue
 
-        # Repetition group completeness check: extend i0 backward if the LLM cut
-        # started mid-group (e.g. cut 'qu'ils' but missed preceding 'parce').
-        # Algorithm: word[i0-k-1] in the first occ must match word[i1+k+1] in the
-        # kept occ for each extension step k. Cap at current cut size to avoid runaway.
+        # Repetition group completeness check.
+        # (a) BACKWARD: extend i0 left if the LLM missed the start of the group.
+        #     Condition: word just before cut == word just after cut (symmetric).
+        #     Example: LLM cuts 'qu'ils' but misses preceding 'parce'.
+        # (b) FORWARD: extend i1 right if the LLM missed the end of the group.
+        #     Condition: words after i1 match words from the first-occurrence
+        #     reference (i0 - grp_size).  Example: LLM cuts 'il' but misses
+        #     'faut' — words[i1+1]='faut₂' matches words[i0-1]='faut₁'.
+        # Both capped at the current cut size to avoid runaway.
         if reason.startswith("repetition"):
+            _ctx_l = _wn(words[i0 - 1]) if i0 > 0 else ""
+            _ctx_r = _wn(words[i1 + 1]) if i1 + 1 < len(words) else ""
+            print(
+                f"[LLM-EDIT] EXTEND-CTX [{i0},{i1}]"
+                f" left={_ctx_l!r} right={_ctx_r!r}",
+                flush=True,
+            )
             _max_ext = i1 - i0 + 1
             _ext = 0
             while (
@@ -487,6 +499,30 @@ Si rien à couper : {{"cuts": [], "kept": []}}"""
                 print(
                     f"[LLM-EDIT] EXTEND-GROUP [{_orig_i0},{i1}]→[{i0},{i1}]"
                     f" +{_ext} word(s) {_ext_text!r}",
+                    flush=True,
+                )
+            # (b) Forward extension: words after i1 should continue the second
+            # occurrence.  Reference: words[i0 - grp .. i0 - 1] is the tail of
+            # the first occurrence immediately before the cut.
+            _grp = i1 - i0 + 1
+            _fwd = 0
+            while (
+                _fwd < _grp
+                and i1 + _fwd + 1 < len(words)
+                and i0 - _grp + _fwd >= 0
+                and _wn(words[i1 + _fwd + 1]) == _wn(words[i0 - _grp + _fwd])
+            ):
+                _fwd += 1
+            if _fwd > 0:
+                _orig_i1 = i1
+                i1 += _fwd
+                _fwd_text = " ".join(
+                    str(words[k].get("text", "")).strip()
+                    for k in range(_orig_i1 + 1, i1 + 1)
+                )
+                print(
+                    f"[LLM-EDIT] EXTEND-GROUP-FWD [{i0},{_orig_i1}]→[{i0},{i1}]"
+                    f" +{_fwd} word(s) {_fwd_text!r}",
                     flush=True,
                 )
 
