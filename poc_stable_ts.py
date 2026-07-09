@@ -29,8 +29,16 @@ def _strip(t: str) -> str:
     return re.sub(r"\W", "", t).lower()
 
 def _extract_wav(video: Path) -> Path:
-    import subprocess, shutil
-    ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
+    import subprocess, shutil, os, sys
+    _WIN_CANDIDATES = [
+        r"C:\Users\KANWAGI\Downloads\ffmpeg-master-latest-win64-gpl-shared\ffmpeg-master-latest-win64-gpl-shared\bin",
+        r"C:\tmp\ffmpeg_extract\ffmpeg-8.1.1-essentials_build\bin",
+    ]
+    if sys.platform == "win32":
+        _bin = next((p for p in _WIN_CANDIDATES if os.path.isdir(p)), None)
+        ffmpeg = os.path.join(_bin, "ffmpeg.exe") if _bin else "ffmpeg.exe"
+    else:
+        ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
     wav = video.with_suffix(".tmp_16k.wav")
     subprocess.run(
         [ffmpeg, "-y", "-loglevel", "error", "-i", str(video),
@@ -67,6 +75,16 @@ def _run_faster_whisper(wav: Path):
     return words
 
 def _run_stable_ts(wav: Path):
+    import os, sys
+    # stable-ts calls ffmpeg internally for silence analysis — inject the bin dir
+    _WIN_CANDIDATES = [
+        r"C:\Users\KANWAGI\Downloads\ffmpeg-master-latest-win64-gpl-shared\ffmpeg-master-latest-win64-gpl-shared\bin",
+        r"C:\tmp\ffmpeg_extract\ffmpeg-8.1.1-essentials_build\bin",
+    ]
+    if sys.platform == "win32":
+        _bin = next((p for p in _WIN_CANDIDATES if os.path.isdir(p)), None)
+        if _bin and _bin not in os.environ.get("PATH", ""):
+            os.environ["PATH"] = _bin + os.pathsep + os.environ.get("PATH", "")
     try:
         import stable_whisper
     except ImportError:
@@ -142,7 +160,7 @@ def _print_context_window(words, label: str, center_tok: str, window: float = 3.
         nearby = [w for w in words if w["start"] >= t0 and w["end"] <= t1]
         print(f"\n  [{label}] context around '{center_tok}' ({cw['start']:.3f}-{cw['end']:.3f}s):")
         for w in nearby:
-            marker = " ◄" if _strip(w["text"]) == center_tok else ""
+            marker = " <--" if _strip(w["text"]) == center_tok else ""
             dur = w["end"] - w["start"]
             print(f"    {w['start']:7.3f}-{w['end']:7.3f}s  ({dur:.3f}s)  {w['text']!r}{marker}")
 
@@ -154,12 +172,12 @@ wav = _extract_wav(VIDEO)
 
 print(f"Running faster-whisper/{MODEL_SIZE}…")
 fw = _run_faster_whisper(wav)
-print(f"  → {len(fw)} words")
+print(f"  -> {len(fw)} words")
 
 print(f"Running stable-ts/{MODEL_SIZE}…")
 st = _run_stable_ts(wav)
 if st is not None:
-    print(f"  → {len(st)} words")
+    print(f"  -> {len(st)} words")
 
 wav.unlink(missing_ok=True)
 

@@ -331,7 +331,7 @@ Si rien à couper : {{"cuts": [], "kept": []}}"""
         # started mid-group (e.g. cut 'qu'ils' but missed preceding 'parce').
         # Algorithm: word[i0-k-1] in the first occ must match word[i1+k+1] in the
         # kept occ for each extension step k. Cap at current cut size to avoid runaway.
-        if reason == "repetition":
+        if reason.startswith("repetition"):
             _max_ext = i1 - i0 + 1
             _ext = 0
             while (
