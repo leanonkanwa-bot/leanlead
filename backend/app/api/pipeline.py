@@ -386,10 +386,11 @@ def _llm_editorial_cuts(
 CONSIGNES :
 0. SCAN SYSTÉMATIQUE : examine CHAQUE indice de [0] à [{_max_idx}] sans en sauter aucun.
 1. Coupe uniquement : fillers isolés (Euh, Bah, Ben, Hein, Hm, ouais isolé), répétitions accidentelles (même mot/groupe répété consécutivement), faux départs (phrase relancée immédiatement).
-2. Répétitions simples : garde LA DERNIÈRE occurrence, coupe les précédentes. Ex : "[5] il [6] il [7] faut" → coupe [5,5], garde [6,7].
+2. Répétitions simples : garde LA DERNIÈRE occurrence, coupe les précédentes. Ex : "[5] il [6] il" → coupe [5,5], garde [6].
 3. Répétitions multi-mots : identifie le groupe entier depuis son PREMIER MOT. Ex : "[12] parce [13] qu'ils [14] parce [15] qu'ils" → coupe [12,13] (TOUT le premier groupe), garde [14,15]. ERREUR À ÉVITER : couper seulement [13,13] "qu'ils" en oubliant [12] "parce" → "parce" orphelin audible.
+3b. Répétitions SUPERPOSÉES — un doublon peut appartenir à un groupe plus long qui se répète aussi. Ex : "[60] il [61] faut [62] il [63] faut" — '[62] il' ressemble à un doublon de '[60] il', MAIS le groupe 'il faut' se répète entièrement × 2. Coupe le PREMIER groupe complet [60,61], garde [62,63]. ERREUR CRITIQUE : couper seulement [62,62]='il' → laisse '[61] faut [63] faut' audible. Règle : après ta coupe, le texte restant ne doit contenir AUCUNE répétition résiduelle du même mot ou groupe.
 4. Répétitions rhétoriques VOLONTAIRES (3+ occurrences identiques, effet stylistique) = NE PAS TOUCHER.
-5. NE JAMAIS toucher ces extraits clés :
+5. NE JAMAIS toucher ces extraits clés (et UNIQUEMENT ceux-ci — ne crée pas de "segment protégé" de ta propre initiative) :
 {key_lines_str}
 6. En cas de doute → NE PAS COUPER.
 
