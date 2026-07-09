@@ -1318,6 +1318,7 @@ def pretrim(
     source_intervals: list[tuple[float, float]] = []
     remapped_words: list[WordTiming] = []
     cum = 0.0
+    _total_sub_parts_count = 0
 
     for _pi, (i, s_src, e, s_padded, e_padded) in enumerate(_planned):
         # Split this segment around any filler drops that fall within it.
@@ -1458,6 +1459,7 @@ def pretrim(
         for _, si_start, si_end in sub_parts:
             source_intervals.append((si_start, si_end))
         parts.append(part)
+        _total_sub_parts_count += len(sub_parts)
         cum += sub_cum
         print(
             f"[PRETRIM] seg[{i}] source {s_padded:.3f}-{e_padded:.3f}"
@@ -1516,10 +1518,23 @@ def pretrim(
         f" | écart={_ecart:+.3f}s",
         flush=True,
     )
-    if abs(_ecart) > 0.3:
+    # AAC encodes in 1024-sample frames (~23ms at 44.1 kHz). Each sub-part's
+    # last frame is padded to a full frame, so actual > planned by up to 23ms
+    # per sub-part. This is expected and does not indicate lost or duplicated audio.
+    _aac_budget = _total_sub_parts_count * 0.025
+    _ecart_residual = _ecart - _aac_budget
+    print(
+        f"[PRETRIM-AUDIT] sub-parts={_total_sub_parts_count}"
+        f" | codec-budget={_aac_budget:.3f}s"
+        f" | residual={_ecart_residual:+.3f}s",
+        flush=True,
+    )
+    if _ecart_residual > 0.100 or _ecart < -0.100:
         raise RuntimeError(
-            f"[PRETRIM-AUDIT] BUDGET ERROR: écart={_ecart:+.3f}s > 0.3s"
-            f" (net={cum:.3f}s actual={_concat_actual:.3f}s)"
+            f"[PRETRIM-AUDIT] BUDGET ERROR: écart={_ecart:+.3f}s"
+            f" residual={_ecart_residual:+.3f}s"
+            f" (codec-budget={_aac_budget:.3f}s for {_total_sub_parts_count} sub-parts,"
+            f" net={cum:.3f}s actual={_concat_actual:.3f}s)"
         )
 
     _output_verify(concat_path, remapped_words, work_dir)
