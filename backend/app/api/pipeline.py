@@ -226,6 +226,11 @@ def _llm_editorial_cuts(
     if not words:
         return []
 
+    import re as _re_wn
+    def _wn(_wd: dict) -> str:
+        """Normalize word text: strip non-alpha characters, lowercase."""
+        return _re_wn.sub(r"\W", "", str(_wd.get("text", "")).lower())
+
     # Build numbered transcript (cap at 600 words — Haiku context is large)
     _MAX_WORDS = 600
     numbered = "\n".join(
@@ -245,7 +250,7 @@ CONSIGNES :
 0. SCAN SYSTÉMATIQUE : examine CHAQUE indice de [0] à [{_max_idx}] sans en sauter aucun.
 1. Coupe uniquement : fillers isolés (Euh, Bah, Ben, Hein, Hm, ouais isolé), répétitions accidentelles (même mot/groupe répété consécutivement), faux départs (phrase relancée immédiatement).
 2. Répétitions simples : garde LA DERNIÈRE occurrence, coupe les précédentes. Ex : "[5] il [6] il [7] faut" → coupe [5,5], garde [6,7].
-3. Répétitions multi-mots : identifie les groupes de mots répétés. Ex : "[12] parce [13] qu'ils [14] parce [15] qu'ils" → coupe [12,13] (premier groupe), garde [14,15].
+3. Répétitions multi-mots : identifie le groupe entier depuis son PREMIER MOT. Ex : "[12] parce [13] qu'ils [14] parce [15] qu'ils" → coupe [12,13] (TOUT le premier groupe), garde [14,15]. ERREUR À ÉVITER : couper seulement [13,13] "qu'ils" en oubliant [12] "parce" → "parce" orphelin audible.
 4. Répétitions rhétoriques VOLONTAIRES (3+ occurrences identiques, effet stylistique) = NE PAS TOUCHER.
 5. NE JAMAIS toucher ces extraits clés :
 {key_lines_str}
@@ -321,6 +326,33 @@ Si rien à couper : {{"cuts": [], "kept": []}}"""
         if i0 < 0 or i1 >= len(words) or i0 > i1:
             print(f"[LLM-EDIT] skip invalid indices [{i0},{i1}] (words={len(words)})", flush=True)
             continue
+
+        # Repetition group completeness check: extend i0 backward if the LLM cut
+        # started mid-group (e.g. cut 'qu'ils' but missed preceding 'parce').
+        # Algorithm: word[i0-k-1] in the first occ must match word[i1+k+1] in the
+        # kept occ for each extension step k. Cap at current cut size to avoid runaway.
+        if reason == "repetition":
+            _max_ext = i1 - i0 + 1
+            _ext = 0
+            while (
+                _ext < _max_ext
+                and i0 - _ext - 1 >= 0
+                and i1 + _ext + 1 < len(words)
+                and _wn(words[i0 - _ext - 1]) == _wn(words[i1 + _ext + 1])
+            ):
+                _ext += 1
+            if _ext > 0:
+                _orig_i0 = i0
+                i0 -= _ext
+                _ext_text = " ".join(
+                    str(words[k].get("text", "")).strip() for k in range(i0, _orig_i0)
+                )
+                print(
+                    f"[LLM-EDIT] EXTEND-GROUP [{_orig_i0},{i1}]→[{i0},{i1}]"
+                    f" +{_ext} word(s) {_ext_text!r}",
+                    flush=True,
+                )
+
         t_start = float(words[i0].get("start", 0))
         t_end   = float(words[i1].get("end", 0))
         if t_end <= t_start:

@@ -716,6 +716,22 @@ def pretrim(
                 e = min(e, max(s + 0.15, next_s - 0.05))
             s_padded = max(0.0, s - pad)
             e_padded = min(src_duration, e + pad) if src_duration > 0 else e + pad
+        # "Liar-gap" fix: when a filler drop ends just before this segment's padded
+        # start, the gap between drop_end and the first word may contain audio that
+        # Whisper mistakenly timestamps as silence (e.g. 're-' of 'retiens' at 27.52
+        # when Whisper places the word at 27.84).  Retract s_padded to drop_end+20ms
+        # so that speech in the gap is included rather than silently abandoned.
+        for _fd in (filler_drops or []):
+            if _fd.end < s and _fd.end + 0.500 >= s_padded:
+                _sp_adj = min(s_padded, _fd.end + 0.020)
+                if _sp_adj < s_padded:
+                    print(
+                        f"[PRETRIM] seg[{i}] s_padded {s_padded:.3f}→{_sp_adj:.3f}"
+                        f" liar-gap: snapped behind drop '{_fd.reason}' end {_fd.end:.3f}",
+                        flush=True,
+                    )
+                    s_padded = _sp_adj
+
         if e_padded - s_padded < 0.15:
             continue
 
