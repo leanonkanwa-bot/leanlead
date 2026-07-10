@@ -1052,6 +1052,7 @@ def pretrim(
             return False
 
         _wl_total_repaired = 0
+        _wl_fallback_count = 0
         _wl_pass_n = 0
         _wl_modified_pis: set[int] = set()  # pairs TOUCHED by this repair pass
         for _wl_pass_n in range(5):  # up to 5 cascade iterations
@@ -1305,8 +1306,10 @@ def pretrim(
             if not (_wl_has_before and _wl_has_after):
                 continue  # pre-plan or post-plan word — intentional exclusion, skip
             # GRACEFUL FALLBACK: force-absorb into nearest segment boundary — never crash to user.
+            _wl_fallback_count += 1
             print(
-                f"[WORD-LOST-FALLBACK] '{_wl_txt}' {_wl_ws:.3f}-{_wl_we:.3f}s"
+                f"[WORD-LOST-FALLBACK] activated ({_wl_fallback_count}th time this job)"
+                f" — '{_wl_txt}' {_wl_ws:.3f}-{_wl_we:.3f}s"
                 f" still orphaned after {_wl_pass_n + 1} repair pass(es)"
                 f" — emergency nearest-segment absorb",
                 flush=True,
@@ -1337,7 +1340,8 @@ def pretrim(
                         _resolved.add(_wl_near_pi - 1)
                 _planned[_wl_near_pi] = (_fb_mi, _fb_ss, _fb_e, _fb_new_sp, _fb_ep2)
             print(
-                f"[WORD-LOST-FALLBACK] absorbed into seg[{_wl_near_pi}]"
+                f"[WORD-LOST-FALLBACK] #{_wl_fallback_count}"
+                f" absorbed into seg[{_wl_near_pi}]"
                 f" side={_wl_near_side} dist={_wl_near_d * 1000:.0f}ms",
                 flush=True,
             )
