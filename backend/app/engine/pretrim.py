@@ -1518,22 +1518,37 @@ def pretrim(
         f" | écart={_ecart:+.3f}s",
         flush=True,
     )
-    # AAC encodes in 1024-sample frames (~23ms at 44.1 kHz). Each sub-part's
-    # last frame is padded to a full frame, so actual > planned by up to 23ms
-    # per sub-part. This is expected and does not indicate lost or duplicated audio.
+    # AAC encodes in 1024-sample frames (~23ms at 44.1 kHz) and each libx264
+    # sub-part rounds up to the next video frame (~33ms at 30 fps). Each clip
+    # contributes up to ~33ms of codec overhead — expected, not a budget error.
     _aac_budget = _total_sub_parts_count * 0.025
     _ecart_residual = _ecart - _aac_budget
+    # stable-ts boundary refinements shift drop edges by small amounts, causing
+    # the segment planner to emit one extra sub-part and accumulate ~50ms of
+    # additional codec overhead per refined repetition cut.
+    import os as _os_audit
+    _stable_ts_on = _os_audit.getenv("STABLE_TS_REPAIR", "false").lower() == "true"
+    _n_llm_rep = (
+        sum(1 for d in (filler_drops or []) if d.reason.startswith("llm_repetition"))
+        if _stable_ts_on else 0
+    )
+    _stable_ts_budget = _n_llm_rep * 0.050
+    _residual_budget  = 0.100 + _stable_ts_budget
     print(
         f"[PRETRIM-AUDIT] sub-parts={_total_sub_parts_count}"
         f" | codec-budget={_aac_budget:.3f}s"
-        f" | residual={_ecart_residual:+.3f}s",
+        f" | residual={_ecart_residual:+.3f}s"
+        f" | stable-ts={_stable_ts_on} llm-rep={_n_llm_rep}"
+        f" stable-budget={_stable_ts_budget:.3f}s"
+        f" | residual-budget={_residual_budget:.3f}s",
         flush=True,
     )
-    if _ecart_residual > 0.100 or _ecart < -0.100:
+    if _ecart_residual > _residual_budget or _ecart < -0.100:
         raise RuntimeError(
             f"[PRETRIM-AUDIT] BUDGET ERROR: écart={_ecart:+.3f}s"
-            f" residual={_ecart_residual:+.3f}s"
-            f" (codec-budget={_aac_budget:.3f}s for {_total_sub_parts_count} sub-parts,"
+            f" residual={_ecart_residual:+.3f}s > budget={_residual_budget:.3f}s"
+            f" (codec={_aac_budget:.3f}s/{_total_sub_parts_count}sp"
+            f" stable-ts={_stable_ts_budget:.3f}s/{_n_llm_rep}cuts,"
             f" net={cum:.3f}s actual={_concat_actual:.3f}s)"
         )
 
