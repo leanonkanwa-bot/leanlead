@@ -111,6 +111,11 @@ class RhythmAwareSilenceRemover:
             timestamp shifting; filler_drops is the unmerged filler-word subset
             passed to pretrim for physical cutting.
         """
+        import os as _os_sr
+        _cut_reps = _os_sr.getenv("CUT_REPETITIONS", "false").lower() == "true"
+        _cut_fs   = _os_sr.getenv("CUT_FALSE_STARTS", "false").lower() == "true"
+        _cut_paus = _os_sr.getenv("CUT_PAUSES",       "false").lower() == "true"
+
         drops: list[DropSegment] = []
 
         # Build a flat list of (text, start, end) from segments.
@@ -183,9 +188,14 @@ class RhythmAwareSilenceRemover:
             if gap_dur <= 0:
                 continue
 
-            # Remove: pause after a filler word (checked before touch threshold).
+            # Remove: pause after a filler word (always active — cleans up after the
+            # physical filler cut regardless of CUT_PAUSES setting).
             if _is_filler(cur_text) and gap_dur > _PAUSE_AFTER_FILLER:
                 drops.append(DropSegment(gap_start, gap_end, f"pause_after_filler:{cur_text}"))
+                continue
+
+            # All pause-shortening below is disabled when CUT_PAUSES=false.
+            if not _cut_paus:
                 continue
 
             # Pauses below the touch threshold are never modified.
@@ -232,12 +242,12 @@ class RhythmAwareSilenceRemover:
         # sees 0-gap words and logs "none" even when pauses exist in the video.
         pause_drops = list(drops)
 
-        # Remove standalone filler words.
+        # Remove standalone filler words (always active).
         filler_drops = self._find_filler_word_drops(words, segment_ends)
-        # Detect word-repetition stutters (physical cuts like fillers).
-        stutter_drops = _find_stutter_drops(words)
-        # Detect and cut false-start phrases (abandoned phrase + restart).
-        false_start_drops = _find_false_start_drops(words)
+        # Lexical stutter detector — gated on CUT_REPETITIONS.
+        stutter_drops = _find_stutter_drops(words) if _cut_reps else []
+        # False-start detector — gated on CUT_FALSE_STARTS.
+        false_start_drops = _find_false_start_drops(words) if _cut_fs else []
 
         # Physical drops = all categories that get excised from the source video.
         physical_drops = pause_drops + filler_drops + stutter_drops + false_start_drops
@@ -246,13 +256,16 @@ class RhythmAwareSilenceRemover:
         drops.extend(filler_drops + stutter_drops + false_start_drops)
         drops.sort(key=lambda d: d.start)
 
-        _log_stutter_near_misses(words)
+        if _cut_reps:
+            _log_stutter_near_misses(words)
 
         print(
-            f"[SILENCE] detected: {len(pause_drops)} pause-excess, "
-            f"{len(filler_drops)} fillers, {len(stutter_drops)} stutters, "
-            f"{len(false_start_drops)} false-starts "
-            f"({len(drops)} raw drops total, {len(physical_drops)} physical)",
+            f"[SILENCE] detected: {len(pause_drops)} pause-excess"
+            f" (cut={'ON' if _cut_paus else 'OFF'}),"
+            f" {len(filler_drops)} fillers,"
+            f" {len(stutter_drops)} stutters (cut={'ON' if _cut_reps else 'OFF'}),"
+            f" {len(false_start_drops)} false-starts (cut={'ON' if _cut_fs else 'OFF'})"
+            f" — {len(drops)} raw drops, {len(physical_drops)} physical",
             flush=True,
         )
 

@@ -795,11 +795,35 @@ def run_job(
         # the indices to cut (fillers, accidental repetitions, false starts).
         # Runs AFTER planning so key_lines can be passed to the prompt.
         # The CUT-GUARD below is a second safety net in case the LLM overshoots.
+        import os as _os_cfg
+        _cfg_reps = _os_cfg.getenv("CUT_REPETITIONS", "false").lower() == "true"
+        _cfg_fs   = _os_cfg.getenv("CUT_FALSE_STARTS", "false").lower() == "true"
+        _cfg_paus = _os_cfg.getenv("CUT_PAUSES",       "false").lower() == "true"
+        print(
+            f"[CONFIG] cuts: fillers=ON"
+            f" repetitions={'ON' if _cfg_reps else 'OFF'}"
+            f" false_starts={'ON' if _cfg_fs else 'OFF'}"
+            f" pauses={'ON' if _cfg_paus else 'OFF'}",
+            flush=True,
+        )
         _t = time.perf_counter()
         try:
             _llm_drops = _llm_editorial_cuts(transcript, plan.key_lines or [])
             # Step 6.6: stable-ts targeted refinement (STABLE_TS_REPAIR=true only)
             _llm_drops = _stable_ts_refine_cuts(src, _llm_drops, transcript)
+            # Filter LLM drops by active cut categories.
+            _n_llm_before = len(_llm_drops)
+            if not _cfg_reps:
+                _llm_drops = [d for d in _llm_drops if not d.reason.startswith("llm_repetition")]
+            if not _cfg_fs:
+                _llm_drops = [d for d in _llm_drops if not d.reason.startswith("llm_false_start")]
+            if _n_llm_before != len(_llm_drops):
+                print(
+                    f"[CONFIG] LLM drops filtered: {_n_llm_before}→{len(_llm_drops)}"
+                    f" (repetitions={'ON' if _cfg_reps else 'OFF'}"
+                    f" false_starts={'ON' if _cfg_fs else 'OFF'})",
+                    flush=True,
+                )
             if _llm_drops:
                 _pre_merge = len(filler_drops)
                 filler_drops = _dedup_drops(filler_drops + _llm_drops)
@@ -863,12 +887,12 @@ def run_job(
         ]
         filler_drops = _word_safe_drops(filler_drops, _source_words)
 
-        # ── Acoustic-stutter detection (logging only) ─────────────────────
+        # ── Acoustic-stutter detection (logging only, gated on CUT_REPETITIONS) ──
         _STUTTER_MAX_LEN = 4    # token chars — short function words only
         _STUTTER_MIN_DUR = 0.55 # seconds — anomalously long for short tokens
         _STUTTER_GAP_MIN = 0.08 # seconds — must be adjacent to a gap
 
-        for _si, _sw in enumerate(_source_words):
+        for _si, _sw in enumerate(_source_words) if _cfg_reps else []:
             _sw_text = str(_sw.get("text", "")).strip().lower().rstrip(".,!?;:'\"")
             if not _sw_text or len(_sw_text) > _STUTTER_MAX_LEN:
                 continue
