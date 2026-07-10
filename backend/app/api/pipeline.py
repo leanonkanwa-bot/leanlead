@@ -454,7 +454,9 @@ Si rien à couper : {{"cuts": [], "kept": []}}"""
                 k_text = " ".join(str(words[k].get("text", "")).strip() for k in range(k0, k1 + 1))
                 print(f"[LLM-EDIT] kept [{k0},{k1}] text={k_text!r} reason={k_reason!r}", flush=True)
 
-    drops = []
+    # Collect (i0, i1, reason, DropSegment) so the proximity guard below can
+    # operate on word indices before committing to the final drops list.
+    _pending_drops: list[tuple[int, int, str, object]] = []
     for cut in data.get("cuts", []):
         idx = cut.get("indices", [])
         reason = cut.get("reason", "llm_editorial")
@@ -543,8 +545,46 @@ Si rien à couper : {{"cuts": [], "kept": []}}"""
             (float(words[k].get("start", 0)), float(words[k].get("end", 0)))
             for k in range(i0, i1 + 1)
         )
-        drops.append(_DS(start=t_start, end=t_end, reason=f"llm_{reason}",
-                         target_intervals=_target_ivs))
+        _pending_drops.append((
+            i0, i1, reason,
+            _DS(start=t_start, end=t_end, reason=f"llm_{reason}",
+                target_intervals=_target_ivs),
+        ))
+
+    # ── Proximity guard for repetition cuts ──────────────────────────────────
+    # Two repetition cuts that overlap or sit within 2 word indices of each
+    # other are almost always the LLM double-firing on the same phonetic event
+    # (e.g. rule-2 + rule-3b both triggering adjacent single-word cuts).
+    # Keep the wider cut; drop the narrower to avoid over-cutting.
+    _rep_pending = [(i0, i1, d) for i0, i1, r, d in _pending_drops if r.startswith("repetition")]
+    _other_drops = [d for _, _, r, d in _pending_drops if not r.startswith("repetition")]
+    _rep_pending.sort(key=lambda x: x[0])
+    _rep_kept: list[tuple[int, int, object]] = []
+    for _ri0, _ri1, _rd in _rep_pending:
+        _conflict = next(
+            (ci for ci, (ki0, ki1, _) in enumerate(_rep_kept)
+             if _ri0 <= ki1 + 2 and _ri1 >= ki0 - 2),
+            None,
+        )
+        if _conflict is None:
+            _rep_kept.append((_ri0, _ri1, _rd))
+        else:
+            _ki0, _ki1, _kd = _rep_kept[_conflict]
+            if (_ri1 - _ri0) > (_ki1 - _ki0):
+                print(
+                    f"[LLM-EDIT] PROXIMITY-DEDUP: [{_ki0},{_ki1}] dropped"
+                    f" — [{_ri0},{_ri1}] is wider",
+                    flush=True,
+                )
+                _rep_kept[_conflict] = (_ri0, _ri1, _rd)
+            else:
+                print(
+                    f"[LLM-EDIT] PROXIMITY-DEDUP: [{_ri0},{_ri1}] dropped"
+                    f" — [{_ki0},{_ki1}] is wider or equal",
+                    flush=True,
+                )
+
+    drops = _other_drops + [d for _, _, d in _rep_kept]
 
     print(
         f"[LLM-EDIT] {len(drops)} cut(s) from {len(data.get('cuts', []))} suggestion(s) "
