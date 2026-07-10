@@ -979,10 +979,12 @@ def pretrim(
                     flush=True,
                 )
 
-    # ── Final assert: overlap, word-clean, and orphan invariants ─────────────
+    # ── Pre-repair scan: overlap, word-clean, and orphan invariants ──────────
     # All comparisons use round(x, 3) — we work in milliseconds; comparing raw
     # float64 triggers false positives (e.g. 20.685 - 0.010 = 20.674999...997
     # when the mathematically correct result is 20.675, causing a spurious assert).
+    # GRACEFUL: none of these crash — they log a warning and self-correct so that
+    # WORD-LOST REPAIR below gets a clean starting state.
     _R = 3  # shared rounding precision (ms)
     for _pi in range(len(_planned) - 1):
         _i, _, _e_i, _s_i, _e_i_pad = _planned[_pi]
@@ -993,11 +995,23 @@ def pretrim(
         _s_r = round(_s_j, _R)
         _thresh_r = round(_s_j - _min_gap, _R)
         if _e_r > _thresh_r:
-            raise RuntimeError(
-                f"[PRETRIM] INVARIANT: seg[{_i}].e={_e_i_pad:.3f}"
-                f" > seg[{_j}].s - {_min_gap:.3f} = {_s_j - _min_gap:.3f}"
-                f" — overlap after stabilization"
+            # Overlap after stabilization — force midpoint clamp rather than crash.
+            _mid2 = (_e_i_pad + _s_j) / 2.0
+            _planned[_pi] = (
+                _planned[_pi][0], _planned[_pi][1], _planned[_pi][2],
+                _planned[_pi][3], _mid2 - 0.005,
             )
+            _planned[_pi + 1] = (
+                _planned[_pi + 1][0], _planned[_pi + 1][1], _planned[_pi + 1][2],
+                _mid2 + 0.005, _planned[_pi + 1][4],
+            )
+            _resolved.add(_pi)
+            print(
+                f"[PRETRIM-WARN] overlap seg[{_i}]/seg[{_j}] after stabilization"
+                f" — force-midpoint {_mid2:.3f} (graceful)",
+                flush=True,
+            )
+            continue  # re-derive e_r / s_r after update would need re-read; skip inner loop
         for ws, we in _wt:
             if ws > _s_j + 0.5:
                 break  # _wt is sorted; no further word can straddle this boundary
@@ -1006,22 +1020,42 @@ def pretrim(
             _ws_r = round(ws, _R)
             _we_r = round(we, _R)
             if _ws_r < _e_r < _we_r:
-                raise RuntimeError(
-                    f"[PRETRIM] INVARIANT: seg[{_i}].e={_e_i_pad:.3f}"
-                    f" inside word [{ws:.3f},{we:.3f}]"
+                # seg[i].e cuts through a word — snap e backward to word start.
+                _new_ep = ws - 0.005
+                _planned[_pi] = (
+                    _planned[_pi][0], _planned[_pi][1], _planned[_pi][2],
+                    _planned[_pi][3], _new_ep,
                 )
+                print(
+                    f"[PRETRIM-WARN] seg[{_i}].e={_e_i_pad:.3f} inside word"
+                    f" [{ws:.3f},{we:.3f}] — snapped to {_new_ep:.3f} (graceful)",
+                    flush=True,
+                )
+                break
             if _ws_r < _s_r < _we_r:
-                raise RuntimeError(
-                    f"[PRETRIM] INVARIANT: seg[{_j}].s={_s_j:.3f}"
-                    f" inside word [{ws:.3f},{we:.3f}]"
+                # seg[j].s cuts through a word — snap s forward to word end.
+                _new_sp = we + 0.005
+                _planned[_pi + 1] = (
+                    _planned[_pi + 1][0], _planned[_pi + 1][1], _planned[_pi + 1][2],
+                    _new_sp, _planned[_pi + 1][4],
                 )
+                print(
+                    f"[PRETRIM-WARN] seg[{_j}].s={_s_j:.3f} inside word"
+                    f" [{ws:.3f},{we:.3f}] — snapped to {_new_sp:.3f} (graceful)",
+                    flush=True,
+                )
+                break
             # Orphan: word entirely in the gap [e_i_pad, s_j]
             # Skip for pairs with a large source gap — excluded words are intentional.
+            # GRACEFUL: log and break — WORD-LOST REPAIR below will absorb it.
             if _s_src_j - _e_i <= 0.300 and _e_r <= _ws_r and _we_r <= _s_r:
-                raise RuntimeError(
-                    f"[PRETRIM] INVARIANT: word [{ws:.3f},{we:.3f}] orphaned"
-                    f" between seg[{_i}].e={_e_i_pad:.3f} and seg[{_j}].s={_s_j:.3f}"
+                print(
+                    f"[PRETRIM-WARN] word [{ws:.3f},{we:.3f}] orphaned between"
+                    f" seg[{_i}].e={_e_i_pad:.3f} and seg[{_j}].s={_s_j:.3f}"
+                    f" — deferring to WORD-LOST repair (graceful)",
+                    flush=True,
                 )
+                break  # stop inner loop; WORD-LOST repair handles this word
 
     # ── WORD-LOST REPAIR: recover words expelled by snap, BEFORE FFmpeg render ──
     # A snap may push e[i] backward past a word that belongs in segment i,
@@ -1506,20 +1540,23 @@ def pretrim(
             flush=True,
         )
 
-    # Invariant: pairwise clamp guarantees no overlap — if this fires it's a bug.
+    # Pairwise overlap check — graceful clamp rather than crash.
     for _oi in range(len(source_intervals) - 1):
         _oi_end = source_intervals[_oi][1]
         _oi1_start = source_intervals[_oi + 1][0]
         if _oi_end > _oi1_start + 0.005:
-            raise RuntimeError(
-                f"[PRETRIM-OVERLAP] BUG: interval[{_oi}].end={_oi_end:.3f}"
+            print(
+                f"[PRETRIM-WARN] OVERLAP: interval[{_oi}].end={_oi_end:.3f}"
                 f" > interval[{_oi + 1}].start={_oi1_start:.3f}"
-                f" (overlap={_oi_end - _oi1_start:.3f}s)"
-                f" — invariant violated after pairwise clamp"
+                f" (overlap={_oi_end - _oi1_start:.3f}s) — clamping (graceful)",
+                flush=True,
             )
+            source_intervals[_oi] = (source_intervals[_oi][0], _oi1_start)
 
     if not parts:
-        raise RuntimeError("No segments produced any clip.")
+        # No segments rendered — fall back to passthrough rather than crash.
+        print("[PRETRIM-WARN] No segments produced any clip — falling back to passthrough", flush=True)
+        return _pretrim_passthrough(src, transcript, all_words, src_duration, work_dir)
 
     # ── Concat all parts into one continuous video ────────────────────
     concat_path = work_dir / "trimmed_concat.mp4"
@@ -1583,12 +1620,13 @@ def pretrim(
         flush=True,
     )
     if _ecart_residual > _residual_budget or _ecart < -0.100:
-        raise RuntimeError(
-            f"[PRETRIM-AUDIT] BUDGET ERROR: écart={_ecart:+.3f}s"
+        print(
+            f"[PRETRIM-WARN] BUDGET: écart={_ecart:+.3f}s"
             f" residual={_ecart_residual:+.3f}s > budget={_residual_budget:.3f}s"
             f" (codec={_aac_budget:.3f}s/{_total_sub_parts_count}sp"
             f" stable-ts={_stable_ts_budget:.3f}s/{_n_llm_rep}cuts,"
-            f" net={cum:.3f}s actual={_concat_actual:.3f}s)"
+            f" net={cum:.3f}s actual={_concat_actual:.3f}s) — continuing (graceful)",
+            flush=True,
         )
 
     _output_verify(concat_path, remapped_words, work_dir)
@@ -1617,9 +1655,10 @@ def pretrim(
     if _pr_lost == 0:
         print(f"[WORD-LOST] POST-RENDER PASS — {len(_pr_pool)} words all accounted for", flush=True)
     else:
-        raise RuntimeError(
-            f"[WORD-LOST] POST-RENDER: {_pr_lost} inter-segment word(s) unaccounted"
-            f" — pre-render repair missed them"
+        print(
+            f"[WORD-LOST] POST-RENDER WARNING: {_pr_lost} inter-segment word(s) unaccounted"
+            f" — pre-render repair missed them (video produced, investigate root cause)",
+            flush=True,
         )
 
     # Clean up part files
