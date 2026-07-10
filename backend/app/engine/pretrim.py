@@ -654,8 +654,9 @@ def pretrim(
         src_word_timings = words  # already list[tuple[float, float]] from _flat_words()
 
     # ── DISABLE_CUTS bypass: use full source as one segment ──────────
-    if _cfg.disable_cuts:
-        print("[PRETRIM] DISABLE_CUTS=true — skipping all segment cutting")
+    if _cfg.disable_cuts or not _cfg.cut_fillers:
+        _reason = "DISABLE_CUTS=true" if _cfg.disable_cuts else "CUT_FILLERS=false"
+        print(f"[PRETRIM] {_reason} — skipping all segment cutting")
         return _pretrim_passthrough(src, transcript, all_words, src_duration, work_dir)
 
     # ── Segment preparation (same logic as render.py) ────────────────

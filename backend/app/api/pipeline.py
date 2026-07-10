@@ -643,12 +643,12 @@ def run_job(
         from app.core.config import settings as _cfg
         drops: list = []
         filler_drops: list = []
-        if _cfg.disable_cuts:
-            # DISABLE_CUTS: skip timestamp adjustment — the video plays
-            # uncut, so drop-shifted timestamps would cause progressive
-            # drift (captions ahead of speech, gap growing toward the end).
+        if _cfg.disable_cuts or not _cfg.cut_fillers:
+            # No-cut mode: skip all speech-cut detection. Transcript timestamps
+            # are used 1:1 in pretrim passthrough (no drift possible).
             transcript_clean = transcript
-            print("[PIPELINE] DISABLE_CUTS=true — skipping silence removal timestamp shift", flush=True)
+            _reason = "DISABLE_CUTS=true" if _cfg.disable_cuts else "CUT_FILLERS=false"
+            print(f"[PIPELINE] {_reason} — skipping ALL speech cuts", flush=True)
         else:
             remover = RhythmAwareSilenceRemover()
             word_timestamps = [
@@ -796,21 +796,28 @@ def run_job(
         # Runs AFTER planning so key_lines can be passed to the prompt.
         # The CUT-GUARD below is a second safety net in case the LLM overshoots.
         import os as _os_cfg
+        _cfg_fillers = _cfg.cut_fillers   # master switch — gated above
         _cfg_reps = _os_cfg.getenv("CUT_REPETITIONS", "false").lower() == "true"
         _cfg_fs   = _os_cfg.getenv("CUT_FALSE_STARTS", "false").lower() == "true"
         _cfg_paus = _os_cfg.getenv("CUT_PAUSES",       "false").lower() == "true"
-        print(
-            f"[CONFIG] cuts: fillers=ON"
-            f" repetitions={'ON' if _cfg_reps else 'OFF'}"
-            f" false_starts={'ON' if _cfg_fs else 'OFF'}"
-            f" pauses={'ON' if _cfg_paus else 'OFF'}",
-            flush=True,
-        )
+        if not _cfg_fillers:
+            print("[CONFIG] cuts: ALL OFF (fillers paused — CUT_FILLERS=false)", flush=True)
+        else:
+            print(
+                f"[CONFIG] cuts: fillers=ON"
+                f" repetitions={'ON' if _cfg_reps else 'OFF'}"
+                f" false_starts={'ON' if _cfg_fs else 'OFF'}"
+                f" pauses={'ON' if _cfg_paus else 'OFF'}",
+                flush=True,
+            )
         _t = time.perf_counter()
         try:
-            _llm_drops = _llm_editorial_cuts(transcript, plan.key_lines or [])
-            # Step 6.6: stable-ts targeted refinement (STABLE_TS_REPAIR=true only)
-            _llm_drops = _stable_ts_refine_cuts(src, _llm_drops, transcript)
+            if not _cfg_fillers:
+                _llm_drops = []   # all cuts off — skip LLM editorial entirely
+            else:
+                _llm_drops = _llm_editorial_cuts(transcript, plan.key_lines or [])
+                # Step 6.6: stable-ts targeted refinement (STABLE_TS_REPAIR=true only)
+                _llm_drops = _stable_ts_refine_cuts(src, _llm_drops, transcript)
             # Filter LLM drops by active cut categories.
             _n_llm_before = len(_llm_drops)
             if not _cfg_reps:

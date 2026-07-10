@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     # beat structure) but keep_segments/drop_segments are ignored.
     disable_cuts: bool = False
 
+    # Master speech-cut switch. When false (default), ALL automatic cuts
+    # (filler words, pauses, repetitions, false-starts) are disabled and the
+    # full source audio is kept unchanged. Set CUT_FILLERS=true to re-enable.
+    # Individual cut types are further gated by CUT_REPETITIONS, CUT_PAUSES, etc.
+    cut_fillers: bool = False
+
     # Style pack for graphic cards and captions.
     # "lean_glass" = dark glass panels with cyan glow (LeanGlass).
     style_pack: str = "lean_glass"
