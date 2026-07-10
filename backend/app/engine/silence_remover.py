@@ -60,6 +60,7 @@ _FILLER_PAUSE_GUARD_PRE  = 0.08   # seconds gap required before the filler (down
 _FILLER_PAUSE_GUARD_POST = 0.08   # seconds gap required after the filler (down from 0.15)
 _FILLER_GLUED_GUARD      = 0.030  # minimum post_gap — below this, next word is too close to cut safely
 _FILLER_CUT_PAD          = 0.080  # seconds padding around filler cut (up from 0.040, covers Whisper ±50ms)
+_FILLER_ZERO_GAP         = 0.005  # < 5ms = effectively 0 — filler is glued to adjacent word
 _MIN_WORD_DUR_S          = 0.030  # words shorter than this are Whisper artifacts, not speech
 
 _PRINCIPLE_PAYOFF = re.compile(
@@ -295,32 +296,49 @@ class RhythmAwareSilenceRemover:
             post_gap = words[i + 1][1] - end   if i < len(words) - 1 else float("inf")
 
             # Evaluate guard outcomes for audit log.
-            _at_seg_end     = any(abs(end - se) < 0.1 for se in segment_ends)
-            _passes_pause   = pre_gap > _FILLER_PAUSE_GUARD_PRE or post_gap > _FILLER_PAUSE_GUARD_POST
-            _glued          = post_gap < _FILLER_GLUED_GUARD and i < len(words) - 1
-            _like_comp      = text.lower() == "like" and _is_comparison_like(words[i - 1][0] if i > 0 else "")
-            _so_connector   = text.lower() == "so" and i > 0 and (start - words[i - 1][2]) > 0.3
+            _at_seg_end   = any(abs(end - se) < 0.1 for se in segment_ends)
+            # A filler glued flush to the previous word (pre_gap ≈ 0ms) has no pad room
+            # on the pre side — the adjacent word boundary IS the cut start, which is more
+            # reliable than the filler's Whisper timestamp (±50ms error).  Bypass the
+            # pause_guard in that case: the silence the filler occupies is removed exactly.
+            _zero_gap_pre = (i > 0) and (pre_gap < _FILLER_ZERO_GAP)
+            _passes_pause = (
+                pre_gap  > _FILLER_PAUSE_GUARD_PRE
+                or post_gap > _FILLER_PAUSE_GUARD_POST
+                or _zero_gap_pre          # glued to prev word — bypass guard, use word edges
+            )
+            _glued        = post_gap < _FILLER_GLUED_GUARD and i < len(words) - 1
+            _like_comp    = text.lower() == "like" and _is_comparison_like(words[i - 1][0] if i > 0 else "")
+            _so_connector = text.lower() == "so" and i > 0 and (start - words[i - 1][2]) > 0.3
 
             _verdict = "CUT"
-            if _at_seg_end:       _verdict = "KEPT:seg_boundary"
-            elif _like_comp:      _verdict = "KEPT:comparison_like"
-            elif _so_connector:   _verdict = "KEPT:so_connector"
+            if _at_seg_end:         _verdict = "KEPT:seg_boundary"
+            elif _like_comp:        _verdict = "KEPT:comparison_like"
+            elif _so_connector:     _verdict = "KEPT:so_connector"
             elif not _passes_pause: _verdict = f"KEPT:pause_guard(pre={pre_gap*1000:.0f}ms<{_FILLER_PAUSE_GUARD_PRE*1000:.0f} post={post_gap*1000:.0f}ms<{_FILLER_PAUSE_GUARD_POST*1000:.0f})"
-            elif _glued:          _verdict = f"KEPT:glued(post={post_gap*1000:.0f}ms<{_FILLER_GLUED_GUARD*1000:.0f})"
+            elif _glued:            _verdict = f"KEPT:glued(post={post_gap*1000:.0f}ms<{_FILLER_GLUED_GUARD*1000:.0f})"
 
             print(
                 f"[FILLER-AUDIT] {text!r} {start:.3f}-{end:.3f}s"
                 f" | pre={pre_gap*1000:.0f}ms post={post_gap*1000:.0f}ms"
-                f" → {_verdict}",
+                + (" [GLUED-PRE]" if _zero_gap_pre else "")
+                + f" → {_verdict}",
                 flush=True,
             )
 
             if _verdict != "CUT":
                 continue
 
-            # Clamp cut boundaries to adjacent word edges — never clip a real word.
-            cut_start = max(start - _FILLER_CUT_PAD, words[i - 1][2] if i > 0 else 0.0)
-            cut_end   = min(end   + _FILLER_CUT_PAD,
+            # Cut boundaries.
+            # When the pre side is glued (pre_gap ≈ 0), anchor to prev_word.end rather
+            # than filler.start ± pad: the adjacent word boundary is acoustically precise
+            # while the filler timestamp carries Whisper ±50ms error.  This eliminates
+            # residual filler audio at the cut edge.
+            if _zero_gap_pre:
+                cut_start = words[i - 1][2]   # prev_word.end — exact acoustic boundary
+            else:
+                cut_start = max(start - _FILLER_CUT_PAD, words[i - 1][2] if i > 0 else 0.0)
+            cut_end   = min(end + _FILLER_CUT_PAD,
                             words[i + 1][1] if i < len(words) - 1 else end + _FILLER_CUT_PAD)
             _pre_pad  = start - cut_start
             _post_pad = cut_end - end
