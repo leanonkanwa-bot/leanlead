@@ -457,6 +457,56 @@ Design {target_cards} graphic overlay cards for this video."""
         return []
 
 
+def _merge_cards(
+    llm_cards: list[dict],
+    semantic_cards: list[dict],
+    min_gap_s: float = 4.5,
+) -> list[dict]:
+    """Greedy-by-confidence merge of LLM graphic cards + semantic B-roll cards.
+
+    LLM cards are assigned implicit confidence 0.70.
+    Semantic cards carry their own confidence value.
+    All cards are sorted descending by confidence; we walk in that order,
+    accept a card, and immediately suppress any remaining card whose window
+    overlaps within min_gap_s (both directions).
+    """
+    # Attach confidence to LLM cards (implicit 0.70)
+    annotated: list[tuple[float, dict]] = []
+    for c in llm_cards:
+        annotated.append((float(c.get("_confidence", 0.70)), c))
+    for c in semantic_cards:
+        annotated.append((float(c.get("_confidence", 0.88)), c))
+
+    # Sort descending by confidence
+    annotated.sort(key=lambda t: t[0], reverse=True)
+
+    accepted: list[dict] = []
+    rejected_starts: list[float] = []
+
+    for conf, card in annotated:
+        cstart = float(card.get("startSec", 0))
+        # Check if this card falls in any rejected window
+        suppressed = any(abs(cstart - rs) < min_gap_s for rs in rejected_starts)
+        if suppressed:
+            print(
+                f"[BROLL-MERGE] suppressed card {card.get('id','?')} "
+                f"at {cstart:.2f}s (conf={conf:.2f}) — within {min_gap_s}s of accepted card",
+                flush=True,
+            )
+            continue
+        accepted.append(card)
+        rejected_starts.append(cstart)
+
+    # Restore display order (chronological)
+    accepted.sort(key=lambda c: float(c.get("startSec", 0)))
+    print(
+        f"[BROLL-MERGE] {len(llm_cards)} LLM + {len(semantic_cards)} semantic → "
+        f"{len(accepted)} accepted after merge",
+        flush=True,
+    )
+    return accepted
+
+
 def generate_storyboard(
     trimmed_duration: float,
     remapped_words: list[WordTiming],
@@ -532,6 +582,43 @@ def generate_storyboard(
                 f"first nearby word='{_near[0].text}'@{_near[0].start:.2f}s",
                 flush=True,
             )
+
+    # Semantic B-roll scan + greedy merge
+    try:
+        from app.engine.semantic_scanner import scan_words
+        from app.engine import broll_registry as _broll_reg
+        _sem_hits = scan_words(remapped_words)
+        _sem_cards: list[dict] = []
+        _card_counter = len(graphic_cards) + 1
+        for _hit in _sem_hits:
+            _btype = _broll_reg.REGISTRY.get(_hit.broll_type)
+            if _btype is None:
+                continue
+            _cid = f"broll-{_card_counter:03d}"
+            _card_counter += 1
+            _end_sec = min(
+                round(_hit.start_sec + _btype.default_duration, 3),
+                trimmed_duration,
+            )
+            _sem_cards.append({
+                "id": _cid,
+                "startSec": round(_hit.start_sec, 3),
+                "endSec": _end_sec,
+                "zone": _btype.preferred_zone,
+                "contentHints": {"style": "__broll__"},
+                "_broll_type": _hit.broll_type,
+                "_broll_params": _hit.params,
+                "_confidence": _hit.confidence,
+                "_text_span": _hit.text_span,
+            })
+            print(
+                f"[BROLL-MERGE] semantic hit: {_hit.broll_type} "
+                f"'{_hit.text_span}' @{_hit.start_sec:.2f}s conf={_hit.confidence:.2f}",
+                flush=True,
+            )
+        graphic_cards = _merge_cards(graphic_cards, _sem_cards)
+    except Exception as _broll_exc:
+        print(f"[BROLL-MERGE] non-fatal error in semantic scan/merge: {_broll_exc}", flush=True)
 
     # Generate caption cards mechanically
     caption_cards = _segment_captions(
