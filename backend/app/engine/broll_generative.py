@@ -25,13 +25,16 @@ if TYPE_CHECKING:
     from app.engine.captions import WordTiming
 
 
-# ── Allowed primitive vocabulary ──────────────────────────────────────────────
+# ── Composition vocabulary (each axis validated independently) ────────────────
 
-ALLOWED_SHAPES        = {"circle", "bar", "badge", "grid"}
-ALLOWED_ENTRIES       = {"pop", "trace", "fade", "slide_up"}
-ALLOWED_CONTENT_TYPES = {"number", "text", "icon"}
-ALLOWED_ICONS         = {"spark", "stop", "growth", "alert", "heart", "star", "check"}
-ALLOWED_ZONES         = {"upper-data", "lower-third"}
+ALLOWED_FRAMES     = {"none", "phone", "card", "none-fullbleed"}
+ALLOWED_VISUALS    = {"icon", "chart_trace", "number_counter", "chat_bubbles", "quote_mark"}
+ALLOWED_TEXT_SLOTS = {"kicker", "label", "quote_text", "none"}
+ALLOWED_LAYOUTS    = {"stacked", "side_by_side", "centered_overlay"}
+ALLOWED_ENTRIES    = {"pop", "trace", "fade", "slide_up", "sequential"}
+ALLOWED_ICONS      = {"spark", "stop", "growth", "alert", "heart", "star", "check"}
+ALLOWED_N_BUBBLES  = {1, 2, 3}
+ALLOWED_ZONES      = {"upper-data", "lower-third"}
 
 STRONG_ROLES = {
     "payoff", "realization", "principle", "climax",
@@ -219,37 +222,46 @@ def _build_prompt(candidates: list[dict], pack: dict, language: str) -> str:
     items_str = "\n".join(items)
 
     return f"""\
-You assign visual primitive parameters for animated graphic card overlays.
+You assign visual composition parameters for animated graphic card overlays.
 
-STYLE PACK (do NOT output these — the renderer uses them automatically):
+STYLE PACK (do NOT output these — the renderer injects them automatically):
   bg={bg}  accent={accent}  text={text}
 
-VOCABULARY (only these values are valid):
-  shape:        circle | bar | badge | grid
-  entry:        pop | trace | fade | slide_up
-  content_type: number | text | icon
-  zone:         upper-data | lower-third
-  icon_name:    spark | stop | growth | alert | heart | star | check
+VOCABULARY — each axis is independent, validate individually:
+  frame:     none | phone | card | none-fullbleed
+  visual:    icon | chart_trace | number_counter | chat_bubbles | quote_mark
+  icon_name: (when visual=icon only) spark | stop | growth | alert | heart | star | check
+  n_bubbles: (when visual=chat_bubbles only) 1 | 2 | 3
+  text_slot: kicker | label | quote_text | none
+  layout:    stacked | side_by_side | centered_overlay
+  entry:     pop | trace | fade | slide_up | sequential
+  zone:      upper-data | lower-third
 
 RULES (strict):
-  - Output ONLY the JSON array below. No prose, no explanation.
+  - Output ONLY the JSON array. No prose, no explanation.
   - One object per candidate, same order as input.
-  - Allowed fields per object: shape, entry, content_type, icon_name, zone
-  - icon_name: required only when content_type="icon". Must be one of the values above. Otherwise omit.
-  - Do NOT output: label, kicker, colors, fonts, emoji glyphs, or any other field.
-  - Prefer content_type="text" when the beat is a statement/principle (stop icon).
-  - Prefer content_type="icon" for emotional, climax, or realization beats.
-  - Prefer content_type="number" only when the context text contains a numeral.
-  - icon_name guide: heart→emotion/climax, spark→realization/hook, star→payoff/success,
-    stop→principle/boundary, growth→stat/amplify, alert→urgency, check→confirmation
-  - Prefer entry="trace" for bar shape. Prefer entry="pop" for badge and circle.
+  - Allowed output fields: frame, visual, icon_name, n_bubbles, text_slot, layout, entry, zone
+  - icon_name: required when visual=icon. Must be from the list above. Otherwise omit.
+  - n_bubbles: required when visual=chat_bubbles (default 2). Otherwise omit.
+  - Do NOT output: label, kicker, colors, fonts, SVG, HTML, or any other field.
+  - visual guide:
+      icon           → emotional/realization/payoff/principle beats
+      number_counter → ONLY when context text contains a numeral
+      chart_trace    → growth/stat/amplify beats with upward trend
+      chat_bubbles   → testimonial/dialogue/message context; pair with frame=phone
+      quote_mark     → principle/wisdom statements; pair with text_slot=quote_text
+  - frame guide: phone→chat_bubbles only | card→default | none-fullbleed→climax/bold moments
+  - layout guide: stacked→default | side_by_side→icon+label | centered_overlay→fullbleed text
+  - entry guide: sequential→chat_bubbles only | trace→chart_trace | pop→icon/badge | fade→quote
+  - icon_name guide: heart→emotion/climax | spark→realization/hook | star→payoff/success |
+    stop→principle/boundary | growth→stat/amplify | alert→urgency | check→confirmation
   - Language of context: {language}
 
 CANDIDATES:
 {items_str}
 
 OUTPUT FORMAT (array, exactly {len(candidates)} objects):
-[{{"shape":"badge","entry":"pop","content_type":"icon","icon_name":"star","zone":"upper-data"}},...]"""
+[{{"frame":"card","visual":"icon","icon_name":"spark","text_slot":"label","layout":"stacked","entry":"pop","zone":"upper-data"}},...]"""
 
 
 def _call_haiku(candidates: list[dict], pack: dict, language: str) -> list[dict] | None:
@@ -265,7 +277,7 @@ def _call_haiku(candidates: list[dict], pack: dict, language: str) -> list[dict]
     try:
         resp = client.messages.create(
             model=model,
-            max_tokens=512,
+            max_tokens=768,
             messages=[{"role": "user", "content": prompt}],
         )
     except Exception as exc:
@@ -307,61 +319,144 @@ def _call_haiku(candidates: list[dict], pack: dict, language: str) -> list[dict]
     return parsed
 
 
-# ── Validation ────────────────────────────────────────────────────────────────
+# ── Validation + compatibility ────────────────────────────────────────────────
 
 def _validate(obj: dict, idx: int) -> dict | None:
-    """Whitelist validation. Returns cleaned dict or None on rejection."""
-    shape        = obj.get("shape", "")
-    entry        = obj.get("entry", "")
-    content_type = obj.get("content_type", "")
-    zone         = obj.get("zone", "upper-data")
+    """Per-axis whitelist validation. Hard-rejects only the two core axes
+    (visual, frame). Soft-corrects soft axes (text_slot, layout, entry, zone).
+    Returns a clean dict ready for _compat_fix, or None on hard rejection.
+    """
+    frame     = obj.get("frame",     "card")
+    visual    = obj.get("visual",    "")
+    text_slot = obj.get("text_slot", "label")
+    layout    = obj.get("layout",    "stacked")
+    entry     = obj.get("entry",     "pop")
+    zone      = obj.get("zone",      "upper-data")
 
-    if shape not in ALLOWED_SHAPES:
+    # Hard reject: unknown visual (the primary semantic choice)
+    if visual not in ALLOWED_VISUALS:
         print(
             f"[BROLL-GENERATIVE] skip candidate[{idx}]"
-            f" — invalid shape={shape!r} (allowed: {sorted(ALLOWED_SHAPES)})",
+            f" — invalid visual={visual!r} (allowed: {sorted(ALLOWED_VISUALS)})",
             flush=True,
         )
         return None
+
+    # Hard reject: unknown frame (structural choice)
+    if frame not in ALLOWED_FRAMES:
+        print(
+            f"[BROLL-GENERATIVE] skip candidate[{idx}]"
+            f" — invalid frame={frame!r} (allowed: {sorted(ALLOWED_FRAMES)})",
+            flush=True,
+        )
+        return None
+
+    # Soft corrections: unknown value → safe default
+    if text_slot not in ALLOWED_TEXT_SLOTS:
+        text_slot = "label"
+    if layout not in ALLOWED_LAYOUTS:
+        layout = "stacked"
     if entry not in ALLOWED_ENTRIES:
-        print(
-            f"[BROLL-GENERATIVE] skip candidate[{idx}]"
-            f" — invalid entry={entry!r} (allowed: {sorted(ALLOWED_ENTRIES)})",
-            flush=True,
-        )
-        return None
-    if content_type not in ALLOWED_CONTENT_TYPES:
-        print(
-            f"[BROLL-GENERATIVE] skip candidate[{idx}]"
-            f" — invalid content_type={content_type!r} (allowed: {sorted(ALLOWED_CONTENT_TYPES)})",
-            flush=True,
-        )
-        return None
+        entry = "pop"
     if zone not in ALLOWED_ZONES:
         zone = "upper-data"
 
-    # Validate icon_name: only when content_type=="icon"; must be in ALLOWED_ICONS
+    # Visual sub-fields
     icon_name = ""
-    if content_type == "icon":
-        raw_name = str(obj.get("icon_name", "")).strip().lower()
-        if raw_name not in ALLOWED_ICONS:
+    if visual == "icon":
+        raw = str(obj.get("icon_name", "")).strip().lower()
+        icon_name = raw if raw in ALLOWED_ICONS else "spark"
+        if raw not in ALLOWED_ICONS and raw:
             print(
-                f"[BROLL-GENERATIVE] candidate[{idx}] icon_name={raw_name!r}"
-                f" not in whitelist — defaulting to 'spark'",
+                f"[BROLL-GENERATIVE] candidate[{idx}] icon_name={raw!r}"
+                f" not in whitelist — defaulted to 'spark'",
                 flush=True,
             )
-            icon_name = "spark"
-        else:
-            icon_name = raw_name
 
-    # Strip every field not in whitelist (colours, labels, emoji glyphs, etc.)
-    return {
-        "shape":        shape,
-        "entry":        entry,
-        "content_type": content_type,
-        "icon_name":    icon_name,
-        "zone":         zone,
-    }
+    n_bubbles = 2
+    if visual == "chat_bubbles":
+        try:
+            n_bubbles = int(obj.get("n_bubbles", 2))
+        except (ValueError, TypeError):
+            n_bubbles = 2
+        if n_bubbles not in ALLOWED_N_BUBBLES:
+            n_bubbles = 2
+
+    return _compat_fix({
+        "frame":     frame,
+        "visual":    visual,
+        "icon_name": icon_name,
+        "n_bubbles": n_bubbles,
+        "text_slot": text_slot,
+        "layout":    layout,
+        "entry":     entry,
+        "zone":      zone,
+    }, idx)
+
+
+def _compat_fix(params: dict, idx: int) -> dict:
+    """Cross-axis compatibility pass — silent correction, never rejection.
+
+    Compatibility table (one rule per line — easy to extend):
+      frame=phone          → visual must be chat_bubbles
+      visual=chat_bubbles  → frame must be phone or card (not none/none-fullbleed)
+      visual=quote_mark    → text_slot must be quote_text
+      visual=number_counter→ frame must not be phone
+      entry=sequential     → only valid with chat_bubbles; else demote to fade
+    """
+    p = dict(params)
+
+    # Rule 1: frame=phone → visual must be chat_bubbles
+    if p["frame"] == "phone" and p["visual"] != "chat_bubbles":
+        print(
+            f"[BROLL-GENERATIVE] compat[{idx}]:"
+            f" frame=phone requires visual=chat_bubbles"
+            f" (was {p['visual']!r}) — corrected",
+            flush=True,
+        )
+        p["visual"]    = "chat_bubbles"
+        p["n_bubbles"] = p.get("n_bubbles", 2) or 2
+
+    # Rule 2: visual=chat_bubbles → frame must be phone or card
+    if p["visual"] == "chat_bubbles" and p["frame"] not in ("phone", "card"):
+        print(
+            f"[BROLL-GENERATIVE] compat[{idx}]:"
+            f" visual=chat_bubbles requires frame=phone|card"
+            f" (was {p['frame']!r}) — corrected to 'card'",
+            flush=True,
+        )
+        p["frame"] = "card"
+
+    # Rule 3: visual=quote_mark → text_slot must be quote_text
+    if p["visual"] == "quote_mark" and p["text_slot"] != "quote_text":
+        print(
+            f"[BROLL-GENERATIVE] compat[{idx}]:"
+            f" visual=quote_mark requires text_slot=quote_text"
+            f" (was {p['text_slot']!r}) — corrected",
+            flush=True,
+        )
+        p["text_slot"] = "quote_text"
+
+    # Rule 4: visual=number_counter → frame must not be phone
+    if p["visual"] == "number_counter" and p["frame"] == "phone":
+        print(
+            f"[BROLL-GENERATIVE] compat[{idx}]:"
+            f" visual=number_counter excludes frame=phone — corrected to 'card'",
+            flush=True,
+        )
+        p["frame"] = "card"
+
+    # Rule 5: entry=sequential → only valid for chat_bubbles; else demote to fade
+    if p["entry"] == "sequential" and p["visual"] != "chat_bubbles":
+        print(
+            f"[BROLL-GENERATIVE] compat[{idx}]:"
+            f" entry=sequential requires visual=chat_bubbles"
+            f" (was {p['visual']!r}) — entry demoted to 'fade'",
+            flush=True,
+        )
+        p["entry"] = "fade"
+
+    return p
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
@@ -430,50 +525,53 @@ def generate_generative_broll(
             )
             continue
 
-        # Resolve content value deterministically
-        content_type  = validated["content_type"]
+        # Resolve number content deterministically for number_counter visual
         content_value = ""
-        if content_type == "icon":
-            content_value = validated["icon_name"] or "spark"
-        elif content_type == "number":
+        if validated["visual"] == "number_counter":
             num = _extract_number(remapped_words, out_s, out_e)
             if num:
                 content_value = num
             else:
-                # No numeral found — fall back to text
-                content_type  = "text"
-                content_value = cand["label"]
-        else:  # text
-            content_value = cand["label"]
+                # No numeral in transcript — demote to icon:spark
+                print(
+                    f"[BROLL-GENERATIVE] candidate[{idx}]"
+                    f" visual=number_counter but no numeral found"
+                    f" — demoted to icon:spark",
+                    flush=True,
+                )
+                validated = dict(validated, visual="icon", icon_name="spark")
 
         cid = f"gen-{card_id_offset + idx + 1:03d}"
 
         params = {
-            "shape":         validated["shape"],
-            "entry":         validated["entry"],
-            "content_type":  content_type,
+            "frame":         validated["frame"],
+            "visual":        validated["visual"],
+            "icon_name":     validated["icon_name"],
+            "n_bubbles":     validated["n_bubbles"],
             "content_value": content_value,
+            "text_slot":     validated["text_slot"],
+            "layout":        validated["layout"],
+            "entry":         validated["entry"],
             "label":         cand["label"],
             "kicker":        cand["kicker"],
         }
 
         card = {
-            "id":           cid,
-            "startSec":     out_s,
-            "endSec":       end_s,
-            "zone":         validated["zone"],
-            "contentHints": {"style": "__broll__"},
-            "_broll_type":  "generative_primitive",
+            "id":            cid,
+            "startSec":      out_s,
+            "endSec":        end_s,
+            "zone":          validated["zone"],
+            "contentHints":  {"style": "__broll__"},
+            "_broll_type":   "generative_primitive",
             "_broll_params": params,
-            "_confidence":  0.65,
-            "_beat_role":   cand["beat_role"],
+            "_confidence":   0.65,
+            "_beat_role":    cand["beat_role"],
         }
         new_cards.append(card)
         print(
             f"[BROLL-GENERATIVE] inserted {cid} at {out_s:.2f}s"
-            f" shape={validated['shape']} entry={validated['entry']}"
-            f" content={content_type}:{content_value!r}"
-            f" beat={cand['beat_role']}",
+            f" frame={validated['frame']} visual={validated['visual']}"
+            f" entry={validated['entry']} beat={cand['beat_role']}",
             flush=True,
         )
 
