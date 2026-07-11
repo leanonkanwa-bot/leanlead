@@ -477,8 +477,15 @@ def _merge_cards(
     for c in semantic_cards:
         annotated.append((float(c.get("_confidence", 0.88)), c))
 
-    # Sort descending by confidence
-    annotated.sort(key=lambda t: t[0], reverse=True)
+    # Sort descending by confidence; ties broken by earliest timestamp.
+    # key=(confidence, -startSec) with reverse=True puts highest confidence
+    # first, and among equal-confidence cards the one with the smallest
+    # startSec (earliest in the video) wins. Explicit and stable regardless
+    # of insertion order or scan_words output ordering.
+    annotated.sort(
+        key=lambda t: (t[0], -float(t[1].get("startSec", 0))),
+        reverse=True,
+    )
 
     accepted: list[dict] = []
     rejected_starts: list[float] = []
