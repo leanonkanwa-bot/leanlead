@@ -29,7 +29,8 @@ if TYPE_CHECKING:
 
 ALLOWED_SHAPES        = {"circle", "bar", "badge", "grid"}
 ALLOWED_ENTRIES       = {"pop", "trace", "fade", "slide_up"}
-ALLOWED_CONTENT_TYPES = {"number", "text", "emoji"}
+ALLOWED_CONTENT_TYPES = {"number", "text", "icon"}
+ALLOWED_ICONS         = {"spark", "stop", "growth", "alert", "heart", "star", "check"}
 ALLOWED_ZONES         = {"upper-data", "lower-third"}
 
 STRONG_ROLES = {
@@ -187,18 +188,21 @@ STYLE PACK (do NOT output these — the renderer uses them automatically):
 VOCABULARY (only these values are valid):
   shape:        circle | bar | badge | grid
   entry:        pop | trace | fade | slide_up
-  content_type: number | text | emoji
+  content_type: number | text | icon
   zone:         upper-data | lower-third
+  icon_name:    spark | stop | growth | alert | heart | star | check
 
 RULES (strict):
   - Output ONLY the JSON array below. No prose, no explanation.
   - One object per candidate, same order as input.
-  - Allowed fields per object: shape, entry, content_type, emoji_value, zone
-  - emoji_value: required only when content_type="emoji". 1-2 chars. Otherwise omit.
-  - Do NOT output: label, kicker, colors, fonts, animation params, or any other field.
-  - Prefer content_type="text" when the beat is a statement/principle.
-  - Prefer content_type="emoji" for emotional/climax beats.
+  - Allowed fields per object: shape, entry, content_type, icon_name, zone
+  - icon_name: required only when content_type="icon". Must be one of the values above. Otherwise omit.
+  - Do NOT output: label, kicker, colors, fonts, emoji glyphs, or any other field.
+  - Prefer content_type="text" when the beat is a statement/principle (stop icon).
+  - Prefer content_type="icon" for emotional, climax, or realization beats.
   - Prefer content_type="number" only when the context text contains a numeral.
+  - icon_name guide: heart→emotion/climax, spark→realization/hook, star→payoff/success,
+    stop→principle/boundary, growth→stat/amplify, alert→urgency, check→confirmation
   - Prefer entry="trace" for bar shape. Prefer entry="pop" for badge and circle.
   - Language of context: {language}
 
@@ -206,7 +210,7 @@ CANDIDATES:
 {items_str}
 
 OUTPUT FORMAT (array, exactly {len(candidates)} objects):
-[{{"shape":"badge","entry":"pop","content_type":"emoji","emoji_value":"🎯","zone":"upper-data"}},...]"""
+[{{"shape":"badge","entry":"pop","content_type":"icon","icon_name":"star","zone":"upper-data"}},...]"""
 
 
 def _call_haiku(candidates: list[dict], pack: dict, language: str) -> list[dict] | None:
@@ -297,20 +301,26 @@ def _validate(obj: dict, idx: int) -> dict | None:
     if zone not in ALLOWED_ZONES:
         zone = "upper-data"
 
-    # Sanitise emoji_value: only if content_type=="emoji", max 2 chars
-    emoji_value = ""
-    if content_type == "emoji":
-        ev = str(obj.get("emoji_value", "")).strip()
-        # Accept at most 2 Unicode code points (single or compound emoji)
-        graphemes = list(ev)[:2]
-        emoji_value = "".join(graphemes) if graphemes else "✨"
+    # Validate icon_name: only when content_type=="icon"; must be in ALLOWED_ICONS
+    icon_name = ""
+    if content_type == "icon":
+        raw_name = str(obj.get("icon_name", "")).strip().lower()
+        if raw_name not in ALLOWED_ICONS:
+            print(
+                f"[BROLL-GENERATIVE] candidate[{idx}] icon_name={raw_name!r}"
+                f" not in whitelist — defaulting to 'spark'",
+                flush=True,
+            )
+            icon_name = "spark"
+        else:
+            icon_name = raw_name
 
-    # Strip every field not in whitelist (colours, labels, etc.)
+    # Strip every field not in whitelist (colours, labels, emoji glyphs, etc.)
     return {
         "shape":        shape,
         "entry":        entry,
         "content_type": content_type,
-        "emoji_value":  emoji_value,
+        "icon_name":    icon_name,
         "zone":         zone,
     }
 
@@ -384,8 +394,8 @@ def generate_generative_broll(
         # Resolve content value deterministically
         content_type  = validated["content_type"]
         content_value = ""
-        if content_type == "emoji":
-            content_value = validated["emoji_value"] or "✨"
+        if content_type == "icon":
+            content_value = validated["icon_name"] or "spark"
         elif content_type == "number":
             num = _extract_number(remapped_words, out_s, out_e)
             if num:

@@ -9,11 +9,19 @@ Shape × entry combinations supported (4 × 4 = 16):
   shape:  circle | bar | badge | grid
   entry:  pop | trace | fade | slide_up
 
-Content slot (value always deterministic — extracted from transcript by code,
-except emoji where the LLM picks the glyph):
+Content slot (value always deterministic from transcript, except icon_name):
   number  — large numeral + optional unit
   text    — short phrase (≤ 4 words, from transcript)
-  emoji   — large centred glyph (≤ 2 chars, LLM-chosen)
+  icon    — SVG icon from closed set; LLM picks the name, renderer supplies the path
+
+Icon vocabulary (closed — LLM never outputs SVG, only the name):
+  spark   réalisation / déclic       (lightning bolt, filled)
+  stop    principe / blocage         (octagon + !, stroked)
+  growth  croissance / hausse        (trend line + arrow, stroked)
+  alert   urgence / alerte           (triangle + !, stroked)
+  heart   émotion / cœur             (heart, filled)
+  star    succès / victoire           (5-point star, filled)
+  check   validation / confirmation  (checkmark, stroked)
 
 Label (≤ 4 words) and kicker (≤ 2 words) are ALWAYS set by code
 from transcript words nearest the beat — never by the LLM.
@@ -30,6 +38,56 @@ def _e(s: str) -> str:
 
 def _ej(s: str) -> str:
     return str(s).replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
+
+
+# ── SVG icon set (closed vocabulary) ─────────────────────────────────────────
+# Each value is raw SVG innerHTML on a 24×24 viewBox.
+# "ACCENT" is substituted at render time with the active pack accent color.
+
+_SVG_ICONS: dict[str, str] = {
+    "spark": (
+        '<path d="M13 2 L4 13 L10.5 13 L8.5 22 L20 11 L13.5 11 Z"'
+        ' fill="ACCENT" stroke="none"/>'
+    ),
+    "stop": (
+        '<path d="M8.93 3 L15.07 3 L21 8.93 L21 15.07 L15.07 21 L8.93 21'
+        ' L3 15.07 L3 8.93 Z" fill="none" stroke="ACCENT" stroke-width="2"'
+        ' stroke-linejoin="round"/>'
+        '<line x1="12" y1="8" x2="12" y2="13.5" stroke="ACCENT"'
+        ' stroke-width="2" stroke-linecap="round"/>'
+        '<circle cx="12" cy="16.5" r="1" fill="ACCENT"/>'
+    ),
+    "growth": (
+        '<polyline points="3,17 8,10 13,14 21,6" fill="none" stroke="ACCENT"'
+        ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+        '<polyline points="16.5,6 21,6 21,10.5" fill="none" stroke="ACCENT"'
+        ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+    ),
+    "alert": (
+        '<path d="M12 3 L21.5 20 L2.5 20 Z" fill="none" stroke="ACCENT"'
+        ' stroke-width="2" stroke-linejoin="round"/>'
+        '<line x1="12" y1="9" x2="12" y2="14" stroke="ACCENT"'
+        ' stroke-width="2" stroke-linecap="round"/>'
+        '<circle cx="12" cy="17.5" r="1" fill="ACCENT"/>'
+    ),
+    "heart": (
+        '<path d="M12 21 C12 21 3 14.5 3 8.5 C3 5.5 5.5 3 8.5 3'
+        ' C10.2 3 11.5 4.1 12 5.2 C12.5 4.1 13.8 3 15.5 3'
+        ' C18.5 3 21 5.5 21 8.5 C21 14.5 12 21 12 21 Z"'
+        ' fill="ACCENT" stroke="none"/>'
+    ),
+    "star": (
+        '<polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02'
+        ' 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"'
+        ' fill="ACCENT" stroke="none"/>'
+    ),
+    "check": (
+        '<polyline points="4,12 9,17 20,6" fill="none" stroke="ACCENT"'
+        ' stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'
+    ),
+}
+
+ALLOWED_ICONS: frozenset[str] = frozenset(_SVG_ICONS)
 
 
 # ── HTML ──────────────────────────────────────────────────────────────────────
@@ -55,10 +113,19 @@ def _render_html(params: dict, pack: dict, card_id: str) -> str:
     cid          = card_id
 
     # ── Content element ──────────────────────────────────────────────────────
-    if content_type == "emoji":
-        content_html = f'<div class="prim-emoji" id="{cid}-prim-content">{content_val}</div>'
-        content_css  = f""".card[data-card-id="{cid}"] .prim-emoji {{
-  font-size:80px; line-height:1; opacity:0; display:block; text-align:center;
+    if content_type == "icon":
+        _icon_key = params.get("content_value", "spark")
+        _icon_raw = _SVG_ICONS.get(_icon_key, _SVG_ICONS["spark"])
+        _icon_svg = _icon_raw.replace("ACCENT", accent)
+        content_html = (
+            f'<div class="prim-icon" id="{cid}-prim-content">'
+            f'<svg viewBox="0 0 24 24" width="72" height="72"'
+            f' xmlns="http://www.w3.org/2000/svg" aria-hidden="true">'
+            f'{_icon_svg}'
+            f'</svg></div>'
+        )
+        content_css = f""".card[data-card-id="{cid}"] .prim-icon {{
+  opacity:0; display:flex; align-items:center; justify-content:center;
 }}"""
     elif content_type == "number":
         content_html = f'<div class="prim-number" id="{cid}-prim-content">{content_val}</div>'
