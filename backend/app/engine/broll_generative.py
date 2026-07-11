@@ -119,14 +119,25 @@ def _find_candidates(
     timing_map,
     trimmed_duration: float,
 ) -> list[dict]:
-    """Return beats that are strong but have no accepted card within MIN_GAP_S."""
+    """Return beats that are strong but have no accepted card within MIN_GAP_S.
+
+    Set env BROLL_GENERATIVE_MIN_SCORE to override STRONG_SCORE_MIN without
+    a code push (useful for Railway one-shot testing: set to 0 to force all
+    STRONG_ROLES beats through regardless of score; remove to restore default).
+    """
+    import os
+    score_min = int(os.environ.get("BROLL_GENERATIVE_MIN_SCORE", STRONG_SCORE_MIN))
     accepted_ivs = _card_intervals(accepted_cards)
 
-    candidates = []
+    candidates: list[dict] = []
+    n_weak = n_range = n_covered = 0
+
     for beat in script_structure:
         role  = beat.get("beat", "")
         score = int(beat.get("score", 0))
-        if role not in STRONG_ROLES and score < STRONG_SCORE_MIN:
+
+        if role not in STRONG_ROLES and score < score_min:
+            n_weak += 1
             continue
 
         src_s = float(beat.get("start", 0))
@@ -135,31 +146,59 @@ def _find_candidates(
         out_e = timing_map.source_to_output(src_e)
 
         if out_e <= out_s or out_s >= trimmed_duration:
+            n_range += 1
             continue
 
         new_end = min(out_s + DEFAULT_DURATION, trimmed_duration)
-        if any(_interval_gap(out_s, new_end, a_s, a_e) < MIN_GAP_S for a_s, a_e in accepted_ivs):
+
+        # Identify the first accepted interval that blocks this beat.
+        blocking = next(
+            ((a_s, a_e) for a_s, a_e in accepted_ivs
+             if _interval_gap(out_s, new_end, a_s, a_e) < MIN_GAP_S),
+            None,
+        )
+        if blocking:
+            a_s, a_e = blocking
+            print(
+                f"[BROLL-GENERATIVE] beat role={role} score={score}"
+                f" t={out_s:.1f}s → covered by [{a_s:.1f},{a_e:.1f}s]"
+                f" gap={_interval_gap(out_s, new_end, a_s, a_e):.2f}s",
+                flush=True,
+            )
+            n_covered += 1
             continue
 
-        label  = _extract_label(remapped_words, out_s, out_e)
-        kicker = _extract_kicker(remapped_words, out_s)
-
-        # Context window: ~30 words around the beat for the LLM prompt
+        label    = _extract_label(remapped_words, out_s, out_e)
+        kicker   = _extract_kicker(remapped_words, out_s)
         ctx_words = _words_in_window(remapped_words, out_s, out_e, pad=3.0)
         ctx_text  = " ".join(getattr(w, "text", "") for w in sorted(
             ctx_words, key=lambda w: float(getattr(w, "start", 0))
         ))[:200]
 
+        print(
+            f"[BROLL-GENERATIVE] beat role={role} score={score}"
+            f" t={out_s:.1f}s → UNCOVERED — queued for LLM",
+            flush=True,
+        )
         candidates.append({
-            "beat_role":    role,
-            "score":        score,
-            "out_start":    round(out_s, 3),
-            "out_end":      min(round(out_e, 3), trimmed_duration),
-            "label":        label,
-            "kicker":       kicker,
-            "ctx_text":     ctx_text,
+            "beat_role": role,
+            "score":     score,
+            "out_start": round(out_s, 3),
+            "out_end":   min(round(out_e, 3), trimmed_duration),
+            "label":     label,
+            "kicker":    kicker,
+            "ctx_text":  ctx_text,
         })
 
+    print(
+        f"[BROLL-GENERATIVE] scan complete:"
+        f" {len(script_structure)} beats"
+        f" | {n_weak} weak/skipped"
+        f" | {n_range} out-of-range"
+        f" | {n_covered} covered"
+        f" | {len(candidates)} uncovered (score_min={score_min})",
+        flush=True,
+    )
     return candidates
 
 
