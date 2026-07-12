@@ -719,6 +719,29 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         parts.append(f'  font-weight: {p["font_weight"]}; color: {p["text"]};')
         parts.append(f'  text-align: center; margin-bottom: 12px;')
         parts.append('}')
+    # Callout: left accent stripe + tinted content area
+    if content_style == "callout":
+        acc_hex = p["accent"].lstrip("#")
+        try:
+            ar, ag, ab = int(acc_hex[0:2], 16), int(acc_hex[2:4], 16), int(acc_hex[4:6], 16)
+            co_bg = f"rgba({ar},{ag},{ab},0.07)"
+        except Exception:
+            co_bg = "rgba(255,255,255,0.05)"
+        parts.append(f'.card[data-card-id="{card_id}"] .co-wrap {{')
+        parts.append(f'  display: flex; align-items: stretch; width: 100%;')
+        parts.append(f'  background: {co_bg}; border-radius: {p["radius"]};')
+        parts.append(f'  overflow: hidden;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .co-stripe {{')
+        parts.append(f'  width: 4px; flex-shrink: 0; transform-origin: top center;')
+        parts.append(f'  background: {p["accent"]};')
+        if p.get("accent_line_glow"):
+            parts.append(f'  box-shadow: {p["accent_line_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .co-body {{')
+        parts.append(f'  padding: 16px 18px 16px 16px; flex: 1;')
+        parts.append(f'  display: flex; flex-direction: column; justify-content: center;')
+        parts.append('}')
     # Attributed quote: quote + attribution line
     if content_style == "attributed_quote":
         parts.append(f'.card[data-card-id="{card_id}"] .attr-line {{')
@@ -1106,8 +1129,17 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         parts.append(f'        <div class="so-cta">{_esc(cta)}</div>')
         parts.append(f'      </div>')
         parts.append(f'    </div>')
+    elif content_style == "callout":
+        parts.append(f'    <div class="co-wrap" id="{card_id}-co">')
+        parts.append(f'      <div class="co-stripe" id="{card_id}-co-stripe"></div>')
+        parts.append(f'      <div class="co-body">')
+        parts.append(f'        <div class="title" id="{card_id}-title">{_split_title_accent(display_text, accent_word_hint, card_id)}</div>')
+        if detail:
+            parts.append(f'        <div class="detail" id="{card_id}-co-detail">{_esc(detail)}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'    </div>')
     else:
-        # key_phrase, quote, callout and any unknown style
+        # key_phrase, quote and any unknown style
         parts.append(f'    <div class="title" id="{card_id}-title">{_split_title_accent(display_text, accent_word_hint, card_id)}</div>')
         if detail:
             parts.append(f'    <div class="detail" id="{card_id}-detail">{_esc(detail)}</div>')
@@ -1939,6 +1971,52 @@ def _build_timeline_js(
                     f'  gsap.to(\'{track_sel}\', '
                     f'{{ x: "-50%", duration: {scroll_dur:.3f}, ease: "none",'
                     f' repeat: -1, delay: {t_in:.4f} }});')
+            elif content_style == "callout":
+                stripe_sel = f'.card[data-card-id="{card_id}"] #{card_id}-co-stripe'
+                if is_cinema:
+                    lines.append(
+                        f'  tl.fromTo(\'{stripe_sel}\', '
+                        f'{{ scaleY: 0 }}, '
+                        f'{{ scaleY: 1, duration: 0.50, ease: "power2.inOut" }}, '
+                        f'{t_in:.4f});')
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0 }}, '
+                        f'{{ opacity: 1, duration: 0.50, ease: _eIn }}, '
+                        f'{t_in + 0.20:.4f});')
+                elif is_ledger:
+                    lines.append(
+                        f'  tl.fromTo(\'{stripe_sel}\', '
+                        f'{{ scaleY: 0 }}, '
+                        f'{{ scaleY: 1, duration: 0.25, ease: "none" }}, '
+                        f'{t_in:.4f});')
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ clipPath: "inset(0 100% 0 0)" }}, '
+                        f'{{ clipPath: "inset(0 0% 0 0)", duration: 0.40, ease: _eIn }}, '
+                        f'{t_in + 0.10:.4f});')
+                elif is_vibe:
+                    lines.append(
+                        f'  tl.fromTo(\'{stripe_sel}\', '
+                        f'{{ scaleY: 0 }}, '
+                        f'{{ scaleY: 1, duration: 0.30, ease: "back.out(1.4)" }}, '
+                        f'{t_in:.4f});')
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0, scale: 0.9 }}, '
+                        f'{{ opacity: 1, scale: 1, duration: 0.35, ease: _eIn }}, '
+                        f'{t_in + 0.10:.4f});')
+                else:  # lean_glass, lean_paper, lean_craft
+                    lines.append(
+                        f'  tl.fromTo(\'{stripe_sel}\', '
+                        f'{{ scaleY: 0 }}, '
+                        f'{{ scaleY: 1, duration: 0.30, ease: "power2.inOut" }}, '
+                        f'{t_in:.4f});')
+                    lines.append(
+                        f'  tl.fromTo(\'{title_sel}\', '
+                        f'{{ opacity: 0, x: 12 }}, '
+                        f'{{ opacity: 1, x: 0, duration: 0.35, ease: _eIn }}, '
+                        f'{t_in + 0.10:.4f});')
             else:
                 if is_cinema:
                     lines.append(
