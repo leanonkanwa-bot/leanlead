@@ -652,36 +652,24 @@ def generate_storyboard(
     except Exception as _broll_exc:
         print(f"[BROLL-MERGE] non-fatal error in semantic scan/merge: {_broll_exc}", flush=True)
 
-    # Generative B-roll: gap-fill uncovered strong beats via Haiku
-    try:
-        from app.engine.broll_generative import generate_generative_broll
-        _style_packs = {
-            "lean_glass": {
-                "bg":             "#0f0f13",
-                "text":           "#f1f1f1",
-                "text_secondary": "rgba(241,241,241,0.45)",
-                "accent":         "#4cc9f0",
-                "font":           '"Inter", "Helvetica Neue", sans-serif',
-                "font_weight":    "800",
-                "radius":         "20px",
-                "shadow":         "0 8px 32px rgba(0,0,0,0.55)",
-                "shadow_inset":   "inset 0 1px 0 rgba(255,255,255,0.08)",
-            },
-        }
-        _pack = _style_packs.get(style_pack, _style_packs["lean_glass"])
-        _gen_cards = generate_generative_broll(
-            script_structure=script_structure,
-            accepted_cards=graphic_cards,
-            remapped_words=remapped_words,
-            timing_map=timing_map,
-            trimmed_duration=trimmed_duration,
-            pack=_pack,
-            language=language,
-            card_id_offset=len(graphic_cards),
-        )
-        graphic_cards = graphic_cards + _gen_cards
-    except Exception as _gen_exc:
-        print(f"[BROLL-GENERATIVE] non-fatal error: {_gen_exc}", flush=True)
+    # Generative B-roll auto-injection is disabled.
+    # The engine (broll_generative.py + broll_primitive.py) drove card selection via internal
+    # narrative beat roles (HOOK, REALIZATION, PRINCIPLE, PAYOFF, EMOTIONAL_END, AMPLIFY).
+    # These roles exist for structural analysis only and were never designed to drive on-screen
+    # visuals directly. Beat-driven injection caused several classes of bugs:
+    #   1. Data mixing: kicker extracted from pre-beat context, content_value from beat text —
+    #      two separate script moments mislabelled as a single stat card.
+    #   2. Label duplication on certain primitive types (progress_bar fixed separately, others
+    #      may still be affected).
+    #   3. Internal role names ("HOOK", "PAYOFF") could appear as visible on-screen text when
+    #      propagated through param pipelines that used beat role as a title fallback.
+    # What remains active and untouched:
+    #   - 3 deterministic scanners (money_counter, calendar_date, growth_curve) — match real
+    #     transcript words and amounts, not beat roles.
+    #   - 16 LLM narrative card styles from the storyboard (stat, quote, comparison, list,
+    #     timeline, dialogue, trend, etc.) — independent of this engine.
+    #   - Density budget (BROLL_MAX_PER_MINUTE) and greedy merge — still applied to all cards.
+    # Re-enable and redesign once beat roles are fully decoupled from visual param extraction.
 
     # Lower-third auto-injection is disabled.
     # The component (broll_lower_third.py) is designed for explicit speaker
