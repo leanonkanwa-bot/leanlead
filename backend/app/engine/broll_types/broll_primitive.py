@@ -520,8 +520,10 @@ def _text_slot_html(params: dict, pack: dict, cid: str) -> tuple[str, str]:
     visual    = params.get("visual",    "icon")
     text_slot = params.get("text_slot", "label")
 
-    # Chat bubbles carry text internally — suppress external text slot
-    if visual == "chat_bubbles" or text_slot == "none":
+    # chat_bubbles and progress_bar carry their label internally (bubbles text /
+    # pb-header label+pct row) — suppress the external prim-text slot to avoid
+    # rendering the label twice.
+    if visual in ("chat_bubbles", "progress_bar") or text_slot == "none":
         return "", ""
 
     accent  = pack.get("accent",         "#4cc9f0")

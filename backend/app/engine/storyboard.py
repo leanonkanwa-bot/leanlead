@@ -683,70 +683,15 @@ def generate_storyboard(
     except Exception as _gen_exc:
         print(f"[BROLL-GENERATIVE] non-fatal error: {_gen_exc}", flush=True)
 
-    # Lower-third name overlays: inject at HOOK beats (max 2 per video, 4s display)
-    try:
-        _lt_count = 0
-        _lt_used_times: list[float] = []
-        for _beat in script_structure:
-            if _lt_count >= 2:
-                break
-            if str(_beat.get("beat", "")).lower() not in ("hook", "intro", "payoff"):
-                continue
-            _src_s = float(_beat.get("start", 0))
-            _src_e = float(_beat.get("end", _src_s + 3.0))
-            _out_s = timing_map.source_to_output(_src_s)
-            _out_e = timing_map.source_to_output(_src_e)
-            if _out_s >= trimmed_duration or _out_e <= _out_s:
-                continue
-            # Skip if too close to another lower-third
-            if any(abs(_out_s - t) < 10.0 for t in _lt_used_times):
-                continue
-            # Collision avoidance: check ALL graphic cards (any zone).
-            # If blocked, shift the lt to just after the blocking card ends.
-            _lt_end_proposed = min(round(_out_s + 4.0, 3), trimmed_duration)
-            _blocking = next(
-                (
-                    _gc for _gc in sorted(graphic_cards, key=lambda c: float(c.get("startSec", 0)))
-                    if float(_gc.get("startSec", 0)) < _lt_end_proposed
-                    and float(_gc.get("endSec", float(_gc.get("startSec", 0)) + 3.5)) > _out_s
-                ),
-                None,
-            )
-            if _blocking:
-                _shifted = round(float(_blocking.get("endSec", _out_s + 4.0)) + 0.1, 3)
-                _shifted_end = min(_shifted + 4.0, trimmed_duration)
-                if _shifted >= trimmed_duration or _shifted_end - _shifted < 1.5:
-                    continue
-                _still_blocked = any(
-                    float(_gc.get("startSec", 0)) < _shifted_end
-                    and float(_gc.get("endSec", float(_gc.get("startSec", 0)) + 3.5)) > _shifted
-                    for _gc in graphic_cards
-                )
-                if _still_blocked:
-                    continue
-                _out_s = _shifted
-            _lt_lines = _beat.get("lines", [])
-            _lt_kicker = (_lt_lines[0][:30] if _lt_lines else "").strip()
-            _lt_id = f"lt-{_lt_count + 1:02d}"
-            _lt_end = min(round(_out_s + 4.0, 3), trimmed_duration)
-            graphic_cards.append({
-                "id":           _lt_id,
-                "startSec":     round(_out_s, 3),
-                "endSec":       _lt_end,
-                "zone":         "lower-third-name",
-                "contentHints": {"style": "__broll__"},
-                "_broll_type":  "lower_third",
-                "_broll_params": {
-                    "name":  _lt_kicker or "Coach",
-                    "title": str(_beat.get("beat", "hook")).capitalize(),
-                },
-                "_confidence": 0.80,
-            })
-            _lt_used_times.append(_out_s)
-            _lt_count += 1
-            print(f"[LOWER-THIRD] injected {_lt_id} at {_out_s:.2f}s '{_lt_kicker}'", flush=True)
-    except Exception as _lt_exc:
-        print(f"[LOWER-THIRD] non-fatal error: {_lt_exc}", flush=True)
+    # Lower-third auto-injection is disabled.
+    # The component (broll_lower_third.py) is designed for explicit speaker
+    # identification (real name + title), not for beat-driven auto-injection.
+    # Auto-injection caused two classes of bugs:
+    #   1. Collisions with semantic/generative cards at the same timestamp,
+    #      silently dropped by _clamp_overlaps() in compose.py.
+    #   2. Internal beat role names ("HOOK", "PAYOFF") leaked as visible
+    #      on-screen text since _beat.get("beat") was used as the "title" param.
+    # Re-enable and redesign when a real speaker-ID data source is available.
 
     # Generate caption cards mechanically
     caption_cards = _segment_captions(
