@@ -1125,54 +1125,19 @@ def _build_caption_card_html(card: dict, pack: dict | None = None) -> str:
     words = card.get("words", [])
     p = pack or _LEAN_GLASS
 
-    # Per-pack caption style
-    _pill_packs    = {"lean_glass", "lean_vibe", "lean_cinema"}
-    _highlight_packs = {"lean_paper", "lean_ledger", "lean_craft"}
-    cap_style = (
-        "pill-karaoke" if p.get("id") in _pill_packs
-        else "highlight" if p.get("id") in _highlight_packs
-        else "default"
-    )
-
     word_spans = []
-    for idx, w in enumerate(words):
+    for w in words:
         text = w.get("text", "")
         emphasis = w.get("emphasis", False)
-        if cap_style == "pill-karaoke":
-            cls = "cap-word cap-pill cap-emphasis" if emphasis else "cap-word cap-pill"
-            # data-w index required for per-word GSAP background targeting
-            word_spans.append(f'<span class="{cls}" data-w="{idx}">{_esc(text)}</span>')
-        elif cap_style == "highlight" and emphasis:
-            cls = "cap-word cap-hl"
-            word_spans.append(f'<span class="{cls}">{_esc(text)}</span>')
-        else:
-            cls = "cap-word cap-emphasis" if emphasis else "cap-word"
-            word_spans.append(f'<span class="{cls}">{_esc(text)}</span>')
+        cls = "cap-word cap-emphasis" if emphasis else "cap-word"
+        word_spans.append(f'<span class="{cls}">{_esc(text)}</span>')
 
-    if cap_style == "pill-karaoke":
-        style_extra = (
-            f'.card[data-card-id="{card_id}"] .cap-pill {{\n'
-            f'  padding: 4px 10px; border-radius: 20px;\n'
-            f'  background: transparent;\n'  # active bg injected per-word via GSAP
-            f'}}\n'
-            f'.card[data-card-id="{card_id}"] .cap-emphasis {{\n'
-            f'  color: {p["accent"]};\n'
-            f'}}\n'
-        )
-    elif cap_style == "highlight":
-        style_extra = (
-            f'.card[data-card-id="{card_id}"] .cap-hl {{\n'
-            f'  color: {p["accent"]};\n'
-            f'  background: rgba(0,0,0,0.12);\n'
-            f'  border-radius: 4px; padding: 1px 4px;\n'
-            f'}}\n'
-        )
-    else:
-        style_extra = (
-            f'.card[data-card-id="{card_id}"] .cap-emphasis {{\n'
-            f'  color: {p["accent"]};\n'
-            f'}}\n'
-        )
+    # Emphasis = accent colour only; zero background or box on any word, ever.
+    style_extra = (
+        f'.card[data-card-id="{card_id}"] .cap-emphasis {{\n'
+        f'  color: {p["accent"]};\n'
+        f'}}\n'
+    )
 
     return (
         f'<div class="card caption-card" data-card-id="{card_id}">\n'
@@ -1302,31 +1267,11 @@ def _build_timeline_js(
                 f'{start:.4f});'
             )
             word_sel = f'.card[data-card-id="{card_id}"] .cap-word'
-            words_data = card.get("words", [])
-            word_count = len(words_data)
-            _is_pill = p.get("id", "") in {"lean_glass", "lean_vibe", "lean_cinema"}
-            if word_count > 0:
+            if len(card.get("words", [])) > 0:
                 lines.append(
                     f'  tl.set(\'{word_sel}\', {{ opacity: 1, y: 0 }}, {start:.4f});'
                 )
-                if _is_pill:
-                    # Pill bg flashes onto active word only — appears at word start,
-                    # fades off at word end. Words are always visible as plain text.
-                    for wi, wd in enumerate(words_data):
-                        ws = round(float(wd.get("start", start)), 4)
-                        we = round(float(wd.get("end",   start + 0.3)), 4)
-                        w_sel = f'.card[data-card-id="{card_id}"] .cap-word[data-w="{wi}"]'
-                        lines.append(
-                            f'  tl.to(\'{w_sel}\','
-                            f'{{background:"rgba(0,0,0,0.55)",duration:0.05,ease:"none"}},'
-                            f'{ws:.4f});'
-                        )
-                        lines.append(
-                            f'  tl.to(\'{w_sel}\','
-                            f'{{background:"transparent",duration:0.12,ease:"power1.out"}},'
-                            f'{we:.4f});'
-                        )
-            # Caption emphasis = accent color only; no swipe/underline on top.
+            # Caption: plain text, accent colour on emphasis words only — no boxes.
         else:
             panel_sel = f'.card[data-card-id="{card_id}"] .card-panel'
             ent_dur = 0.550 if is_cinema else 0.320
