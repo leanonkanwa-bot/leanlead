@@ -475,9 +475,12 @@ def _merge_cards(
 
     Density cap: _MAX_BROLL_PER_MINUTE (default 3) — prevents overlay saturation
     on content-rich videos. Cap is proportional to video duration.
+    Set env BROLL_MAX_PER_MINUTE to override without a code push.
     """
+    import os
+    _effective_cap = float(os.environ.get("BROLL_MAX_PER_MINUTE", _MAX_BROLL_PER_MINUTE))
     max_cards = (
-        max(1, int(_MAX_BROLL_PER_MINUTE * video_duration_s / 60.0))
+        max(1, int(_effective_cap * video_duration_s / 60.0))
         if video_duration_s > 0
         else 999
     )
