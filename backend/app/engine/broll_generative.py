@@ -116,8 +116,8 @@ def _extract_content_value(remapped_words: list, beat_start: float,
                             beat_end: float, hint: str = "") -> str:
     """Extract a typed value from the beat window for progress_bar / countdown_ring.
 
-    hint='pct'   → look for r'\\d+%' pattern first, fallback to bare number
-    hint='time'  → look for N jours/semaines/mois first, fallback to bare number
+    hint='pct'   → return "<n>%" only if a literal % is adjacent in source text; else ""
+    hint='time'  → return "N <unit>" only if a time word is adjacent; else ""
     default      → return the first numeral found (same as _extract_number)
     """
     window = _words_in_window(remapped_words, beat_start, beat_end, pad=1.5)
@@ -128,11 +128,13 @@ def _extract_content_value(remapped_words: list, beat_start: float,
         m = _PCT_RE.search(text)
         if m:
             return m.group(1) + "%"
+        return ""          # no % symbol found — do NOT fall through to bare number
     elif hint == "time":
         m = _DELAY_RE.search(text)
         if m:
             return m.group(0).strip()
-    # Fallback: first numeral
+        return ""          # no time unit found — do NOT fall through to bare number
+    # Fallback: first numeral (only reached when hint="")
     m2 = re.search(r'\b\d+(?:[.,]\d+)?(?:\s*[kKmM%])?\b', text)
     return m2.group().strip() if m2 else ""
 
