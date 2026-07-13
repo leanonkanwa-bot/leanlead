@@ -31,7 +31,7 @@ function apiFetch(url, opts = {}) {
 
 // ── Section switching ─────────────────────────────────────────────────────────
 function switchSection(targetId) {
-  ["editorArea", "dashboardSection", "profileSection", "learnSection", "outilsSection"].forEach(id => {
+  ["editorArea", "dashboardSection", "profileSection", "leanBriefSection", "learnSection", "outilsSection"].forEach(id => {
     const el = $(id);
     if (el) {
       const isTarget = id === targetId;
@@ -46,6 +46,7 @@ function switchSection(targetId) {
   if (targetId === "profileSection") loadProfileSection();
   if (targetId === "editorArea") updateOnboardingProgress();
   if (targetId === "learnSection") renderLessons();
+  if (targetId === "leanBriefSection") renderLeanBrief();
 }
 
 
@@ -1398,6 +1399,7 @@ async function showResult(jobId, result) {
 }
 
 let _currentJobId = null;
+let _lastPreview   = null;
 let _selectedPlatforms = new Set();
 
 async function loadPublishConnections() {
@@ -1481,6 +1483,7 @@ let _reviewJobId = null;
 
 function showPreview(jobId, preview) {
   _reviewJobId = jobId;
+  _lastPreview  = preview;
   if (submitBtn) { submitBtn.disabled = false; submitBtn.querySelector(".btn-label").textContent = "Éditer ma vidéo"; submitBtn.classList.remove("loading"); }
   statusCard?.classList.add("hidden");
   if (!previewCard || !preview) return;
@@ -2763,6 +2766,60 @@ function getLearningProgress() {
 
 function saveLearningProgress(p) {
   localStorage.setItem("learn_progress", JSON.stringify(p));
+}
+
+// ── LeanBrief ─────────────────────────────────────────────────────────────────
+
+function lbToggle(btn) {
+  btn.classList.toggle("open");
+}
+
+function renderLeanBrief() {
+  const container = $("lbAnalysis");
+  if (!container) return;
+
+  const segs = _lastPreview?.edit_plan || [];
+
+  if (segs.length === 0) {
+    container.innerHTML = '<div class="lb-empty">Lancez une première analyse pour voir les notes de rétention ici.</div>';
+    return;
+  }
+
+  const roleColor = {
+    hook:          "#f59e0b",
+    payoff:        "#22c55e",
+    story:         "#3b82f6",
+    realization:   "#a855f7",
+    principle:     "#06b6d4",
+    problem:       "#ef4444",
+    emotional_end: "#ec4899",
+    tension:       "#f97316",
+  };
+
+  container.innerHTML = segs.map((s, i) => {
+    const raw = typeof s.score === "number" ? s.score : 0;
+    const disp = raw <= 10 ? raw * 10 : raw;
+    const sc = disp >= 80 ? "#22c55e" : disp >= 55 ? "var(--salmon)" : "#ff5c7a";
+    const role = (s.role || "").toLowerCase();
+    const rc = roleColor[role];
+    const note = (s.retention_note || "").trim();
+    const pillStyle = rc
+      ? `background:${rc}18;color:${rc};border-color:${rc}44`
+      : "";
+    return `<div class="lb-seg">
+      <div class="lb-seg-left">
+        <span class="lb-seg-num">#${s.order || (i + 1)}</span>
+        <span class="lb-role-pill" style="${pillStyle}">${role || "—"}</span>
+        <span class="score-badge" style="background:${sc}22;color:${sc};border:1px solid ${sc}44">${disp}</span>
+      </div>
+      <div class="lb-seg-right">
+        <div class="lb-seg-time">${s.original_time || ""} → ${s.edit_dur || ""}</div>
+        ${note
+          ? `<div class="lb-seg-note">${note.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>`
+          : `<div class="lb-seg-note-empty">—</div>`}
+      </div>
+    </div>`;
+  }).join("");
 }
 
 function renderLessons() {

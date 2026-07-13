@@ -691,6 +691,36 @@
       .team-comment-author { font-size: .74rem; font-weight: 700; color: var(--salmon); }
       .team-invite-row { display: flex; gap: .4rem; flex-wrap: wrap; margin: .5rem 0; }
       #learnSection .card { max-width: 680px; margin: 0 auto; }
+
+      /* ── LEANBRIEF ───────────────────────────────────────────── */
+      #leanBriefSection { padding-top: 1.5rem; }
+      .lb-page-title { font-size: 1.1rem; font-weight: 700; letter-spacing: -.01em; margin-bottom: 1.5rem; }
+      .lb-page-title span { color: var(--salmon); }
+      .lb-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+      .lb-card-label { font-size: .68rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .08em; margin-bottom: .85rem; }
+      .lb-empty { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); font-size: .875rem; }
+      .lb-seg { display: flex; gap: .75rem; padding: .65rem 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+      .lb-seg:last-child { border-bottom: none; }
+      .lb-seg-left { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: .3rem; min-width: 52px; }
+      .lb-seg-num { font-size: .7rem; font-weight: 700; color: var(--text-secondary); }
+      .lb-role-pill { font-size: .62rem; font-weight: 700; padding: .15rem .45rem; border-radius: 99px; background: var(--salmon-dim); color: var(--salmon); border: 1px solid var(--salmon-border); text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+      .lb-seg-right { flex: 1; min-width: 0; }
+      .lb-seg-time { font-size: .68rem; color: var(--text-secondary); font-family: var(--mono); margin-bottom: .25rem; }
+      .lb-seg-note { font-size: .82rem; color: var(--text); line-height: 1.55; }
+      .lb-seg-note-empty { font-size: .78rem; color: var(--text-secondary); font-style: italic; }
+      .lb-accordion { display: flex; flex-direction: column; gap: .5rem; }
+      .lb-acc-item { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+      .lb-acc-hd { width: 100%; background: transparent; border: none; display: flex; align-items: center; gap: .75rem; padding: .8rem 1rem; cursor: pointer; font-family: var(--font); text-align: left; transition: background .15s; }
+      .lb-acc-hd:hover { background: rgba(255,255,255,.03); }
+      .lb-acc-hd.open { background: rgba(255,119,81,.06); }
+      .lb-acc-num { width: 22px; height: 22px; border-radius: 50%; background: var(--salmon-dim); border: 1px solid var(--salmon-border); color: var(--salmon); font-size: .65rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+      .lb-acc-title { flex: 1; font-size: .85rem; font-weight: 600; color: var(--text); }
+      .lb-acc-chevron { font-size: .75rem; color: var(--text-secondary); transition: transform .2s; flex-shrink: 0; }
+      .lb-acc-hd.open .lb-acc-chevron { transform: rotate(180deg); }
+      .lb-acc-bd { display: none; padding: 0 1rem 1rem 1rem; }
+      .lb-acc-hd.open + .lb-acc-bd { display: block; }
+      .lb-acc-text { font-size: .82rem; color: var(--text-secondary); line-height: 1.65; }
+      .lb-acc-text strong { color: var(--text); font-weight: 600; }
     </style>
   </head>
   <body>
@@ -702,6 +732,7 @@
       <div class="sidebar-nav" id="navTabs">
         <button class="nav-tab active" data-target="editorArea">Éditeur</button>
         <button class="nav-tab" data-target="dashboardSection">Dashboard</button>
+        <button class="nav-tab" data-target="leanBriefSection">LeanBrief</button>
         <button class="nav-tab" data-target="profileSection">Profil</button>
       </div>
       <div class="sidebar-bottom">
@@ -1065,6 +1096,71 @@
             <button class="action-btn" id="editProfileBtn">Modifier ICP &amp; piliers</button>
           </div>
           <p id="profileSaveMsg" class="save-msg">Profil enregistré.</p>
+        </div>
+      </section>
+
+      <!-- ── LEANBRIEF ──────────────────────────────────────────── -->
+      <section id="leanBriefSection" class="app-section">
+        <p class="lb-page-title"><span>Lean</span>Brief</p>
+
+        <!-- Analysis — last job -->
+        <div class="lb-card">
+          <div class="lb-card-label">Analyse — dernière vidéo</div>
+          <div id="lbAnalysis">
+            <div class="lb-empty">Lancez une première analyse pour voir les notes de rétention ici.</div>
+          </div>
+        </div>
+
+        <!-- Static lessons -->
+        <div class="lb-card">
+          <div class="lb-card-label">Cours — Les bases du montage qui retient</div>
+          <div class="lb-accordion">
+
+            <div class="lb-acc-item">
+              <button class="lb-acc-hd" onclick="lbToggle(this)">
+                <span class="lb-acc-num">1</span>
+                <span class="lb-acc-title">La structure qui retient l'attention</span>
+                <span class="lb-acc-chevron">▾</span>
+              </button>
+              <div class="lb-acc-bd">
+                <p class="lb-acc-text">Une vidéo qui retient suit toujours la même architecture, dans cet ordre : <strong>Hook</strong> (0–3s, la promesse ou le choc qui arrête le scroll) → <strong>Contraste</strong> (ce qui rend la situation intéressante) → <strong>Conséquence</strong> (l'enjeu réel) → <strong>Loop</strong> (une question ouverte qui pousse à continuer) → <strong>Histoire</strong> → <strong>Réalisation</strong> → <strong>Principe</strong> → <strong>Reframe</strong> → <strong>Payoff</strong> → <strong>Closing</strong>. Sauter une étape, c'est perdre un point d'accroche.</p>
+              </div>
+            </div>
+
+            <div class="lb-acc-item">
+              <button class="lb-acc-hd" onclick="lbToggle(this)">
+                <span class="lb-acc-num">2</span>
+                <span class="lb-acc-title">Pourquoi on coupe les pauses et les répétitions</span>
+                <span class="lb-acc-chevron">▾</span>
+              </button>
+              <div class="lb-acc-bd">
+                <p class="lb-acc-text">Une pause de plus de 0,3–0,5s sans intention fait perdre du rythme et invite au scroll. Une répétition ralentit la compréhension sans ajouter de sens. La règle : on coupe ce qui n'ajoute ni clarté ni émotion, on garde tout ce qui en ajoute.</p>
+              </div>
+            </div>
+
+            <div class="lb-acc-item">
+              <button class="lb-acc-hd" onclick="lbToggle(this)">
+                <span class="lb-acc-num">3</span>
+                <span class="lb-acc-title">Le zoom et le rythme</span>
+                <span class="lb-acc-chevron">▾</span>
+              </button>
+              <div class="lb-acc-bd">
+                <p class="lb-acc-text">Le zoom lent avec punch-in ponctuel (100&nbsp;% → 130&nbsp;%) crée un mouvement continu qui empêche l'œil de se lasser. Trop de zoom = fatigue visuelle. Pas assez = statique. La cadence idéale suit les moments d'emphase du discours.</p>
+              </div>
+            </div>
+
+            <div class="lb-acc-item">
+              <button class="lb-acc-hd" onclick="lbToggle(this)">
+                <span class="lb-acc-num">4</span>
+                <span class="lb-acc-title">Le B-roll au service du propos</span>
+                <span class="lb-acc-chevron">▾</span>
+              </button>
+              <div class="lb-acc-bd">
+                <p class="lb-acc-text">Un B-roll ne doit apparaître que quand il illustre vraiment ce qui est dit à l'instant précis — jamais pour remplir un silence. Trop de B-roll noie le message ; pas assez, le discours reste abstrait.</p>
+              </div>
+            </div>
+
+          </div>
         </div>
       </section>
 
