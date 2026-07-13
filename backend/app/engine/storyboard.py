@@ -335,7 +335,7 @@ OUTPUT: a JSON array of card objects. Each card:
     "accent_word": "<optional: one word/phrase from title to emphasize via highlight swipe>",
     "detail": "<optional supporting text>",
     "number": "<if a stat/number is featured>",
-    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote"|"carousel"|"definition"|"checklist"|"score"|"mindmap"|"data_chart"|"instagram-follow"|"tiktok-follow"|"yt-lower-third"|"news_ticker"|"rating"|"map_location"|"progress_bar"|"before_after_image"|"countdown"|"poll_question"|"myth_vs_fact"|"step_number"|"quote_carousel"|"emoji_reaction"|"price_tag"|"warning_soft"|"testimonial"|"versus_battle"|"recap_summary"|"location_journey"|"formula_equation"|"roadmap_milestone"|"pros_cons"|"star_rating_review"|"income_reveal",
+    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote"|"carousel"|"definition"|"checklist"|"score"|"mindmap"|"data_chart"|"instagram-follow"|"tiktok-follow"|"yt-lower-third"|"news_ticker"|"rating"|"map_location"|"progress_bar"|"before_after_image"|"countdown"|"poll_question"|"myth_vs_fact"|"step_number"|"quote_carousel"|"emoji_reaction"|"price_tag"|"warning_soft"|"testimonial"|"versus_battle"|"recap_summary"|"location_journey"|"formula_equation"|"roadmap_milestone"|"pros_cons"|"star_rating_review"|"income_reveal"|"question_answer_pair"|"chapter_marker"|"secret_reveal"|"objection_response"|"data_bar_chart"|"cause_effect"|"number_ranking",
     "left_label": "<comparison: left side label>",
     "left_value": "<comparison: left side value>",
     "right_label": "<comparison: right side label>",
@@ -392,7 +392,19 @@ OUTPUT: a JSON array of card objects. Each card:
     "review_text": "<star_rating_review: the review quote>",
     "reviewer_name": "<star_rating_review: reviewer name or handle>",
     "income_value": "<income_reveal: the income/number to reveal, e.g. '12 000 €/mois'>",
-    "income_context": "<income_reveal: brief context, e.g. 'revenu passif en 6 mois'>"
+    "income_context": "<income_reveal: brief context, e.g. 'revenu passif en 6 mois'>",
+    "qa_question": "<question_answer_pair: the question text>",
+    "qa_answer": "<question_answer_pair: the answer text>",
+    "chapter_num": "<chapter_marker: chapter number or label, e.g. '01', 'II', 'Partie 3'>",
+    "chapter_title": "<chapter_marker: chapter title or subject>",
+    "secret_text": "<secret_reveal: the text to reveal from blur, e.g. the key insight or secret>",
+    "objection_text": "<objection_response: the objection or pushback being addressed>",
+    "response_text": "<objection_response: the speaker's response or rebuttal>",
+    "bar_labels": ["<data_bar_chart: label for bar 1>", "<label for bar 2>"],
+    "bar_values": [0.0, 0.0],
+    "cause_text": "<cause_effect: the cause or trigger>",
+    "effect_text": "<cause_effect: the resulting effect or outcome>",
+    "rankings": ["<number_ranking: first place label>", "<second place label>", "<third place label>"]
   }}
 }}
 
@@ -488,7 +500,9 @@ RULES:
     multiple pure quotes. Distinct from attributed_quote (attributed_quote
     is one quote + source). Provide "quotes" array.
   "emoji_reaction" — speaker expresses a reaction, emotion, or tone best
-    captured with a single emoji. Provide "emoji" + optional "emoji_label".
+    captured with a single emoji. Provide "emoji" (MUST be chosen ONLY from
+    this confirmed-safe set: 🔥 💡 ✅ ❌ 🎯 💪 🚀 🏆 📈 📉 💰 🙌 👀 ⭐ ⚠️
+    — do NOT use any other emoji) + optional "emoji_label".
   "price_tag" — speaker mentions a specific price point or cost. Provide
     "price" string + optional "price_context".
   "warning_soft" — speaker flags a caution, common mistake, or risk (soft
@@ -546,6 +560,46 @@ RULES:
     financial figure. Distinct from stat (stat is informational; income_reveal
     has suspense/reveal energy). Provide "income_value" (the number string)
     + "income_context" (brief qualifier).
+  "question_answer_pair" — speaker poses a question AND immediately answers
+    it in the same breath (e.g. "Qu'est-ce que c'est ? C'est une méthode
+    en 3 étapes"). BOTH question and answer are present in the same segment.
+    Distinct from question (question leaves the answer to the viewer or to
+    a later beat). NOT poll_question (poll is an open vote). Provide
+    "qa_question" + "qa_answer".
+  "chapter_marker" — speaker introduces a new major section or chapter of
+    a longer video (e.g. "on passe maintenant à la partie 2", "chapitre 3").
+    Use for structural dividers that announce a topic shift. Distinct from
+    step_number (step_number is a numbered item within a sequence; chapter_marker
+    is a top-level section break). Provide "chapter_num" + "chapter_title".
+  "secret_reveal" — speaker reveals a hidden insight, secret, or surprising
+    answer after building suspense ("le secret c'est…", "ce que personne ne
+    dit c'est…", "la réponse surprenante c'est…"). Requires REVEAL ENERGY —
+    the content was withheld then unveiled. Distinct from key_phrase (key_phrase
+    is a strong statement without suspense buildup). Provide "secret_text".
+  "objection_response" — speaker voices a common objection or pushback and
+    then immediately rebutts it ("mais tu vas me dire X… eh bien en réalité Y").
+    REQUIRES both the objection AND the speaker's response in the same beat.
+    Distinct from myth_vs_fact (myth_vs_fact debunks a common belief;
+    objection_response is a direct dialogue rebuttal with first-person objection
+    voice). Provide "objection_text" + "response_text".
+  "data_bar_chart" — speaker cites MULTIPLE numeric values that directly
+    compare to each other (2-4 values with labels). Distinct from stat (stat is
+    a single number). Distinct from score (score is competitive ranking).
+    Distinct from trend (trend is a directional curve). Distinct from data_chart
+    (data_chart is the pre-existing hand-coded bar chart; data_bar_chart is
+    the pack-styled Wave 4 version — prefer data_bar_chart for new cards).
+    Provide "bar_labels" list + "bar_values" list of float (same length, 2-4 items).
+  "cause_effect" — speaker explicitly states a cause-and-effect relationship
+    ("parce que X, donc Y", "X entraîne Y", "si X alors Y"). REQUIRES both
+    cause and effect to be named. Distinct from callout (callout is one point).
+    Distinct from comparison (comparison contrasts two things; cause_effect
+    shows a directional causal link). Provide "cause_text" + "effect_text".
+  "number_ranking" — speaker names a ranked ordered list (top 3, podium,
+    leaderboard). REQUIRES explicit ordering/ranking. Distinct from list
+    (list is unordered or loosely ordered; number_ranking has explicit
+    rank positions). Distinct from score (score is a competitive result;
+    number_ranking is an ordered catalog). Provide "rankings" list (2-5 items,
+    ordered 1st to last).
 - TIMING: startSec should match when the speaker BEGINS saying the
   words the card references — synchronous with speech, like captions.
 - Place cards at NARRATIVELY IMPORTANT moments — not evenly spaced

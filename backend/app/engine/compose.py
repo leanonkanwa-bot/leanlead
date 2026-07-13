@@ -77,7 +77,7 @@ def _zone_bounds(zone: str, layout: str) -> dict:
 # Data cards are remapped to a side panel when Claude places them in a center zone.
 # Hero cards (key_phrase, quote, question, definition, etc.) remain in Claude's
 # chosen zone — they carry the visual message and need the full canvas.
-_DATA_PANEL_TYPES = {"stat", "list", "comparison", "checklist", "score", "trend", "rating", "progress_bar", "countdown", "step_number", "price_tag", "recap_summary", "formula_equation", "pros_cons", "star_rating_review", "income_reveal"}
+_DATA_PANEL_TYPES = {"stat", "list", "comparison", "checklist", "score", "trend", "rating", "progress_bar", "countdown", "step_number", "price_tag", "recap_summary", "formula_equation", "pros_cons", "star_rating_review", "income_reveal", "data_bar_chart", "number_ranking", "question_answer_pair", "cause_effect"}
 _CENTER_ZONES = {"fullscreen", "video-overlay"}
 _SIDE_PANEL_ZONES = {"side-panel", "side-panel-left", "side-panel-right", "side-panel-top", "upper-data", "upper-right"}
 
@@ -1334,6 +1334,171 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
         parts.append(f'  color:{p["text_secondary"]}; opacity:0;')
         parts.append('}')
+    # ── Wave 4 CSS ────────────────────────────────────────────────────────────
+    if content_style == "question_answer_pair":
+        parts.append(f'.card[data-card-id="{card_id}"] .qap-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:14px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .qap-q {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:700; letter-spacing:0.08em; text-transform:uppercase;')
+        parts.append(f'  color:{p["accent"]}; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .qap-div {{')
+        parts.append(f'  width:0; height:2px; background:{p["accent"]}; border-radius:1px;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .qap-a {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; line-height:1.2; color:{p["text"]}; opacity:0;')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+    if content_style == "chapter_marker":
+        parts.append(f'.card[data-card-id="{card_id}"] .cm-wrap {{')
+        parts.append('  display:flex; flex-direction:column; align-items:center; gap:10px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .cm-num {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{number_size_eff};')
+        parts.append(f'  font-weight:900; color:{p["accent"]}; opacity:0; line-height:1;')
+        if p["title_glow_intense"]:
+            parts.append(f'  text-shadow:{p["title_glow_intense"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .cm-line {{')
+        parts.append(f'  width:0; height:3px; background:{p["accent"]}; border-radius:2px;')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:{p["accent_line_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .cm-title {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; text-align:center; opacity:0;')
+        parts.append('}')
+    if content_style == "secret_reveal":
+        parts.append(f'.card[data-card-id="{card_id}"] .sec-wrap {{')
+        parts.append('  display:flex; flex-direction:column; align-items:center; gap:10px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .sec-label {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:700; letter-spacing:0.15em; text-transform:uppercase;')
+        parts.append(f'  color:{p["accent"]}; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .sec-text {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]};')
+        parts.append(f'  text-align:center; filter:blur(12px); opacity:0;')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+    if content_style == "objection_response":
+        parts.append(f'.card[data-card-id="{card_id}"] .or-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:12px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .or-obj-hdr {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:700; letter-spacing:0.1em; text-transform:uppercase;')
+        parts.append(f'  color:{p["text_secondary"]}; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .or-obj {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{detail_size_eff};')
+        parts.append(f'  color:{p["text_secondary"]}; font-style:italic; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .or-div {{')
+        parts.append(f'  width:100%; height:2px; background:{p["accent"]}; transform:scaleX(0); transform-origin:left;')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:{p["accent_line_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .or-resp-hdr {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:700; letter-spacing:0.1em; text-transform:uppercase;')
+        parts.append(f'  color:{p["accent"]}; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .or-resp {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; opacity:0;')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+    if content_style == "data_bar_chart":
+        _dbc_bg = "rgba(0,0,0,0.06)" if p["id"] in ("lean_paper", "lean_craft") else "rgba(255,255,255,0.08)"
+        _dbc_fill_r = "3px 2px 5px 2px" if p["id"] == "lean_craft" else "8px"
+        parts.append(f'.card[data-card-id="{card_id}"] .dbc-wrap {{')
+        parts.append('  width:100%; display:flex; flex-direction:column; gap:10px;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .dbc-row {{')
+        parts.append('  display:flex; align-items:center; gap:10px; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .dbc-label {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:600; color:{p["text_secondary"]}; width:90px; flex-shrink:0; text-align:right;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .dbc-track {{')
+        parts.append(f'  flex:1; height:14px; background:{_dbc_bg}; border-radius:7px; overflow:hidden;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .dbc-fill {{')
+        parts.append(f'  height:100%; width:0%; background:{p["accent"]}; border-radius:{_dbc_fill_r};')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:{p["accent_line_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .dbc-val {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:800; color:{p["accent"]}; width:52px; flex-shrink:0; text-align:left;')
+        parts.append('}')
+    if content_style == "cause_effect":
+        parts.append(f'.card[data-card-id="{card_id}"] .ceff-wrap {{')
+        parts.append('  display:flex; flex-direction:row; align-items:center; gap:12px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ceff-box {{')
+        parts.append(f'  flex:1; display:flex; flex-direction:column; align-items:center; gap:6px;')
+        parts.append(f'  padding:14px 12px; border-radius:{p["radius"]}; text-align:center; opacity:0;')
+        parts.append(f'  border:1px solid {p["accent"]}40; background:{p["accent"]}0A;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ceff-lbl {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:700; letter-spacing:0.1em; text-transform:uppercase;')
+        parts.append(f'  color:{p["accent"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ceff-text {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{detail_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ceff-arrow {{')
+        parts.append(f'  flex-shrink:0; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ceff-arrow-path {{')
+        parts.append(f'  stroke:{p["accent"]}; stroke-dasharray:100; stroke-dashoffset:100; fill:none;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ceff-arrowhead {{')
+        parts.append(f'  fill:{p["accent"]}; opacity:0;')
+        parts.append('}')
+    if content_style == "number_ranking":
+        parts.append(f'.card[data-card-id="{card_id}"] .nr-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:10px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .nr-item {{')
+        parts.append('  display:flex; align-items:center; gap:14px; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .nr-pos {{')
+        _nr_font_sz = "18px" if compact else "22px"
+        parts.append(f'  width:40px; height:40px; border-radius:50%; flex-shrink:0;')
+        parts.append(f'  display:flex; align-items:center; justify-content:center;')
+        parts.append(f'  font-family:{p["font"]}; font-size:{_nr_font_sz}; font-weight:900;')
+        parts.append(f'  color:{p["bg"]}; background:{p["accent"]};')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:{p["accent_line_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .nr-label {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .nr-item.nr-first .nr-pos {{')
+        parts.append(f'  width:50px; height:50px;')
+        if p["title_glow"]:
+            parts.append(f'  box-shadow:{p["title_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .nr-item.nr-first .nr-label {{')
+        parts.append(f'  font-size:{number_size_eff};')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
     parts.append('</style>')
     # Timeline: full-screen overlay, no card-panel wrapper
     if content_style == "timeline":
@@ -1838,6 +2003,90 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         parts.append(f'    <div class="ir-wrap">')
         parts.append(f'      <div class="ir-value" id="{card_id}-ir-value">{_ir_val}</div>')
         parts.append(f'      <div class="ir-ctx" id="{card_id}-ir-ctx">{_ir_ctx}</div>')
+        parts.append(f'    </div>')
+    # ── Wave 4 HTML ───────────────────────────────────────────────────────────
+    elif content_style == "question_answer_pair":
+        _qap_q = _esc(hints.get("qa_question", ""))
+        _qap_a = _esc(hints.get("qa_answer", ""))
+        parts.append(f'    <div class="qap-wrap">')
+        parts.append(f'      <div class="qap-q" id="{card_id}-qap-q">{_qap_q}</div>')
+        parts.append(f'      <div class="qap-div" id="{card_id}-qap-div"></div>')
+        parts.append(f'      <div class="qap-a" id="{card_id}-qap-a">{_qap_a}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "chapter_marker":
+        _cm_num = _esc(hints.get("chapter_num", ""))
+        _cm_ttl = _esc(hints.get("chapter_title", ""))
+        parts.append(f'    <div class="cm-wrap">')
+        parts.append(f'      <div class="cm-num" id="{card_id}-cm-num">{_cm_num}</div>')
+        parts.append(f'      <div class="cm-line" id="{card_id}-cm-line"></div>')
+        parts.append(f'      <div class="cm-title" id="{card_id}-cm-title">{_cm_ttl}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "secret_reveal":
+        _sec_text = _esc(hints.get("secret_text", ""))
+        parts.append(f'    <div class="sec-wrap">')
+        parts.append(f'      <div class="sec-label" id="{card_id}-sec-label">&#x1F512;</div>')
+        parts.append(f'      <div class="sec-text" id="{card_id}-sec-text">{_sec_text}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "objection_response":
+        _or_obj = _esc(hints.get("objection_text", ""))
+        _or_resp = _esc(hints.get("response_text", ""))
+        parts.append(f'    <div class="or-wrap">')
+        parts.append(f'      <div class="or-obj-hdr" id="{card_id}-or-obj-hdr">&#x2715; Objection</div>')
+        parts.append(f'      <div class="or-obj" id="{card_id}-or-obj">{_or_obj}</div>')
+        parts.append(f'      <div class="or-div" id="{card_id}-or-div"></div>')
+        parts.append(f'      <div class="or-resp-hdr" id="{card_id}-or-resp-hdr">&#x2713; R&#xe9;ponse</div>')
+        parts.append(f'      <div class="or-resp" id="{card_id}-or-resp">{_or_resp}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "data_bar_chart":
+        _dbc_labels = hints.get("bar_labels", [])
+        _dbc_values = hints.get("bar_values", [])
+        _dbc_rows: list[tuple[str, float]] = []
+        for _dbc_i in range(min(len(_dbc_labels), len(_dbc_values), 4)):
+            try:
+                _dbc_v = float(_dbc_values[_dbc_i])
+            except (TypeError, ValueError):
+                _dbc_v = 0.0
+            _dbc_rows.append((str(_dbc_labels[_dbc_i]), _dbc_v))
+        _dbc_max = max((v for _, v in _dbc_rows), default=1.0) or 1.0
+        parts.append(f'    <div class="dbc-wrap">')
+        for _dbc_i, (_dbc_lbl, _dbc_v) in enumerate(_dbc_rows):
+            _dbc_pct = round(_dbc_v / _dbc_max * 100, 1)
+            parts.append(f'      <div class="dbc-row" id="{card_id}-dbc-{_dbc_i}">')
+            parts.append(f'        <div class="dbc-label">{_esc(_dbc_lbl)}</div>')
+            parts.append(f'        <div class="dbc-track"><div class="dbc-fill" id="{card_id}-dbc-fill-{_dbc_i}" data-pct="{_dbc_pct}"></div></div>')
+            parts.append(f'        <div class="dbc-val">{_dbc_v:g}</div>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "cause_effect":
+        _ceff_cause = _esc(hints.get("cause_text", ""))
+        _ceff_effect = _esc(hints.get("effect_text", ""))
+        _ceff_acc = p["accent"]
+        _ceff_arrow_svg = (
+            f'<svg width="32" height="32" viewBox="0 0 32 32" class="ceff-arrow" id="{card_id}-ceff-arrow">'
+            f'<path class="ceff-arrow-path" id="{card_id}-ceff-path" d="M 4 16 L 24 16" stroke-width="2.5" stroke-linecap="round"/>'
+            f'<polygon class="ceff-arrowhead" id="{card_id}-ceff-head" points="20,10 28,16 20,22"/>'
+            f'</svg>'
+        )
+        parts.append(f'    <div class="ceff-wrap">')
+        parts.append(f'      <div class="ceff-box" id="{card_id}-ceff-cause">')
+        parts.append(f'        <div class="ceff-lbl">Cause</div>')
+        parts.append(f'        <div class="ceff-text">{_ceff_cause}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'      {_ceff_arrow_svg}')
+        parts.append(f'      <div class="ceff-box" id="{card_id}-ceff-effect">')
+        parts.append(f'        <div class="ceff-lbl">Effet</div>')
+        parts.append(f'        <div class="ceff-text">{_ceff_effect}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "number_ranking":
+        _nr_items = hints.get("rankings", [])
+        parts.append(f'    <div class="nr-wrap">')
+        for _nr_i, _nr_item in enumerate(_nr_items[:5]):
+            _nr_cls = "nr-item nr-first" if _nr_i == 0 else "nr-item"
+            parts.append(f'      <div class="{_nr_cls}" id="{card_id}-nr-{_nr_i}">')
+            parts.append(f'        <div class="nr-pos">{_nr_i + 1}</div>')
+            parts.append(f'        <div class="nr-label">{_esc(str(_nr_item))}</div>')
+            parts.append(f'      </div>')
         parts.append(f'    </div>')
     else:
         # key_phrase, quote and any unknown style
@@ -3290,6 +3539,235 @@ def _build_timeline_js(
                         _w3_ir_tgi = _esc_js(p["title_glow_intense"])
                         lines.append(f'  tl.to(\'{_w3_ir_val}\', {{ textShadow: "{_w3_ir_tgi}", duration: 0.30 }}, {t_in + 0.60:.4f});')
                     lines.append(f'  tl.fromTo(\'{_w3_ir_ctx}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in + 0.55:.4f});')
+            # ── Wave 4 GSAP ───────────────────────────────────────────────────
+            elif content_style == "question_answer_pair":
+                _w4_qap_q   = f'.card[data-card-id="{card_id}"] #{card_id}-qap-q'
+                _w4_qap_div = f'.card[data-card-id="{card_id}"] #{card_id}-qap-div'
+                _w4_qap_a   = f'.card[data-card-id="{card_id}"] #{card_id}-qap-a'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w4_qap_q}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_qap_div}\', {{ width: "100%" }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_qap_a}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_q}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.50, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_div}\', {{ width: "0%" }}, {{ width: "100%", duration: 0.80, ease: "power2.inOut" }}, {t_in + 0.40:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_a}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.70, ease: _eIn }}, {t_in + 1.10:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_q}\', {{ opacity: 0, y: -10 }}, {{ opacity: 1, y: 0, duration: 0.20, ease: "back.out(1.5)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_div}\', {{ width: "0%" }}, {{ width: "100%", duration: 0.25, ease: "power3.out" }}, {t_in + 0.18:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_a}\', {{ opacity: 0, scale: 0.9 }}, {{ opacity: 1, scale: 1, duration: 0.22, ease: "back.out(1.4)" }}, {t_in + 0.38:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_q}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_div}\', {{ width: "0%" }}, {{ width: "100%", duration: 0.40, ease: "power1.out" }}, {t_in + 0.28:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_a}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.35, ease: _eIn }}, {t_in + 0.60:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_q}\', {{ opacity: 0, rotation: -1 }}, {{ opacity: 1, rotation: 0, duration: 0.28, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_div}\', {{ width: "0%" }}, {{ width: "100%", duration: 0.45, ease: "elastic.out(1,0.5)" }}, {t_in + 0.22:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_a}\', {{ opacity: 0, rotation: 1 }}, {{ opacity: 1, rotation: 0, duration: 0.30, ease: _eIn }}, {t_in + 0.55:.4f});')
+                else:
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_q}\', {{ opacity: 0, y: -8 }}, {{ opacity: 1, y: 0, duration: 0.28, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_div}\', {{ width: "0%" }}, {{ width: "100%", duration: 0.35, ease: "power2.out" }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_qap_a}\', {{ opacity: 0, y: 10 }}, {{ opacity: 1, y: 0, duration: 0.30, ease: _eIn }}, {t_in + 0.52:.4f});')
+                    if p["title_glow"]:
+                        _w4_tg = _esc_js(p["title_glow"])
+                        lines.append(f'  tl.to(\'{_w4_qap_a}\', {{ textShadow: "{_w4_tg}", duration: 0.20 }}, {t_in + 0.70:.4f});')
+            elif content_style == "chapter_marker":
+                _w4_cm_num = f'.card[data-card-id="{card_id}"] #{card_id}-cm-num'
+                _w4_cm_ln  = f'.card[data-card-id="{card_id}"] #{card_id}-cm-line'
+                _w4_cm_ttl = f'.card[data-card-id="{card_id}"] #{card_id}-cm-title'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w4_cm_num}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_cm_ln}\', {{ width: "80px" }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_cm_ttl}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_num}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.80, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ln}\', {{ width: "0px" }}, {{ width: "80px", duration: 1.00, ease: "power2.inOut" }}, {t_in + 0.60:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ttl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.80, ease: _eIn }}, {t_in + 1.20:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_num}\', {{ opacity: 0, scale: 0.5 }}, {{ opacity: 1, scale: 1, duration: 0.30, ease: "back.out(2)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ln}\', {{ width: "0px" }}, {{ width: "80px", duration: 0.30, ease: "power3.out" }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ttl}\', {{ opacity: 0, y: 12 }}, {{ opacity: 1, y: 0, duration: 0.25, ease: "back.out(1.4)" }}, {t_in + 0.40:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_num}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.40, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ln}\', {{ width: "0px" }}, {{ width: "80px", duration: 0.50, ease: "power1.out" }}, {t_in + 0.35:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ttl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.35, ease: _eIn }}, {t_in + 0.70:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_num}\', {{ opacity: 0, rotation: -5 }}, {{ opacity: 1, rotation: 0, duration: 0.35, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ln}\', {{ width: "0px" }}, {{ width: "80px", duration: 0.50, ease: "elastic.out(1,0.5)" }}, {t_in + 0.28:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ttl}\', {{ opacity: 0, rotation: 1 }}, {{ opacity: 1, rotation: 0, duration: 0.32, ease: _eIn }}, {t_in + 0.65:.4f});')
+                else:
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_num}\', {{ opacity: 0, scale: 0.8 }}, {{ opacity: 1, scale: 1, duration: 0.35, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ln}\', {{ width: "0px" }}, {{ width: "80px", duration: 0.40, ease: "power2.out" }}, {t_in + 0.30:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_cm_ttl}\', {{ opacity: 0, y: 8 }}, {{ opacity: 1, y: 0, duration: 0.30, ease: _eIn }}, {t_in + 0.55:.4f});')
+                    if p["title_glow_intense"]:
+                        _w4_cm_tgi = _esc_js(p["title_glow_intense"])
+                        lines.append(f'  tl.to(\'{_w4_cm_num}\', {{ textShadow: "{_w4_cm_tgi}", duration: 0.25 }}, {t_in + 0.20:.4f});')
+            elif content_style == "secret_reveal":
+                _w4_sec_lbl  = f'.card[data-card-id="{card_id}"] #{card_id}-sec-label'
+                _w4_sec_text = f'.card[data-card-id="{card_id}"] #{card_id}-sec-text'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w4_sec_lbl}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_sec_text}\', {{ opacity: 1, filter: "blur(0px)" }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.50, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_text}\', {{ opacity: 0, filter: "blur(16px)" }}, {{ opacity: 1, filter: "blur(0px)", duration: 1.50, ease: _eIn }}, {t_in + 0.50:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_lbl}\', {{ opacity: 0, scale: 0.5 }}, {{ opacity: 1, scale: 1, duration: 0.18, ease: "back.out(2)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_text}\', {{ opacity: 0, filter: "blur(10px)", scale: 0.92 }}, {{ opacity: 1, filter: "blur(0px)", scale: 1, duration: 0.28, ease: "power2.out" }}, {t_in + 0.60:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_text}\', {{ opacity: 0, filter: "blur(8px)" }}, {{ opacity: 1, filter: "blur(0px)", duration: 0.80, ease: _eIn }}, {t_in + 0.40:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.28, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_text}\', {{ opacity: 0, filter: "blur(6px)", rotation: -1 }}, {{ opacity: 1, filter: "blur(0px)", rotation: 0, duration: 0.60, ease: _eIn }}, {t_in + 0.40:.4f});')
+                else:
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.25, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_sec_text}\', {{ opacity: 0, filter: "blur(12px)" }}, {{ opacity: 1, filter: "blur(0px)", duration: 0.80, ease: _eIn }}, {t_in + 0.45:.4f});')
+                    if p["title_glow"]:
+                        _w4_sec_tg = _esc_js(p["title_glow"])
+                        lines.append(f'  tl.to(\'{_w4_sec_text}\', {{ textShadow: "{_w4_sec_tg}", duration: 0.25 }}, {t_in + 1.05:.4f});')
+            elif content_style == "objection_response":
+                _w4_or_oh   = f'.card[data-card-id="{card_id}"] #{card_id}-or-obj-hdr'
+                _w4_or_obj  = f'.card[data-card-id="{card_id}"] #{card_id}-or-obj'
+                _w4_or_div  = f'.card[data-card-id="{card_id}"] #{card_id}-or-div'
+                _w4_or_rh   = f'.card[data-card-id="{card_id}"] #{card_id}-or-resp-hdr'
+                _w4_or_resp = f'.card[data-card-id="{card_id}"] #{card_id}-or-resp'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w4_or_oh}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_or_obj}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_or_div}\', {{ scaleX: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_or_rh}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_or_resp}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w4_or_oh}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.40, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_obj}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.60, ease: _eIn }}, {t_in + 0.30:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_div}\', {{ scaleX: 0 }}, {{ scaleX: 1, duration: 0.70, ease: "power2.inOut" }}, {t_in + 0.80:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_rh}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.40, ease: _eIn }}, {t_in + 1.30:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_resp}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.70, ease: _eIn }}, {t_in + 1.60:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w4_or_oh}\', {{ opacity: 0, x: -10 }}, {{ opacity: 1, x: 0, duration: 0.18, ease: "power3.out" }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_obj}\', {{ opacity: 0, x: -8 }}, {{ opacity: 1, x: 0, duration: 0.20, ease: _eIn }}, {t_in + 0.14:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_div}\', {{ scaleX: 0 }}, {{ scaleX: 1, duration: 0.22, ease: "power3.out" }}, {t_in + 0.30:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_rh}\', {{ opacity: 0, x: 10 }}, {{ opacity: 1, x: 0, duration: 0.18, ease: "back.out(1.5)" }}, {t_in + 0.48:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_resp}\', {{ opacity: 0, scale: 0.95 }}, {{ opacity: 1, scale: 1, duration: 0.22, ease: "back.out(1.4)" }}, {t_in + 0.60:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w4_or_oh}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.25, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_obj}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in + 0.22:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_div}\', {{ scaleX: 0 }}, {{ scaleX: 1, duration: 0.40, ease: "power1.out" }}, {t_in + 0.45:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_rh}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.25, ease: _eIn }}, {t_in + 0.75:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_resp}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in + 0.92:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w4_or_oh}\', {{ opacity: 0, rotation: -1 }}, {{ opacity: 1, rotation: 0, duration: 0.28, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_obj}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.28, ease: _eIn }}, {t_in + 0.20:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_div}\', {{ scaleX: 0 }}, {{ scaleX: 1, duration: 0.50, ease: "elastic.out(1,0.5)" }}, {t_in + 0.42:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_rh}\', {{ opacity: 0, rotation: 1 }}, {{ opacity: 1, rotation: 0, duration: 0.28, ease: _eIn }}, {t_in + 0.78:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_resp}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in + 0.95:.4f});')
+                else:
+                    lines.append(f'  tl.fromTo(\'{_w4_or_oh}\', {{ opacity: 0, y: -6 }}, {{ opacity: 1, y: 0, duration: 0.25, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_obj}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.28, ease: _eIn }}, {t_in + 0.20:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_div}\', {{ scaleX: 0 }}, {{ scaleX: 1, duration: 0.35, ease: "power2.out" }}, {t_in + 0.42:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_rh}\', {{ opacity: 0, y: 6 }}, {{ opacity: 1, y: 0, duration: 0.25, ease: _eIn }}, {t_in + 0.70:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_or_resp}\', {{ opacity: 0, y: 8 }}, {{ opacity: 1, y: 0, duration: 0.30, ease: _eIn }}, {t_in + 0.88:.4f});')
+                    if p["title_glow"]:
+                        _w4_or_tg = _esc_js(p["title_glow"])
+                        lines.append(f'  tl.to(\'{_w4_or_resp}\', {{ textShadow: "{_w4_or_tg}", duration: 0.20 }}, {t_in + 1.10:.4f});')
+            elif content_style == "data_bar_chart":
+                _w4_dbc_h = card.get("contentHints", {})
+                _w4_dbc_labels = _w4_dbc_h.get("bar_labels", [])
+                _w4_dbc_values = _w4_dbc_h.get("bar_values", [])
+                _w4_dbc_n = min(len(_w4_dbc_labels), len(_w4_dbc_values), 4)
+                _w4_dbc_max = max((float(v) for v in _w4_dbc_values[:_w4_dbc_n] if v is not None), default=1.0) or 1.0
+                for _w4_di in range(_w4_dbc_n):
+                    _w4_dbc_row  = f'.card[data-card-id="{card_id}"] #{card_id}-dbc-{_w4_di}'
+                    _w4_dbc_fill = f'.card[data-card-id="{card_id}"] #{card_id}-dbc-fill-{_w4_di}'
+                    try:
+                        _w4_dbc_pct = round(float(_w4_dbc_values[_w4_di]) / _w4_dbc_max * 100, 1)
+                    except (TypeError, ValueError, ZeroDivisionError):
+                        _w4_dbc_pct = 0.0
+                    _w4_dbc_delay = t_in + _w4_di * 0.15
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w4_dbc_row}\', {{ opacity: 1 }}, {t_in:.4f});')
+                        lines.append(f'  tl.set(\'{_w4_dbc_fill}\', {{ width: "{_w4_dbc_pct}%" }}, {t_in:.4f});')
+                    elif is_cinema:
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_row}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.50, ease: _eIn }}, {_w4_dbc_delay:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_fill}\', {{ width: "0%" }}, {{ width: "{_w4_dbc_pct}%", duration: 1.20, ease: "power1.out" }}, {_w4_dbc_delay + 0.30:.4f});')
+                    elif is_vibe:
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_row}\', {{ opacity: 0, x: -10 }}, {{ opacity: 1, x: 0, duration: 0.18, ease: "power3.out" }}, {_w4_dbc_delay:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_fill}\', {{ width: "0%" }}, {{ width: "{_w4_dbc_pct}%", duration: 0.35, ease: "back.out(1.2)" }}, {_w4_dbc_delay + 0.15:.4f});')
+                    elif is_paper:
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_row}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {_w4_dbc_delay:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_fill}\', {{ width: "0%" }}, {{ width: "{_w4_dbc_pct}%", duration: 0.60, ease: "power1.out" }}, {_w4_dbc_delay + 0.20:.4f});')
+                    elif is_craft:
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_row}\', {{ opacity: 0, rotation: -1 }}, {{ opacity: 1, rotation: 0, duration: 0.28, ease: _eIn }}, {_w4_dbc_delay:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_fill}\', {{ width: "0%" }}, {{ width: "{_w4_dbc_pct}%", duration: 0.55, ease: "elastic.out(1,0.6)" }}, {_w4_dbc_delay + 0.18:.4f});')
+                    else:
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_row}\', {{ opacity: 0, y: 6 }}, {{ opacity: 1, y: 0, duration: 0.25, ease: _eIn }}, {_w4_dbc_delay:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w4_dbc_fill}\', {{ width: "0%" }}, {{ width: "{_w4_dbc_pct}%", duration: 0.50, ease: "power2.out" }}, {_w4_dbc_delay + 0.18:.4f});')
+            elif content_style == "cause_effect":
+                _w4_ce_cause  = f'.card[data-card-id="{card_id}"] #{card_id}-ceff-cause'
+                _w4_ce_arrow  = f'.card[data-card-id="{card_id}"] #{card_id}-ceff-arrow'
+                _w4_ce_path   = f'.card[data-card-id="{card_id}"] #{card_id}-ceff-path'
+                _w4_ce_head   = f'.card[data-card-id="{card_id}"] #{card_id}-ceff-head'
+                _w4_ce_effect = f'.card[data-card-id="{card_id}"] #{card_id}-ceff-effect'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w4_ce_cause}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_ce_arrow}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_ce_path}\', {{ strokeDashoffset: 0 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_ce_head}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_ce_effect}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_cause}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.60, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_ce_arrow}\', {{ opacity: 1 }}, {t_in + 0.50:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_path}\', {{ strokeDashoffset: 100 }}, {{ strokeDashoffset: 0, duration: 0.80, ease: "power2.inOut" }}, {t_in + 0.50:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_head}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in + 1.10:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_effect}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.70, ease: _eIn }}, {t_in + 1.20:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_cause}\', {{ opacity: 0, scale: 0.9 }}, {{ opacity: 1, scale: 1, duration: 0.22, ease: "back.out(1.5)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_ce_arrow}\', {{ opacity: 1 }}, {t_in + 0.18:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_path}\', {{ strokeDashoffset: 100 }}, {{ strokeDashoffset: 0, duration: 0.20, ease: "power3.out" }}, {t_in + 0.18:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_head}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.10, ease: _eIn }}, {t_in + 0.36:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_effect}\', {{ opacity: 0, scale: 0.9 }}, {{ opacity: 1, scale: 1, duration: 0.22, ease: "back.out(1.5)" }}, {t_in + 0.42:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_cause}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_ce_arrow}\', {{ opacity: 1 }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_path}\', {{ strokeDashoffset: 100 }}, {{ strokeDashoffset: 0, duration: 0.35, ease: "power1.out" }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_head}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.20, ease: _eIn }}, {t_in + 0.55:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_effect}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in + 0.65:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_cause}\', {{ opacity: 0, rotation: -2 }}, {{ opacity: 1, rotation: 0, duration: 0.30, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_ce_arrow}\', {{ opacity: 1 }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_path}\', {{ strokeDashoffset: 100 }}, {{ strokeDashoffset: 0, duration: 0.40, ease: "elastic.out(1,0.6)" }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_head}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.20, ease: _eIn }}, {t_in + 0.55:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_effect}\', {{ opacity: 0, rotation: 2 }}, {{ opacity: 1, rotation: 0, duration: 0.30, ease: _eIn }}, {t_in + 0.65:.4f});')
+                else:
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_cause}\', {{ opacity: 0, x: -12 }}, {{ opacity: 1, x: 0, duration: 0.28, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w4_ce_arrow}\', {{ opacity: 1 }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_path}\', {{ strokeDashoffset: 100 }}, {{ strokeDashoffset: 0, duration: 0.30, ease: "power2.out" }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_head}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.15, ease: _eIn }}, {t_in + 0.50:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w4_ce_effect}\', {{ opacity: 0, x: 12 }}, {{ opacity: 1, x: 0, duration: 0.28, ease: _eIn }}, {t_in + 0.55:.4f});')
+                    if p["accent_line_glow"]:
+                        _w4_ce_alg = _esc_js(p["accent_line_glow"])
+                        lines.append(f'  tl.to(\'{_w4_ce_arrow}\', {{ filter: "drop-shadow(0 0 4px {p["accent"]})" }}, {t_in + 0.50:.4f});')
+            elif content_style == "number_ranking":
+                _w4_nr_h = card.get("contentHints", {})
+                _w4_nr_items = _w4_nr_h.get("rankings", [])
+                _w4_nr_n = min(len(_w4_nr_items), 5)
+                for _w4_ni in range(_w4_nr_n):
+                    _w4_nr_item = f'.card[data-card-id="{card_id}"] #{card_id}-nr-{_w4_ni}'
+                    _w4_nr_delay = t_in + _w4_ni * 0.18
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w4_nr_item}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    elif is_cinema:
+                        lines.append(f'  tl.fromTo(\'{_w4_nr_item}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.55, ease: _eIn }}, {_w4_nr_delay:.4f});')
+                    elif is_vibe:
+                        _w4_nr_bounce = "back.out(2.0)" if _w4_ni == 0 else "back.out(1.5)"
+                        lines.append(f'  tl.fromTo(\'{_w4_nr_item}\', {{ opacity: 0, scale: 0.7, y: -10 }}, {{ opacity: 1, scale: 1, y: 0, duration: 0.22, ease: "{_w4_nr_bounce}" }}, {_w4_nr_delay:.4f});')
+                    elif is_paper:
+                        lines.append(f'  tl.fromTo(\'{_w4_nr_item}\', {{ opacity: 0, x: -8 }}, {{ opacity: 1, x: 0, duration: 0.28, ease: _eIn }}, {_w4_nr_delay:.4f});')
+                    elif is_craft:
+                        lines.append(f'  tl.fromTo(\'{_w4_nr_item}\', {{ opacity: 0, rotation: -2 }}, {{ opacity: 1, rotation: 0, duration: 0.28, ease: _eIn }}, {_w4_nr_delay:.4f});')
+                    else:
+                        lines.append(f'  tl.fromTo(\'{_w4_nr_item}\', {{ opacity: 0, y: 10 }}, {{ opacity: 1, y: 0, duration: 0.28, ease: _eIn }}, {_w4_nr_delay:.4f});')
             else:
                 if is_cinema:
                     lines.append(
