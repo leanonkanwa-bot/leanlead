@@ -335,7 +335,7 @@ OUTPUT: a JSON array of card objects. Each card:
     "accent_word": "<optional: one word/phrase from title to emphasize via highlight swipe>",
     "detail": "<optional supporting text>",
     "number": "<if a stat/number is featured>",
-    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote"|"carousel"|"definition"|"checklist"|"score"|"mindmap"|"data_chart"|"instagram-follow"|"tiktok-follow"|"yt-lower-third"|"news_ticker",
+    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote"|"carousel"|"definition"|"checklist"|"score"|"mindmap"|"data_chart"|"instagram-follow"|"tiktok-follow"|"yt-lower-third"|"news_ticker"|"rating"|"map_location"|"progress_bar"|"before_after_image"|"countdown"|"poll_question"|"myth_vs_fact",
     "left_label": "<comparison: left side label>",
     "left_value": "<comparison: left side value>",
     "right_label": "<comparison: right side label>",
@@ -353,7 +353,21 @@ OUTPUT: a JSON array of card objects. Each card:
     "definition": "<definition: explanation text>",
     "score_text": "<score: e.g. 3-1, Top 5>",
     "center": "<mindmap: central concept>",
-    "branches": ["<mindmap: branch 1>", "<mindmap: branch 2>", ...]
+    "branches": ["<mindmap: branch 1>", "<mindmap: branch 2>", ...],
+    "rating_value": "<rating: numeric score, e.g. 8.5>",
+    "rating_max": "<rating: max of the scale, e.g. 10>",
+    "location_name": "<map_location: city, country, or place name>",
+    "location_context": "<map_location: optional context e.g. country or region>",
+    "progress_percent": "<progress_bar: integer 0-100>",
+    "progress_label": "<progress_bar: what is being measured>",
+    "before_label": "<before_after_image: description of the BEFORE state>",
+    "after_label": "<before_after_image: description of the AFTER state>",
+    "countdown_from": "<countdown: starting integer, counts down to 0>",
+    "countdown_label": "<countdown: what is being counted down>",
+    "poll_question": "<poll_question: the question text>",
+    "poll_options": ["<poll_question: option 1>", "<poll_question: option 2>"],
+    "myth_text": "<myth_vs_fact: the incorrect belief to debunk>",
+    "fact_text": "<myth_vs_fact: the corrected truth>"
   }}
 }}
 
@@ -403,6 +417,27 @@ RULES:
   "dialogue" — speaker recounts an exchange between two people.
   "trend" — speaker describes a directional change (growth/decline).
   "question" — speaker poses a question and then answers it.
+  "rating" — speaker gives a numerical score to something (e.g. "I'd
+    give this 8 out of 10"). Provide "rating_value" + "rating_max".
+    NOT stat (stat is a count/metric); NOT score (score is rankings).
+  "map_location" — speaker references a specific geographic location.
+    Provide "location_name" + optional "location_context".
+  "progress_bar" — speaker describes a percentage, completion level,
+    or how far along something is ("we're 70% there"). Provide
+    "progress_percent" (0-100 integer) + "progress_label". NOT stat.
+  "before_after_image" — speaker describes a visual transformation
+    (conceptual before/after). Use for transformations, NOT for
+    contrasting two separate things (use comparison for that). Provide
+    "before_label" + "after_label".
+  "countdown" — speaker counts DOWN from a number (urgency, steps
+    remaining, limited time). Numbers DECREASE. NOT stat. Provide
+    "countdown_from" (integer) + "countdown_label".
+  "poll_question" — speaker poses a question WITH explicit
+    multiple-choice options. Distinct from question (question has no
+    options). Provide "poll_question" + "poll_options" array (2-4).
+  "myth_vs_fact" — speaker debunks a myth and states the real fact.
+    Distinct from callout (callout adds context, not a correction).
+    Provide "myth_text" + "fact_text".
 - TIMING: startSec should match when the speaker BEGINS saying the
   words the card references — synchronous with speech, like captions.
 - Place cards at NARRATIVELY IMPORTANT moments — not evenly spaced
