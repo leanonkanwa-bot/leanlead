@@ -1092,10 +1092,10 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         parts.append('}')
     if content_style == "quote_carousel":
         parts.append(f'.card[data-card-id="{card_id}"] .qc-wrap {{')
-        parts.append('  position:relative; width:100%; min-height:120px;')
+        parts.append('  display:grid; width:100%;')
         parts.append('}')
         parts.append(f'.card[data-card-id="{card_id}"] .qc-item {{')
-        parts.append('  position:absolute; top:0; left:0; right:0; opacity:0;')
+        parts.append('  grid-area:1/1; opacity:0;')
         parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
         parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; text-align:center;')
         if p["title_glow"]:
