@@ -3015,6 +3015,14 @@ document.addEventListener("DOMContentLoaded", function() {
       if (target === "profileSection") loadProfileSection();
       if (target === "editorArea") updateOnboardingProgress();
       if (target === "learnSection") renderLessons();
+      if (target === "leanBriefSection") renderLeanBrief();
+    });
+  });
+
+  // LEANBRIEF ACCORDION ──────────────────────────────────────────────────────
+  document.querySelectorAll(".lb-acc-hd").forEach(function(hd) {
+    hd.addEventListener("click", function() {
+      hd.classList.toggle("open");
     });
   });
 
