@@ -2698,49 +2698,54 @@ def _build_timeline_js(
                 f'{{ opacity: 1, duration: {ent_dur:.3f}, ease: _eIn }}, '
                 f'{start:.4f});'
             )
-            # Per-pack panel entry (the card-panel slides/scales into view)
-            if is_cinema:
-                pass  # cinema: slow opacity only, no panel movement
-            elif is_ledger:
-                # Scan down: clip from top (matches ledger's terminal aesthetic)
-                lines.append(
-                    f'  tl.fromTo(\'{panel_sel}\', '
-                    f'{{ clipPath: "inset(100% 0 0% 0)" }}, '
-                    f'{{ clipPath: "inset(0% 0 0% 0)", duration: 0.350, ease: _eIn }}, '
-                    f'{start:.4f});'
-                )
-            elif is_vibe:
-                # Bouncy: more scale, more y, slight tilt
-                lines.append(
-                    f'  tl.fromTo(\'{panel_sel}\', '
-                    f'{{ scale: 1.08, y: 20, rotation: -1.5 }}, '
-                    f'{{ scale: 1, y: 0, rotation: 0, duration: 0.400, ease: _eIn }}, '
-                    f'{start:.4f});'
-                )
-            elif is_craft:
-                # Handwritten tilt: slight rotation on entry
-                lines.append(
-                    f'  tl.fromTo(\'{panel_sel}\', '
-                    f'{{ scale: 1.05, y: 10, rotation: 1 }}, '
-                    f'{{ scale: 1, y: 0, rotation: 0, duration: 0.450, ease: _eIn }}, '
-                    f'{start:.4f});'
-                )
-            elif is_paper:
-                # Minimal: barely perceptible scale (clean aesthetic)
-                lines.append(
-                    f'  tl.fromTo(\'{panel_sel}\', '
-                    f'{{ scale: 1.01, y: 6 }}, '
-                    f'{{ scale: 1, y: 0, duration: 0.300, ease: _eIn }}, '
-                    f'{start:.4f});'
-                )
-            else:
-                # lean_glass (default)
-                lines.append(
-                    f'  tl.fromTo(\'{panel_sel}\', '
-                    f'{{ scale: 1.04, y: 14 }}, '
-                    f'{{ scale: 1, y: 0, duration: 0.350, ease: _eIn }}, '
-                    f'{start:.4f});'
-                )
+            # Per-pack panel entry (the card-panel slides/scales into view).
+            # timeline and news_ticker are full-screen overlays built without a
+            # .card-panel div, so skip the panel tween for those types.
+            # content_style isn't assigned until ~line 2762, so look it up here.
+            _early_style = card.get("contentHints", {}).get("style", "") if "_broll_type" not in card else "__broll__"
+            if _early_style not in ("timeline", "news_ticker"):
+                if is_cinema:
+                    pass  # cinema: slow opacity only, no panel movement
+                elif is_ledger:
+                    # Scan down: clip from top (matches ledger's terminal aesthetic)
+                    lines.append(
+                        f'  tl.fromTo(\'{panel_sel}\', '
+                        f'{{ clipPath: "inset(100% 0 0% 0)" }}, '
+                        f'{{ clipPath: "inset(0% 0 0% 0)", duration: 0.350, ease: _eIn }}, '
+                        f'{start:.4f});'
+                    )
+                elif is_vibe:
+                    # Bouncy: more scale, more y, slight tilt
+                    lines.append(
+                        f'  tl.fromTo(\'{panel_sel}\', '
+                        f'{{ scale: 1.08, y: 20, rotation: -1.5 }}, '
+                        f'{{ scale: 1, y: 0, rotation: 0, duration: 0.400, ease: _eIn }}, '
+                        f'{start:.4f});'
+                    )
+                elif is_craft:
+                    # Handwritten tilt: slight rotation on entry
+                    lines.append(
+                        f'  tl.fromTo(\'{panel_sel}\', '
+                        f'{{ scale: 1.05, y: 10, rotation: 1 }}, '
+                        f'{{ scale: 1, y: 0, rotation: 0, duration: 0.450, ease: _eIn }}, '
+                        f'{start:.4f});'
+                    )
+                elif is_paper:
+                    # Minimal: barely perceptible scale (clean aesthetic)
+                    lines.append(
+                        f'  tl.fromTo(\'{panel_sel}\', '
+                        f'{{ scale: 1.01, y: 6 }}, '
+                        f'{{ scale: 1, y: 0, duration: 0.300, ease: _eIn }}, '
+                        f'{start:.4f});'
+                    )
+                else:
+                    # lean_glass (default)
+                    lines.append(
+                        f'  tl.fromTo(\'{panel_sel}\', '
+                        f'{{ scale: 1.04, y: 14 }}, '
+                        f'{{ scale: 1, y: 0, duration: 0.350, ease: _eIn }}, '
+                        f'{start:.4f});'
+                    )
 
             # Premium backdrop dim: every center-zone card darkens the video behind it.
             # Uses a separate overlay div (not CSS filter) — filter: brightness()
@@ -4686,11 +4691,12 @@ def _build_timeline_js(
                 f'{{ opacity: 0, duration: {exit_dur:.3f}, ease: {exit_ease} }}, '
                 f'{exit_start:.4f});'
             )
-            lines.append(
-                f'  tl.to(\'{panel_sel}\', '
-                f'{{ scale: 0.97, duration: 0.180, ease: _eOut }}, '
-                f'{exit_start:.4f});'
-            )
+            if content_style not in ("timeline", "news_ticker"):
+                lines.append(
+                    f'  tl.to(\'{panel_sel}\', '
+                    f'{{ scale: 0.97, duration: 0.180, ease: _eOut }}, '
+                    f'{exit_start:.4f});'
+                )
         lines.append(f'  tl.set(\'{sel}\', {{ opacity: 0, visibility: "hidden" }}, {end:.4f});')
 
         lines.append(f'  }} catch(_e) {{ console.warn("card {card_id} animation error:", _e); }}')
