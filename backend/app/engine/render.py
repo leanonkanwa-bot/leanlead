@@ -2221,6 +2221,13 @@ def _render_hyperframes(
         env["PRODUCER_PUPPETEER_PROTOCOL_TIMEOUT_MS"] = str(_proto_timeout_ms)
         print(f"[HF] protocolTimeout: {_proto_timeout_ms}ms ({_proto_timeout_ms/1000:.0f}s) for {timing_map.output_duration:.1f}s video", flush=True)
 
+        # Raise Node.js V8 heap beyond its ~4 GB default. Railway containers have
+        # 22 GB cgroup RAM; without this, the frame-capture JSON serialisation OOMs
+        # around the halfway point on any video longer than ~20s.
+        _node_heap_mb = max(4096, min(8192, int(_mem_avail_gb * 512)))  # 50 % of avail, 4–8 GB
+        env["NODE_OPTIONS"] = f"--max-old-space-size={_node_heap_mb}"
+        print(f"[HF] NODE_OPTIONS: --max-old-space-size={_node_heap_mb} ({_node_heap_mb // 1024}GB)", flush=True)
+
         _shell_candidates = sorted(
             p for p in Path("/usr/local/lib/chrome").rglob("chrome-headless-shell")
             if p.is_file()
