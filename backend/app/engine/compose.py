@@ -5049,10 +5049,26 @@ def compose(
 
     # Build card host divs — iterate all_cards (not graphic/caption separately)
     # so there is exactly one list reference shared with _build_timeline_js below.
-    card_hosts = []
+    card_hosts: list[str] = []
+    _rendered_cards: list[dict] = []
     for c in all_cards:
+        _missing = [k for k in ("id", "startSec", "endSec") if k not in c]
+        if _missing:
+            print(
+                f"[COMPOSE] WARNING: malformed card skipped — missing fields {_missing}: {c}",
+                flush=True,
+            )
+            continue
         track = 3 if c.get("type") == "caption" else 2
-        card_hosts.append(_build_card_host(c, layout, track_index=track, pack=pack))
+        try:
+            card_hosts.append(_build_card_host(c, layout, track_index=track, pack=pack))
+            _rendered_cards.append(c)
+        except Exception as _card_exc:
+            print(
+                f"[COMPOSE] WARNING: card render error — skipping id={c.get('id', '?')}: {_card_exc} | card={c}",
+                flush=True,
+            )
+    all_cards = _rendered_cards
 
     # Build master timeline
     timeline_js = _build_timeline_js(all_cards, zoom_entries=zoom_entries, subject_position=subject_position, pack=pack)

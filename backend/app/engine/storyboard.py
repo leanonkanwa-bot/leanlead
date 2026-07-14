@@ -1043,6 +1043,7 @@ def generate_storyboard(
                 phrase = " ".join(w.text for w in ws[:20])
             phrase = phrase.replace("—", " ").replace("–", " ").strip()
             _fallback_cards.append({
+                "id": f"dz-fill-{len(_fallback_cards) + 1:03d}",
                 "type": "key_phrase",
                 "zone": "video-overlay",
                 "startSec": c_start,
