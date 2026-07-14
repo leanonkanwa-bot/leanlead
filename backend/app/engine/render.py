@@ -2049,25 +2049,70 @@ def _render_hyperframes(
                 flush=True,
             )
 
-    # Zoom coverage audit: log windows with no active zoom entry > 8s
-    _zoom_audit = sorted(remapped_zoom, key=lambda z: float(z.get("start", 0)))
+    # Zoom coverage audit + fill: log gaps > 8s; inject micro-bumps for gaps > 25s
+    _zoom_audit_sorted = sorted(remapped_zoom, key=lambda z: float(z.get("start", 0)))
     _zg_prev_end = 0.0
     _zoom_gaps: list[tuple[float, float]] = []
-    for _ze in _zoom_audit:
-        _zs = float(_ze.get("start", 0))
-        _ze_e = float(_ze.get("end", _zs))
-        if _zs - _zg_prev_end > 8.0:
-            _zoom_gaps.append((round(_zg_prev_end, 1), round(_zs, 1)))
+    _zoom_bumps: list[dict] = []
+
+    def _zg_fill(gap_start: float, gap_end: float) -> None:
+        gap = gap_end - gap_start
+        if gap <= 25.0:
+            return
+        n_ideal = max(1, int(gap / 40.0))
+        n = min(3, n_ideal)
+        if n_ideal > n:
             print(
-                f"[ZOOM-GAP] no zoom {_zg_prev_end:.1f}→{_zs:.1f}s ({_zs - _zg_prev_end:.1f}s)",
+                f"[ZOOM-GAP-FILL] skipped (cap reached): gap at {gap_start:.1f}s-{gap_end:.1f}s"
+                f" needs {n_ideal} bumps, injecting {n}",
                 flush=True,
             )
+        step = gap / (n + 1)
+        for _bi in range(n):
+            pos = round(gap_start + step * (_bi + 1), 3)
+            baseline = _interp_zoom_scale(pos, remapped_zoom)
+            _zoom_bumps.extend([
+                {"start": pos, "end": round(pos + 0.25, 3), "from": baseline, "to": round(baseline * 1.03, 6), "kind": "punch_in", "ease": "power2.out"},
+                {"start": round(pos + 0.25, 3), "end": round(pos + 0.50, 3), "from": round(baseline * 1.03, 6), "to": baseline, "kind": "punch_in", "ease": "power2.out"},
+            ])
+            print(
+                f"[ZOOM-GAP-FILL] injected bump @{pos:.1f}s (baseline={baseline:.4f})"
+                f" in gap {gap_start:.1f}→{gap_end:.1f}s ({gap:.1f}s)",
+                flush=True,
+            )
+
+    for _ze in _zoom_audit_sorted:
+        _zs = float(_ze.get("start", 0))
+        _ze_e = float(_ze.get("end", _zs))
+        _zg = _zs - _zg_prev_end
+        if _zg > 8.0:
+            _zoom_gaps.append((round(_zg_prev_end, 1), round(_zs, 1)))
+            print(
+                f"[ZOOM-GAP] no zoom {_zg_prev_end:.1f}→{_zs:.1f}s ({_zg:.1f}s)",
+                flush=True,
+            )
+        _zg_fill(_zg_prev_end, _zs)
         _zg_prev_end = max(_zg_prev_end, _ze_e)
+
+    _tail_zg = timing_map.output_duration - _zg_prev_end
+    if _tail_zg > 8.0:
+        _zoom_gaps.append((round(_zg_prev_end, 1), round(timing_map.output_duration, 1)))
+        print(
+            f"[ZOOM-GAP] no zoom {_zg_prev_end:.1f}→{timing_map.output_duration:.1f}s ({_tail_zg:.1f}s)",
+            flush=True,
+        )
+    _zg_fill(_zg_prev_end, timing_map.output_duration)
+
     if not _zoom_gaps:
         print(
             f"[ZOOM-GAP] Full zoom coverage — no gaps > 8s across {len(remapped_zoom)} entries",
             flush=True,
         )
+
+    if _zoom_bumps:
+        remapped_zoom.extend(_zoom_bumps)
+        remapped_zoom.sort(key=lambda z: float(z.get("start", 0)))
+        print(f"[ZOOM-GAP-FILL] {len(_zoom_bumps)} bump entries injected total", flush=True)
 
     # Stage 3: Compose
     _t = time.perf_counter()

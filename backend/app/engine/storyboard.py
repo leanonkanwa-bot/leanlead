@@ -1013,11 +1013,51 @@ def generate_storyboard(
 
     print(f"[STORYBOARD] {len(graphic_cards)} graphic + {len(caption_cards)} caption cards", flush=True)
 
-    # Dead-zone audit: log gaps > 12s between consecutive graphic cards
+    # Dead-zone audit + fill: log gaps > 12s; inject fallback key_phrase cards for gaps > 20s
     _sorted_gc = sorted(graphic_cards, key=lambda c: float(c.get("startSec", 0)))
-    _dz_gaps = []
+    _dz_gaps: list[float] = []
+    _fallback_cards: list[dict] = []
     _prev_end = 0.0
-    for _gi, _gc2 in enumerate(_sorted_gc):
+
+    def _dz_fill(gap_start: float, gap_end: float) -> None:
+        gap = gap_end - gap_start
+        if gap <= 20.0:
+            return
+        n_ideal = max(1, int(gap / 40.0))
+        n = min(3, n_ideal)
+        if n_ideal > n:
+            print(
+                f"[DEAD-ZONE-FILL] skipped (cap reached): gap at {gap_start:.1f}s-{gap_end:.1f}s"
+                f" needs {n_ideal} cards, injecting {n}",
+                flush=True,
+            )
+        step = gap / (n + 1)
+        for _i in range(n):
+            pos = gap_start + step * (_i + 1)
+            c_start = round(max(gap_start, pos - 3.0), 3)
+            c_end = round(min(gap_end, pos + 3.0), 3)
+            ws = [w for w in remapped_words if c_start - 2.0 <= w.start <= c_end + 2.0]
+            phrase = " ".join(w.text for w in ws[:20])
+            if not phrase:
+                ws = [w for w in remapped_words if gap_start <= w.start <= gap_end]
+                phrase = " ".join(w.text for w in ws[:20])
+            phrase = phrase.replace("—", " ").replace("–", " ").strip()
+            _fallback_cards.append({
+                "type": "key_phrase",
+                "zone": "video-overlay",
+                "startSec": c_start,
+                "endSec": c_end,
+                "contentHints": {"phrase": phrase or "…"},
+                "_fallback": True,
+                "_confidence": 0.50,
+            })
+            print(
+                f"[DEAD-ZONE-FILL] injected key_phrase {c_start:.1f}→{c_end:.1f}s"
+                f" in gap {gap_start:.1f}→{gap_end:.1f}s ({gap:.1f}s)",
+                flush=True,
+            )
+
+    for _gc2 in _sorted_gc:
         _cs = float(_gc2.get("startSec", 0))
         _ce = float(_gc2.get("endSec", _cs))
         _gap = _cs - _prev_end
@@ -1029,7 +1069,9 @@ def generate_storyboard(
                 flush=True,
             )
             _dz_gaps.append(_gap)
+        _dz_fill(_prev_end, _cs)
         _prev_end = max(_prev_end, _ce)
+
     _tail_gap = trimmed_duration - _prev_end
     if _tail_gap > 12.0:
         _tail_words = [w for w in remapped_words if _prev_end <= w.start]
@@ -1039,6 +1081,8 @@ def generate_storyboard(
             flush=True,
         )
         _dz_gaps.append(_tail_gap)
+    _dz_fill(_prev_end, trimmed_duration)
+
     if _dz_gaps:
         print(
             f"[DEAD-ZONE] {len(_dz_gaps)} gap(s) > 12s | max={max(_dz_gaps):.1f}s avg={sum(_dz_gaps)/len(_dz_gaps):.1f}s",
@@ -1046,6 +1090,11 @@ def generate_storyboard(
         )
     else:
         print("[DEAD-ZONE] No card gaps > 12s — full coverage OK", flush=True)
+
+    if _fallback_cards:
+        graphic_cards.extend(_fallback_cards)
+        graphic_cards.sort(key=lambda c: float(c.get("startSec", 0)))
+        print(f"[DEAD-ZONE-FILL] {len(_fallback_cards)} fallback card(s) injected total", flush=True)
 
     storyboard = {
         "composition": {
