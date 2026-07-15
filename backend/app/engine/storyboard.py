@@ -744,6 +744,16 @@ RULES:
     fluid narrative beat without numbering). Distinct from timeline
     (timeline is a sequence of events; story_chapter_transition is one
     pivot-beat separator). Provide "transition_label".
+- VERBATIM GROUNDING — mandatory check before assigning any explicit-signal
+  card type (contrarian_take, warning_soft, red_flag_list, action_step_cta,
+  myth_vs_fact, secret_reveal, objection_response): the trigger phrase MUST
+  appear verbatim in the KEY LINES or be unambiguously present in the beat
+  description. The BEAT SPINE "lines" field is editorial context synthesised
+  by a planning model — it may paraphrase, editorially rephrase, or invent
+  punchier wording that was never literally spoken. Do NOT assign a
+  trigger-phrase type based on beat-spine lines alone when those lines are
+  absent from KEY LINES. When uncertain between a trigger-phrase type and a
+  generic type (callout, key_phrase, quote), always prefer the generic type.
 - TIMING: startSec should match when the speaker BEGINS saying the
   words the card references — synchronous with speech, like captions.
 - Place cards at NARRATIVELY IMPORTANT moments — not evenly spaced
@@ -792,6 +802,17 @@ Design {target_cards} graphic overlay cards for this video."""
         for card in cards:
             card["startSec"] = max(0, min(float(card.get("startSec", 0)), trimmed_duration - 1))
             card["endSec"] = max(card["startSec"] + 1, min(float(card.get("endSec", 0)), trimmed_duration))
+        # Defensive duration cap: contrarian_take is a brief verbal signal, not a
+        # long window. Cap at 2.5s to prevent swallowing adjacent content types
+        # if classification fired on paraphrased planning output rather than
+        # literal speech.
+        for card in cards:
+            if card.get("contentHints", {}).get("style") == "contrarian_take":
+                _start = float(card["startSec"])
+                _end = float(card["endSec"])
+                if _end - _start > 2.5:
+                    card["endSec"] = round(_start + 2.5, 2)
+                    print(f"[STORYBOARD] contrarian_take cap: {_start:.2f}-{_end:.2f}s → {_start:.2f}-{card['endSec']}s", flush=True)
         print(f"[STORYBOARD] Generated {len(cards)} graphic cards", flush=True)
         return cards
     except Exception as e:
