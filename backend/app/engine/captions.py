@@ -227,19 +227,32 @@ def _strip_punct(word: str) -> str:
     return PUNCT_RE.sub("", word).strip()
 
 
-_APOS = ("'", "’")  # U+0027 straight + U+2019 right single quotation mark
+_APOS = ("’", "’")  # U+0027 straight + U+2019 right single quotation mark
+
+
+def _log_raw_je_tokens(words: list, style: str) -> None:
+    """Log raw Whisper tokens around any short j* token before merge."""
+    for i, w in enumerate(words):
+        bare = w.text.strip("’’ ")
+        if bare.lower().startswith("j") and len(bare) <= 2:
+            ctx_s = max(0, i - 1)
+            ctx_e = min(len(words), i + 3)
+            ctx = ", ".join(repr(w2.text) for w2 in words[ctx_s:ctx_e])
+            print("[WHISPER-RAW] %s: [%s]" % (style, ctx), flush=True)
 
 
 def _merge_elisions(words: list) -> list:
-    """Merge Whisper-split French elision tokens: ['j'', 'ai'] → ['j'ai']."""
+    """Merge Whisper-split French elision tokens."""
     merged: list = []
     for w in words:
         if merged and (
             any(w.text.startswith(a) for a in _APOS) or
             any(merged[-1].text.endswith(a) for a in _APOS)
         ):
+            _prev = merged[-1].text
             merged[-1].text += w.text
             merged[-1].end   = w.end
+            print("[CAPTIONS-MERGE] %r + %r -> %r" % (_prev, w.text, merged[-1].text), flush=True)
         else:
             merged.append(w)
     return merged
@@ -617,8 +630,9 @@ def _build_priestley_ass(
 
     valid_words = [
         w for w in words
-        if _strip_punct(w.text) and w.text.strip("'’") and (video_duration is None or w.start < video_duration)
+        if _strip_punct(w.text) and w.text.strip("’’") and (video_duration is None or w.start < video_duration)
     ]
+    _log_raw_je_tokens(valid_words, "priestley")
     valid_words = _merge_elisions(valid_words)
 
     def _build_kara_parts(phrase: list, first_word_index: int) -> list[str]:
@@ -803,6 +817,7 @@ def _build_momentum_ass(
         w for w in words
         if _strip_punct(w.text) and w.text.strip("''") and (video_duration is None or w.start < video_duration)
     ]
+    _log_raw_je_tokens(valid_words, "momentum")
     valid_words = _merge_elisions(valid_words)
 
     i = 0
@@ -971,6 +986,7 @@ def build_ass(
     )
 
     word_list = [w for w in words if _strip_punct(w.text) and w.text.strip("''")]
+    _log_raw_je_tokens(word_list, caption_style)
     word_list = _merge_elisions(word_list)
 
     # ── Caption style dispatch ───────────────────────────────────────────────
