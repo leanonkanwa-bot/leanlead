@@ -630,6 +630,7 @@ def run_job(
         # ── Step 1: Transcribe + Vision (concurrent) ──────────────────────
         store.update(job_id, status="transcribing", progress=10,
                      message="Transcribing audio + analysing subject position…")
+        print(f"[CONFIG] SUBJECT_TRACKING={settings.subject_tracking}", flush=True)
         _subject_fn = track_subject if settings.subject_tracking else analyze_subject_position
         with ThreadPoolExecutor(max_workers=2) as pool:
             f_transcript = pool.submit(lambda: transcribe(src).to_dict())
