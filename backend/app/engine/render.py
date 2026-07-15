@@ -3060,8 +3060,19 @@ def render(
     src_h = concat_info.get("height", 0) or target_h
 
     if short_form:
-        # 9:16 vertical: center-crop horizontal source then scale up
-        scale_filter = f"crop=ih*9/16:ih,scale={target_w}:{target_h}"
+        # 9:16 vertical: crop horizontal source to portrait, centred on face.
+        # face_cx_pct=50 (tracking fallback) gives the geometric centre crop.
+        crop_w_px  = int(src_h * 9 / 16)
+        crop_x_px  = int(face_cx_pct / 100.0 * src_w - crop_w_px / 2)
+        crop_x_px  = max(0, min(src_w - crop_w_px, crop_x_px))
+        center_x   = (src_w - crop_w_px) // 2
+        print(
+            f"[CROP] face_cx={face_cx_pct:.1f}% src={src_w}x{src_h}"
+            f" crop_w={crop_w_px} crop_x={crop_x_px}"
+            f" (center={center_x}, shift={crop_x_px - center_x:+d}px)",
+            flush=True,
+        )
+        scale_filter = f"crop={crop_w_px}:{src_h}:{crop_x_px}:0,scale={target_w}:{target_h}"
     else:
         # 16:9 horizontal: straight scale, skip if already correct size
         if src_w == target_w and src_h == target_h:

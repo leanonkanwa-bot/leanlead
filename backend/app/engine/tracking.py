@@ -20,10 +20,28 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
+import urllib.request
 from pathlib import Path
 
 # Re-use the binary paths already resolved at startup.
 from app.engine.transcribe import FFMPEG_PATH, FFPROBE_PATH
+
+# MediaPipe Tasks API model — downloaded once to /tmp on first use.
+# mediapipe.solutions is absent in mediapipe >=0.10 on all platforms;
+# the Tasks API (mediapipe.tasks) is the only supported detection path.
+_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/face_detector/"
+    "blaze_face_full_range/float16/latest/blaze_face_full_range.tflite"
+)
+_MODEL_CACHE = Path(tempfile.gettempdir()) / "blaze_face_full_range.tflite"
+
+
+def _ensure_model() -> Path:
+    if not _MODEL_CACHE.exists():
+        print("[TRACKING] downloading face detection model...", flush=True)
+        urllib.request.urlretrieve(_MODEL_URL, _MODEL_CACHE)
+        print(f"[TRACKING] model cached at {_MODEL_CACHE}", flush=True)
+    return _MODEL_CACHE
 
 _DEFAULT: dict = {
     "face_cx_pct":       50.0,
@@ -68,16 +86,25 @@ def _probe_duration(src: Path) -> float:
 
 
 def _track(src: Path) -> dict:
-    # Explicit submodule import required: `import mediapipe as mp` does NOT
-    # auto-expose mp.solutions in mediapipe 0.10.x (lazy namespace, not pulled
-    # into __init__). Importing the submodule directly always works.
-    import mediapipe.solutions.face_detection as _mp_fd
+    # Tasks API: mediapipe.solutions is absent in mediapipe >=0.10 on all
+    # platforms. mediapipe.tasks is the only supported path.
+    from mediapipe.tasks.python.vision.face_detector import FaceDetector, FaceDetectorOptions
+    from mediapipe.tasks.python.core.base_options import BaseOptions
+    from mediapipe.tasks.python.vision.core.vision_task_running_mode import VisionTaskRunningMode
+    import mediapipe as mp
     import numpy as np
     from PIL import Image
 
+    model_path = _ensure_model()
     duration = _probe_duration(src)
     MAX_FRAMES = 60
     sample_fps = min(2.0, MAX_FRAMES / duration) if duration > 5.0 else 2.0
+
+    options = FaceDetectorOptions(
+        base_options=BaseOptions(model_asset_path=str(model_path)),
+        running_mode=VisionTaskRunningMode.IMAGE,
+        min_detection_confidence=0.3,
+    )
 
     with tempfile.TemporaryDirectory(prefix="tracking_") as tmp:
         frame_dir = Path(tmp)
@@ -98,23 +125,24 @@ def _track(src: Path) -> dict:
 
         detections: dict[int, tuple[float, float, float, float]] = {}
 
-        with _mp_fd.FaceDetection(
-            model_selection=1,
-            min_detection_confidence=0.3,
-        ) as detector:
+        with FaceDetector.create_from_options(options) as detector:
             for fi, fp in enumerate(frame_paths):
                 try:
-                    arr = np.array(Image.open(fp).convert("RGB"))
-                    res = detector.process(arr)
-                    if res.detections:
-                        b = res.detections[0].location_data.relative_bounding_box
-                        cx = (b.xmin + b.width / 2) * 100
-                        cy = (b.ymin + b.height / 2) * 100
+                    arr    = np.array(Image.open(fp).convert("RGB"))
+                    img_w  = arr.shape[1]
+                    img_h  = arr.shape[0]
+                    mp_img = mp.Image(image_format=mp.ImageFormat.SRGB, data=arr)
+                    result = detector.detect(mp_img)
+                    if result.detections:
+                        # Tasks API BoundingBox is in pixels (not normalized).
+                        b  = result.detections[0].bounding_box
+                        cx = (b.origin_x + b.width  / 2) / img_w * 100
+                        cy = (b.origin_y + b.height / 2) / img_h * 100
                         detections[fi] = (
                             round(cx, 1),
                             round(cy, 1),
-                            round(b.width  * 100, 1),
-                            round(b.height * 100, 1),
+                            round(b.width  / img_w * 100, 1),
+                            round(b.height / img_h * 100, 1),
                         )
                 except Exception:
                     pass  # single-frame failure is recoverable
