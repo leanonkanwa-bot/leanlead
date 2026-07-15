@@ -99,8 +99,8 @@ def _track(src: Path) -> dict:
         detections: dict[int, tuple[float, float, float, float]] = {}
 
         with _mp_fd.FaceDetection(
-            model_selection=0,
-            min_detection_confidence=0.5,
+            model_selection=1,
+            min_detection_confidence=0.3,
         ) as detector:
             for fi, fp in enumerate(frame_paths):
                 try:
