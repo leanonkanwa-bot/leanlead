@@ -130,11 +130,13 @@ def _segment_captions(
 
     # Merge apostrophe-split tokens (French elisions: m'a, l'équipe, j'ai, etc.)
     # Whisper often splits these into ["m'", "a"] or ["m", "'a"] as separate words.
+    # Both U+0027 (straight) and U+2019 (right single quotation mark) are handled.
+    _STORYBOARD_APOS = ("'", "'")  # U+0027 + U+2019
     merged_words: list[dict] = []
     for w in all_words:
         if merged_words and (
-            w["text"].startswith("'") or
-            merged_words[-1]["text"].endswith("'")
+            any(w["text"].startswith(a) for a in _STORYBOARD_APOS) or
+            any(merged_words[-1]["text"].endswith(a) for a in _STORYBOARD_APOS)
         ):
             prev = merged_words[-1]
             prev["text"] = prev["text"] + w["text"]

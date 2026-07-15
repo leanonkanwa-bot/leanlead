@@ -68,7 +68,7 @@ CATEGORY_COLOR_ASS: dict[str, str] = {
     "hook":     "&H005177FF",  # salmon    #FF7751 (same as emphasis)
 }
 
-PUNCT_RE = re.compile(r"[.,!?;:\"'()\[\]…–—]")
+PUNCT_RE = re.compile(r"""[.,!?;:"()\[\]…–—]""")
 
 # Matches digits, %, $ — the only tokens allowed to take brand_color emphasis.
 # Main caption text is always white; brand_color is reserved for these.
@@ -225,6 +225,24 @@ def _ts(t: float) -> str:
 
 def _strip_punct(word: str) -> str:
     return PUNCT_RE.sub("", word).strip()
+
+
+_APOS = ("'", "’")  # U+0027 straight + U+2019 right single quotation mark
+
+
+def _merge_elisions(words: list) -> list:
+    """Merge Whisper-split French elision tokens: ['j'', 'ai'] → ['j'ai']."""
+    merged: list = []
+    for w in words:
+        if merged and (
+            any(w.text.startswith(a) for a in _APOS) or
+            any(merged[-1].text.endswith(a) for a in _APOS)
+        ):
+            merged[-1].text += w.text
+            merged[-1].end   = w.end
+        else:
+            merged.append(w)
+    return merged
 
 
 def _hex_to_ass_bgr(hex6: str) -> str:
@@ -599,8 +617,9 @@ def _build_priestley_ass(
 
     valid_words = [
         w for w in words
-        if _strip_punct(w.text) and (video_duration is None or w.start < video_duration)
+        if _strip_punct(w.text) and w.text.strip("'’") and (video_duration is None or w.start < video_duration)
     ]
+    valid_words = _merge_elisions(valid_words)
 
     def _build_kara_parts(phrase: list, first_word_index: int) -> list[str]:
         """Return ['{\\kf<cs>}word', ...] for each word in phrase."""
@@ -782,8 +801,9 @@ def _build_momentum_ass(
 
     valid_words = [
         w for w in words
-        if _strip_punct(w.text) and (video_duration is None or w.start < video_duration)
+        if _strip_punct(w.text) and w.text.strip("''") and (video_duration is None or w.start < video_duration)
     ]
+    valid_words = _merge_elisions(valid_words)
 
     i = 0
     while i < len(valid_words):
@@ -950,7 +970,8 @@ def build_ass(
         "Effect, Text\n"
     )
 
-    word_list = [w for w in words if _strip_punct(w.text)]
+    word_list = [w for w in words if _strip_punct(w.text) and w.text.strip("''")]
+    word_list = _merge_elisions(word_list)
 
     # ── Caption style dispatch ───────────────────────────────────────────────
     _kw_anim  = r"{\fad(80,0)\t(\fscx97\fscy97,\fscx100\fscy100)}"
