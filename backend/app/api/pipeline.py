@@ -32,6 +32,7 @@ from app.engine.silence_remover import RhythmAwareSilenceRemover, apply_drops_to
 from app.engine.speaker_detector import SpeakerDetector
 from app.engine.template_engine import apply_template, get_template
 from app.engine.transcribe import AudioMissingError, transcribe, unload_model
+from app.engine.tracking import track_subject
 
 # Purge work_dirs older than 2 days at module load (i.e. server startup).
 def _purge_old_work_dirs() -> None:
@@ -629,9 +630,10 @@ def run_job(
         # ── Step 1: Transcribe + Vision (concurrent) ──────────────────────
         store.update(job_id, status="transcribing", progress=10,
                      message="Transcribing audio + analysing subject position…")
+        _subject_fn = track_subject if settings.subject_tracking else analyze_subject_position
         with ThreadPoolExecutor(max_workers=2) as pool:
             f_transcript = pool.submit(lambda: transcribe(src).to_dict())
-            f_subject    = pool.submit(lambda: analyze_subject_position(src))
+            f_subject    = pool.submit(lambda: _subject_fn(src))
             transcript  = f_transcript.result()
             subject_pos = f_subject.result()
         print(f"[TIMING] transcription+vision: {time.perf_counter()-_t0:.1f}s", flush=True)

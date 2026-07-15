@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     # Individual cut types are further gated by CUT_REPETITIONS, CUT_PAUSES, etc.
     cut_fillers: bool = False
 
+    # MediaPipe BlazeFace 2fps subject tracking.
+    # When true, replaces single-frame Claude Vision with multi-frame face detection.
+    # Toggle via SUBJECT_TRACKING=true in Railway env vars (default: false).
+    subject_tracking: bool = False
+
     # Style pack for graphic cards and captions.
     # "lean_glass" = dark glass panels with cyan glow (LeanGlass).
     style_pack: str = "lean_glass"

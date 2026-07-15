@@ -14,3 +14,4 @@ stripe>=11,<12
 requests>=2.31,<3
 modal>=0.64
 stable-ts>=2.17
+mediapipe>=0.10,<1

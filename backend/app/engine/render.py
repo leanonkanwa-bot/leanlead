@@ -2007,6 +2007,16 @@ def _render_hyperframes(
     # Stage 2: Storyboard
     _t = time.perf_counter()
     print("[HF] Stage 2: Generating storyboard...", flush=True)
+    _subject_side: str | None = None
+    if subject_position:
+        _subject_side = subject_position.get("subject_side")
+        if not _subject_side:
+            # Derive from face centre for backward-compat (Claude Vision results)
+            _fl = float(subject_position.get("face_left_pct", 25.0))
+            _fr = float(subject_position.get("face_right_pct", 75.0))
+            _cx = (_fl + _fr) / 2
+            _subject_side = "left" if _cx < 38.0 else ("right" if _cx > 62.0 else "center")
+
     storyboard = generate_storyboard(
         trimmed_duration=timing_map.output_duration,
         remapped_words=timing_map.remapped_words,
@@ -2023,6 +2033,7 @@ def _render_hyperframes(
         timing_map=timing_map,
         language=transcript.get("language", "en"),
         style_pack=style_pack,
+        subject_side=_subject_side,
     )
     n_graphic = sum(1 for c in storyboard.get("cards", []) if c.get("type") != "caption")
     n_caption = sum(1 for c in storyboard.get("cards", []) if c.get("type") == "caption")

@@ -283,6 +283,7 @@ def _generate_graphic_cards(
     format_hint: str,
     timing_map: TimingMap,
     language: str = "en",
+    subject_side: str | None = None,
 ) -> list[dict]:
     """Generate graphic overlay cards via Claude API call.
 
@@ -456,7 +457,7 @@ ZONES — where the card sits on screen:
   side-panel    — left or right portion (data, comparisons)
   video-overlay — full canvas but transparent (glass effect over video)
   NEVER use "lower-third" — that zone is reserved for captions only.
-
+{f"SUBJECT POSITION: the speaker occupies the {subject_side} side of the frame. Place data-heavy cards (stat, list, comparison) on the OPPOSITE side so they don't obscure the face." if subject_side and subject_side != "center" else ""}
 RULES:
 - Target {target_cards} cards for a {trimmed_duration:.0f}s video
 - Card startSec/endSec must be within [0, {trimmed_duration:.1f}]
@@ -919,6 +920,7 @@ def generate_storyboard(
     timing_map: TimingMap,
     language: str = "en",
     style_pack: str = "lean_glass",
+    subject_side: str | None = None,
 ) -> dict:
     """Generate a complete storyboard: graphic cards + caption cards.
 
@@ -939,6 +941,7 @@ def generate_storyboard(
         format_hint=format_hint,
         timing_map=timing_map,
         language=language,
+        subject_side=subject_side,
     )
 
     # Fix 4/5: Snap graphic card startSec to the first spoken word at or after
