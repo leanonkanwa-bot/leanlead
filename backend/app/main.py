@@ -1778,20 +1778,16 @@ def demo_video(which: str):
     ).strip()
     if not job_id:
         raise HTTPException(404)
-    # Edited output first, then raw upload (for "before" clips)
-    path = settings.outputs_dir / f"{job_id}.mp4"
-    if not path.exists():
-        for ext in (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"):
-            candidate = settings.uploads_dir / f"{job_id}{ext}"
+    _EXTS = (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v")
+    for search_dir in (settings.outputs_dir, settings.uploads_dir):
+        for ext in _EXTS:
+            candidate = search_dir / f"{job_id}{ext}"
             if candidate.exists():
-                path = candidate
-                break
-        else:
-            raise HTTPException(404)
-    return FileResponse(
-        str(path), media_type="video/mp4",
-        headers={"Cache-Control": "public, max-age=3600"},
-    )
+                return FileResponse(
+                    str(candidate), media_type="video/mp4",
+                    headers={"Cache-Control": "public, max-age=3600"},
+                )
+    raise HTTPException(404)
 
 
 editor_dir = Path(__file__).resolve().parents[2] / "editor_frontend"
