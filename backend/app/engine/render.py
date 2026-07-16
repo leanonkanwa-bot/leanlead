@@ -3038,15 +3038,6 @@ def render(
     else:
         print("[CAPTIONS] Disabled (skip_captions=True) -- no ASS file generated")
 
-    face_cx_pct = 50.0
-    face_cy_pct = 50.0
-    if subject_position:
-        fl = subject_position.get("face_left_pct", 25.0)
-        fr = subject_position.get("face_right_pct", 75.0)
-        ft = subject_position.get("face_top_pct", 15.0)
-        fb = subject_position.get("face_bottom_pct", 65.0)
-        face_cx_pct = (fl + fr) / 2
-        face_cy_pct = (ft + fb) / 2
     total_frames = max(1, int(total_duration * fps))
 
     # Motion graphics disabled -- clean professional output.
@@ -3060,25 +3051,11 @@ def render(
     src_h = concat_info.get("height", 0) or target_h
 
     if short_form:
-        # 9:16 vertical: crop horizontal source to portrait, centred on face.
-        # face_cx_pct=50 (tracking fallback) gives the geometric centre crop.
-        crop_w_px  = int(src_h * 9 / 16)
-        crop_x_px  = int(face_cx_pct / 100.0 * src_w - crop_w_px / 2)
-        crop_x_px  = max(0, min(src_w - crop_w_px, crop_x_px))
-        center_x   = (src_w - crop_w_px) // 2
-        print(
-            f"[CROP] face_cx={face_cx_pct:.1f}% src={src_w}x{src_h}"
-            f" crop_w={crop_w_px} crop_x={crop_x_px}"
-            f" (center={center_x}, shift={crop_x_px - center_x:+d}px)",
-            flush=True,
-        )
-        scale_filter = f"crop={crop_w_px}:{src_h}:{crop_x_px}:0,scale={target_w}:{target_h}"
+        scale_filter = f"crop=ih*9/16:ih,scale={target_w}:{target_h}"
+    elif src_w == target_w and src_h == target_h:
+        scale_filter = None
     else:
-        # 16:9 horizontal: straight scale, skip if already correct size
-        if src_w == target_w and src_h == target_h:
-            scale_filter = None
-        else:
-            scale_filter = f"scale={target_w}:{target_h}"
+        scale_filter = f"scale={target_w}:{target_h}"
 
     system_font = _find_system_font()
 

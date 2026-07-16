@@ -5111,7 +5111,7 @@ def compose(
     overflow: hidden; border-radius: 0; box-shadow: none;
     transform-origin: center center;
   }}
-  .video-wrapper video {{ width: 100%; height: 100%; object-fit: cover; }}
+  .video-wrapper video {{ width: 100%; height: 100%; object-fit: cover; object-position: {_face_cx:.1f}% 50%; }}
   #stage {{ overflow: hidden; }}
   .video-wrapper.framed {{
     border-radius: 16px;
