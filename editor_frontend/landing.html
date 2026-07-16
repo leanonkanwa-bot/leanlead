@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#080808" />
   <title>LeanRetention : Éditeur vidéo IA pour créateurs</title>
   <meta name="description" content="LeanRetention analyse votre contenu, réécrit votre hook, supprime les silences et publie automatiquement. Première vidéo offerte." />
-  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23FF7751'/><path d='M11 9l13 7-13 7V9z' fill='%23080808'/></svg>" />
+  <link rel="icon" type="image/png" href="/logo.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&family=Montserrat:wght@600;700&family=Inter:wght@400;600&family=DM+Sans:wght@400;600&family=Bebas+Neue&display=swap" rel="stylesheet" />
@@ -56,10 +56,7 @@
       width: 100%; max-width: 1160px; margin: 0 auto; padding: 0 1.5rem;
       display: flex; align-items: center; justify-content: space-between;
     }
-    .logo { display: flex; align-items: center; gap: .55rem; text-decoration: none; color: var(--text); font-weight: 700; font-size: 1rem; }
-    .logo-mark { width: 30px; height: 30px; border-radius: 7px; background: var(--salmon); display: grid; place-items: center; flex-shrink: 0; }
-    .logo-mark::after { content: ""; border-left: 10px solid var(--bg); border-top: 7px solid transparent; border-bottom: 7px solid transparent; margin-left: 2px; }
-    .logo-name { color: var(--salmon); }
+    .logo { display: flex; align-items: center; text-decoration: none; }
     .nav-right { display: flex; align-items: center; gap: 1.25rem; }
     .nav-link { font-size: .875rem; font-weight: 500; color: var(--muted); text-decoration: none; transition: color .15s; }
     .nav-link:hover { color: var(--text); }
@@ -402,8 +399,7 @@
   <nav class="nav" id="nav">
     <div class="nav-inner">
       <a class="logo" href="/">
-        <span class="logo-mark"></span>
-        <span class="logo-name">LeanRetention</span>
+        <img src="/logo.png" alt="LeanRetention" height="34" style="display:block" />
       </a>
       <div class="nav-right">
         <a href="/api/auth/google/login" class="nav-link">Se connecter</a>
@@ -642,7 +638,7 @@
   <!-- FOOTER -->
   <footer class="footer">
     <div class="footer-inner">
-      <a class="logo" href="/"><span class="logo-mark"></span><span class="logo-name">LeanRetention</span></a>
+      <a class="logo" href="/"><img src="/logo.png" alt="LeanRetention" height="34" style="display:block" /></a>
       <div class="footer-links">
         <a href="#features">Fonctionnalités</a>
         <a href="#pricing">Tarifs</a>

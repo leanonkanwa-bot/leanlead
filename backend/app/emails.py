@@ -64,8 +64,8 @@ def _shell(body: str) -> str:
         '<div style="font-family:\'Helvetica Neue\',Arial,sans-serif;background:#0d0d0d;'
         'color:#F5F5F6;padding:48px 32px;max-width:560px;margin:0 auto">'
         '<div style="margin-bottom:32px">'
-        '<span style="background:#FF7751;color:#0d0d0d;font-size:12px;font-weight:800;'
-        'padding:6px 14px;border-radius:6px;letter-spacing:.05em">LEANRETENTION</span>'
+        '<img src="https://leanretention.com/logo.png" alt="LeanRetention"'
+        ' height="36" style="display:block;max-width:180px" />'
         '</div>'
         + body
         + '<div style="margin-top:48px;padding-top:20px;border-top:1px solid rgba(255,255,255,.08)">'

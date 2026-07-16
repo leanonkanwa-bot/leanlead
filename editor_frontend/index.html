@@ -7,7 +7,7 @@
     <title>LeanRetention — Éditeur IA</title>
     <meta name="description" content="Déposez votre vidéo brute. Obtenez un montage pro en quelques minutes." />
 
-    <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23FF7751'/><path d='M11 9l13 7-13 7V9z' fill='%23fff'/></svg>" />
+    <link rel="icon" type="image/png" href="/logo.png" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -55,11 +55,9 @@
         padding: 1.25rem 0; z-index: 100;
       }
       .sidebar .logo {
-        text-decoration: none; color: var(--text);
-        font-size: 1rem; font-weight: 700; letter-spacing: -.01em;
+        display: block; text-decoration: none;
         padding: 0 1.25rem; margin-bottom: 1.5rem;
       }
-      .sidebar .logo span { color: var(--salmon); }
       .sidebar-nav { display: flex; flex-direction: column; gap: .15rem; padding: 0 .75rem; flex: 1; }
       .nav-tab {
         background: transparent; border: none; border-left: 3px solid transparent;
@@ -732,7 +730,7 @@
     <!-- ── SIDEBAR ─────────────────────────────────────────── -->
     <div class="app-shell">
     <aside class="sidebar">
-      <a class="logo" href="#" onclick="event.preventDefault();switchSection('dashboardSection')"><span>Lean</span>Retention</a>
+      <a class="logo" href="#" onclick="event.preventDefault();switchSection('dashboardSection')"><img src="/logo.png" alt="LeanRetention" height="30" style="display:block" /></a>
       <div class="sidebar-nav" id="navTabs">
         <button class="nav-tab active" data-target="editorArea">Éditeur</button>
         <button class="nav-tab" data-target="dashboardSection">Dashboard</button>
