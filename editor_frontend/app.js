@@ -94,6 +94,7 @@ $("dashEditBtn")?.addEventListener("click", () => switchSection("editorArea"));
           const restored = await res.json();
           localStorage.setItem("coach_profile", JSON.stringify(restored));
           raw = JSON.stringify(restored);
+          showCancelingBanner(restored);
         }
       } catch {}
 
@@ -919,6 +920,40 @@ async function startCheckout(tier) {
   history.replaceState({}, "", cleanUrl);
 })();
 
+// ── Billing: canceling banner ────────────────────────────────────────────────
+function showCancelingBanner(profile) {
+  if (profile?.billing_status !== "canceling") return;
+  if (document.getElementById("cancelingBanner")) return;
+  const cancelAt = profile.cancel_at;
+  let dateStr = "";
+  if (cancelAt) {
+    dateStr = new Date(cancelAt * 1000).toLocaleDateString("fr-FR", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+  }
+  const banner = document.createElement("div");
+  banner.id = "cancelingBanner";
+  banner.style.cssText = [
+    "position:fixed;top:0;left:0;right:0;z-index:9999",
+    "background:#1c1200;border-bottom:1px solid rgba(251,191,36,.2)",
+    "color:rgba(251,191,36,.88);font-size:.76rem;padding:.4rem 1rem",
+    "display:flex;align-items:center;justify-content:center;gap:.75rem",
+    "font-family:var(--font)",
+  ].join(";");
+  const dateInfo = dateStr ? ` — accès jusqu'au <strong>${dateStr}</strong>` : "";
+  banner.innerHTML =
+    `<span>Abonnement en cours d'annulation${dateInfo}.</span>` +
+    `<button onclick="document.querySelector('.btn-upgrade')?.click()" style="` +
+    `background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35);` +
+    `color:rgba(251,191,36,.88);border-radius:6px;padding:.2rem .65rem;` +
+    `font-size:.72rem;font-weight:600;cursor:pointer;font-family:var(--font)` +
+    `">Renouveler</button>`;
+  document.body.prepend(banner);
+  // Push app-shell down so the fixed banner doesn't overlap content
+  const shell = document.querySelector(".app-shell");
+  if (shell) shell.style.marginTop = "2rem";
+}
+
 loginForm?.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (loginErr) loginErr.textContent = "";
@@ -1211,7 +1246,7 @@ async function poll(jobId) {
         try { await apiFetch(`/api/jobs/${jobId}/approve`, { method: "POST" }); } catch (_) {}
         continue;
       }
-      if (job.status === "error") return fail(job.error || "Erreur inconnue", jobId);
+      if (job.status === "error") return fail(job.message || "Une erreur est survenue — réessayez.", jobId);
     } catch (pollErr) {
       console.warn("poll iteration error:", pollErr);
     }

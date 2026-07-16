@@ -108,10 +108,83 @@ async def stripe_webhook(request: Request) -> dict:
     except (ValueError, stripe.error.SignatureVerificationError):
         raise HTTPException(400, "Invalid webhook signature")
 
+    obj = event["data"]["object"]
     if event["type"] == "checkout.session.completed":
-        _handle_checkout_completed(event["data"]["object"])
+        _handle_checkout_completed(obj)
+    elif event["type"] == "customer.subscription.updated":
+        _handle_subscription_updated(obj)
+    elif event["type"] == "customer.subscription.deleted":
+        _handle_subscription_deleted(obj)
 
     return {"received": True}
+
+
+def _find_profile_by_customer_id(customer_id: str) -> tuple[str | None, dict | None]:
+    """Scan profiles dir for a profile whose stripe_customer_id matches."""
+    if not customer_id:
+        return None, None
+    try:
+        for p in _PROFILES_DIR.glob("*.json"):
+            try:
+                profile = json.loads(p.read_text(encoding="utf-8"))
+                if profile.get("stripe_customer_id") == customer_id:
+                    return p.stem, profile
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return None, None
+
+
+def _save_profile(profile_id: str, profile: dict) -> None:
+    (_PROFILES_DIR / f"{profile_id}.json").write_text(
+        json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def _handle_subscription_updated(subscription: dict) -> None:
+    customer_id = subscription.get("customer", "")
+    status = subscription.get("status", "")
+    cancel_at_period_end = subscription.get("cancel_at_period_end", False)
+    current_period_end = subscription.get("current_period_end")
+
+    profile_id, profile = _find_profile_by_customer_id(customer_id)
+    if not profile_id:
+        logger.warning(f"subscription.updated: no profile found for customer={customer_id}")
+        return
+
+    if status == "canceled":
+        profile["plan"] = DEFAULT_PLAN
+        profile["billing_status"] = "canceled"
+        profile["cancel_at"] = None
+        _save_profile(profile_id, profile)
+        logger.info(f"subscription.updated status=canceled → plan=free for profile={profile_id}")
+    elif status == "active" and cancel_at_period_end:
+        profile["billing_status"] = "canceling"
+        profile["cancel_at"] = current_period_end
+        _save_profile(profile_id, profile)
+        logger.info(
+            f"subscription.updated cancel_at_period_end=True → "
+            f"billing_status=canceling cancel_at={current_period_end} profile={profile_id}"
+        )
+    else:
+        logger.info(
+            f"subscription.updated status={status} cancel_at_period_end={cancel_at_period_end} "
+            f"— no action for profile={profile_id}"
+        )
+
+
+def _handle_subscription_deleted(subscription: dict) -> None:
+    customer_id = subscription.get("customer", "")
+    profile_id, profile = _find_profile_by_customer_id(customer_id)
+    if not profile_id:
+        logger.warning(f"subscription.deleted: no profile found for customer={customer_id}")
+        return
+    profile["plan"] = DEFAULT_PLAN
+    profile["billing_status"] = "canceled"
+    profile["cancel_at"] = None
+    _save_profile(profile_id, profile)
+    logger.info(f"subscription.deleted → plan=free for profile={profile_id}")
 
 
 def _handle_checkout_completed(session: dict) -> None:
