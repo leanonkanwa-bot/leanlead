@@ -1229,6 +1229,7 @@ def run_job(
             status="error",
             error=f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
             message="Phase 1 (analysis) failed.",
+            is_retry=True,
         )
 
 
@@ -1456,6 +1457,7 @@ def run_render_phase(job_id: str, src: Path) -> None:
             status="error",
             error=f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
             message="Phase 2 (render) failed.",
+            is_retry=True,
         )
     finally:
         _RENDER_SEM.release()
