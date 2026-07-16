@@ -206,7 +206,8 @@
     .step-visual img { width: 100%; border-radius: 12px; border: 1px solid var(--salmon-border); box-shadow: 0 0 40px rgba(255,119,81,.1), 0 16px 48px rgba(0,0,0,.4); display: block; }
     .step-placeholder { width: 100%; aspect-ratio: 16/10; background: var(--surface); border: 1px dashed rgba(255,119,81,.25); border-radius: 12px; display: grid; place-items: center; }
     .step-ph-label { font-size: .7rem; color: rgba(245,245,246,.25); letter-spacing: .12em; text-transform: uppercase; }
-    .pricing-preview-vid { margin-top: .75rem; width: 100%; border-radius: 8px; display: block; border: 1px solid var(--salmon-border); }
+    .pricing-preview-vid { margin-top: .75rem; width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; display: block; border: 1px solid var(--salmon-border); }
+    .step-img { width: 100%; border-radius: 12px; border: 1px solid var(--salmon-border); box-shadow: 0 0 40px rgba(255,119,81,.1), 0 16px 48px rgba(0,0,0,.4); display: block; }
 
     /* ── FEATURES GRID ───────────────────────────────────────────────── */
     .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
@@ -474,7 +475,7 @@
             <p>Glissez-déposez votre fichier mp4, mov ou webm, jusqu'à 20 Go. Notre upload sécurisé par chunks gère les fichiers lourds sans problème.</p>
           </div>
           <div class="step-visual">
-            <div class="step-placeholder"><span class="step-ph-label">Capture interface upload</span></div>
+            <img class="step-img" src="/public/step-01.png" alt="Interface d'upload LeanRetention">
           </div>
         </div>
 
@@ -485,7 +486,7 @@
             <p>Transcription, réécriture du hook, suppression des silences, ajout de captions et de graphics IA : tout en quelques minutes, pas des heures.</p>
           </div>
           <div class="step-visual">
-            <div class="step-placeholder"><span class="step-ph-label">Capture LeanBrief — retention notes</span></div>
+            <img class="step-img" src="/public/step-02.png" alt="LeanBrief — analyse et notes de rétention">
           </div>
         </div>
 
@@ -496,7 +497,7 @@
             <p>Récupérez votre MP4 prêt à poster, ou publiez en 1 clic sur YouTube, TikTok, Instagram et LinkedIn.</p>
           </div>
           <div class="step-visual">
-            <div class="step-placeholder"><span class="step-ph-label">Capture rendu — graphic overlay</span></div>
+            <img class="step-img" src="/public/step-03.png" alt="Résultat final avec motion graphics et captions">
           </div>
         </div>
 
