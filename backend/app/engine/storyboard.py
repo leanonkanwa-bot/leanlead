@@ -13,6 +13,7 @@ Two distinct card types in one storyboard:
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from app.engine.captions import WordTiming
@@ -22,6 +23,36 @@ from app.engine.pretrim import TimingMap
 _PAUSE_GAP = 0.15       # Seconds gap between words to trigger a caption break
 _MAX_WORDS = 7           # Maximum words per caption card
 _ORPHAN_MIN_DUR = 0.25   # 1-word groups shorter than this merge into neighbors
+
+# ── Grounding guard constants ──────────────────────────────────────────
+# Trigger-style cards require explicit verbal signals ("voici ce que personne ne
+# dit", "attention", "fais ça maintenant", …). When the LLM misclassifies a card
+# by paraphrasing from the beat spine instead of literal speech, these guards
+# catch the mismatch and reclassify to a safe generic fallback before render.
+_TRIGGER_STYLES: frozenset[str] = frozenset({
+    "contrarian_take",
+    "warning_soft",
+    "red_flag_list",
+    "action_step_cta",
+    "myth_vs_fact",
+    "secret_reveal",
+    "objection_response",
+})
+_GROUNDING_OVERLAP_THRESHOLD = 0.20   # tunable — fraction of trigger-text tokens that must match speech
+_GROUNDING_WINDOW_PRE_S  = 0.5        # seconds before startSec included in the speech window
+_GROUNDING_WINDOW_POST_S = 3.0        # seconds after  startSec included in the speech window
+
+# Maps each trigger style to the contentHints field that holds its key claim.
+# This field is what the speaker must have literally said for the style to be valid.
+_TRIGGER_TEXT_FIELD: dict[str, str] = {
+    "contrarian_take":    "take_text",
+    "warning_soft":       "warning_text",
+    "red_flag_list":      "flags",         # list → joined into one string
+    "action_step_cta":    "cta_text",
+    "myth_vs_fact":       "myth_text",     # the debunked claim is the most trigger-specific piece
+    "secret_reveal":      "secret_text",
+    "objection_response": "objection_text",
+}
 
 
 def _segment_captions(
@@ -904,6 +935,51 @@ def _merge_cards(
     return accepted
 
 
+def _tokenize_text(text: str) -> frozenset[str]:
+    """Lowercase + strip punctuation → frozen token set. Skips 1-char tokens (articles)."""
+    return frozenset(
+        t for t in re.sub(r"[^\w\s]", "", text.lower()).split()
+        if len(t) >= 2
+    )
+
+
+def _card_trigger_text(card: dict) -> str:
+    """Extract the primary trigger-text string from a trigger-style card's contentHints.
+
+    Only reads the type-specific field (take_text, warning_text, …) — NOT the generic
+    'title'. Title is a display label, not a verbatim trigger phrase; checking it would
+    cause false-positive reclassifications on cards whose title is a generic header.
+    Returns "" when the field is absent or empty, which yields overlap=1.0 (pass-through).
+    """
+    hints  = card.get("contentHints", {})
+    style  = hints.get("style", "")
+    field  = _TRIGGER_TEXT_FIELD.get(style, "")
+    if not field:
+        return ""
+    val = hints.get(field) or ""
+    if isinstance(val, list):
+        val = " ".join(str(x) for x in val)
+    return str(val)
+
+
+def _grounding_overlap(card: dict, remapped_words: list[WordTiming]) -> float:
+    """Return fraction of card trigger-text tokens present in speech near startSec.
+
+    Window: [startSec - _GROUNDING_WINDOW_PRE_S, startSec + _GROUNDING_WINDOW_POST_S].
+    Returns 1.0 (always passes) when the card has no extractable trigger text, to avoid
+    false-positive reclassification on cards that only have a generic 'title' field.
+    """
+    trigger_tokens = _tokenize_text(_card_trigger_text(card))
+    if not trigger_tokens:
+        return 1.0
+    start = float(card.get("startSec", 0))
+    spoken: frozenset[str] = frozenset()
+    for w in remapped_words:
+        if start - _GROUNDING_WINDOW_PRE_S <= w.start <= start + _GROUNDING_WINDOW_POST_S:
+            spoken |= _tokenize_text(w.text)
+    return len(trigger_tokens & spoken) / len(trigger_tokens)
+
+
 def generate_storyboard(
     trimmed_duration: float,
     remapped_words: list[WordTiming],
@@ -963,7 +1039,36 @@ def generate_storyboard(
                 flush=True,
             )
 
-    # Timing audit — after snap, log CRITICAL if card still has no speech nearby.
+    # Grounding guard — code-level backstop for trigger-style cards.
+    # The LLM prompt contains a verbatim-grounding rule, but it's a soft constraint
+    # that Claude can violate under paraphrase pressure from the beat spine. This loop
+    # cross-references each trigger-style card's key claim against actual Whisper words
+    # in a ±window around startSec. Cards that fail are reclassified to a safe generic
+    # fallback (key_phrase if a title exists, otherwise callout) so they remain as
+    # dead-zone fillers rather than disappearing entirely.
+    for _gc in graphic_cards:
+        _style = _gc.get("contentHints", {}).get("style", "")
+        if _style not in _TRIGGER_STYLES:
+            continue
+        _overlap = _grounding_overlap(_gc, remapped_words)
+        _pct = int(_overlap * 100)
+        if _overlap < _GROUNDING_OVERLAP_THRESHOLD:
+            _orig = _style
+            _title = _gc.get("contentHints", {}).get("title", "")
+            _gc["contentHints"]["style"] = "key_phrase" if _title else "callout"
+            print(
+                f"[STORYBOARD] GROUNDING REJECT card {_gc.get('id','?')} "
+                f"style={_orig!r}→{_gc['contentHints']['style']!r} overlap={_pct}%",
+                flush=True,
+            )
+        else:
+            print(
+                f"[STORYBOARD] GROUNDING OK card {_gc.get('id','?')} "
+                f"style={_style!r} overlap={_pct}%",
+                flush=True,
+            )
+
+    # Timing audit — after snap + grounding guard, log CRITICAL if card has no speech nearby.
     for _gc in graphic_cards:
         _start = float(_gc.get("startSec", 0))
         _end   = float(_gc.get("endSec", _start + 3))
