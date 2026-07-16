@@ -216,8 +216,8 @@ def transcribe(video_path: Path) -> Transcript:
         # CLEAN:    deterministic beam search, high-conf output (legacy behaviour).
         if _VERBATIM_ASR:
             _transcribe_kwargs: dict = dict(
-                beam_size=5,
-                best_of=5,
+                beam_size=7,
+                best_of=7,
                 # Fallback chain: deterministic first, stochastic if compression_ratio too high.
                 temperature=[0.0, 0.2, 0.4],
                 condition_on_previous_text=False,   # no context carry-over → each segment fresh
