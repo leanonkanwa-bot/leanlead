@@ -1776,12 +1776,14 @@ def demo_video(which: str):
         os.getenv("DEMO_VIDEO_BEFORE", "") if which == "before"
         else os.getenv("DEMO_VIDEO_AFTER", "")
     ).strip()
+    print(f"[demo/{which}] job_id={job_id!r} DATA_DIR={os.getenv('DATA_DIR')!r}"
+          f" outputs_dir={settings.outputs_dir} data_root={settings._data_root}",
+          flush=True)
     if not job_id:
+        print(f"[demo/{which}] 404 — env var empty", flush=True)
         raise HTTPException(404)
     _EXTS = (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v")
-    # Explicit _data_root/"outputs" and "uploads" guard against STORAGE_OUTPUTS
-    # being set to an absolute/empty value on Railway, which would make
-    # settings.outputs_dir skip the expected subdirectory entirely.
+    checked: list[str] = []
     for search_dir in (
         settings.outputs_dir,
         settings._data_root / "outputs",
@@ -1790,11 +1792,14 @@ def demo_video(which: str):
     ):
         for ext in _EXTS:
             candidate = search_dir / f"{job_id}{ext}"
+            checked.append(str(candidate))
             if candidate.exists():
+                print(f"[demo/{which}] FOUND {candidate}", flush=True)
                 return FileResponse(
                     str(candidate), media_type="video/mp4",
                     headers={"Cache-Control": "public, max-age=3600"},
                 )
+    print(f"[demo/{which}] 404 — tried:\n" + "\n".join(f"  {p}" for p in checked), flush=True)
     raise HTTPException(404)
 
 
