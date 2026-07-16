@@ -11,6 +11,7 @@ skills-lock.json
 analysis/
 *.mp4
 !editor_frontend/previews/*.mp4
+!editor_frontend/public/*.mp4
 __pycache__/
 backend/.env
 storage/
