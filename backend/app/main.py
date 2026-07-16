@@ -1764,6 +1764,35 @@ GSAP animation: scale 0.3-1.5, rotation 360deg, label fade</p>
     return Response(content=html, media_type="text/html")
 
 
+# ── Public demo-video streaming (no auth, landing page) ───────────────────
+# Set DEMO_VIDEO_BEFORE / DEMO_VIDEO_AFTER in Railway Variables to the job IDs.
+# Files are served straight from /data without committing large binaries to git.
+@app.get("/demo/{which}", include_in_schema=False)
+def demo_video(which: str):
+    if which not in ("before", "after"):
+        raise HTTPException(404)
+    job_id = (
+        os.getenv("DEMO_VIDEO_BEFORE", "") if which == "before"
+        else os.getenv("DEMO_VIDEO_AFTER", "")
+    ).strip()
+    if not job_id:
+        raise HTTPException(404)
+    # Edited output first, then raw upload (for "before" clips)
+    path = settings.outputs_dir / f"{job_id}.mp4"
+    if not path.exists():
+        for ext in (".mp4", ".mov", ".mkv", ".webm", ".avi", ".m4v"):
+            candidate = settings.uploads_dir / f"{job_id}{ext}"
+            if candidate.exists():
+                path = candidate
+                break
+        else:
+            raise HTTPException(404)
+    return FileResponse(
+        str(path), media_type="video/mp4",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 editor_dir = Path(__file__).resolve().parents[2] / "editor_frontend"
 if not editor_dir.exists():
     # fallback for local dev where files live in frontend/
