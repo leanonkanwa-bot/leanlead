@@ -128,10 +128,10 @@ def _on_startup() -> None:
     # to uvicorn so it exits normally.  Renders that outlast the drain window
     # are recovered on the next boot by the auto-resume logic below.
     #
-    # Railway note: the drain window only buys time if Railway's "Stop Grace
-    # Period" (service settings UI) is ≥ _SIGTERM_DRAIN_SECS.  Default is ~10s;
-    # for long renders, raise it to 600 s in the Railway dashboard.
-    _SIGTERM_DRAIN_SECS = 600  # 10 min — matches the spec; align Railway UI
+    # Railway note: Railway's default SIGTERM→SIGKILL gap is 0 s.  This drain
+    # window only buys time because railway.json sets drainingSeconds: 600 to
+    # match this constant.  If that config is removed, SIGKILL fires immediately.
+    _SIGTERM_DRAIN_SECS = 600  # 10 min — must match drainingSeconds in railway.json
     _uvicorn_sigterm = _signal.getsignal(_signal.SIGTERM)
 
     def _sigterm_handler(signum: int, frame: object) -> None:
