@@ -37,6 +37,11 @@ _TRIGGER_STYLES: frozenset[str] = frozenset({
     "myth_vs_fact",
     "secret_reveal",
     "objection_response",
+    # Wave 7 trigger types
+    "live_reaction_split",
+    "hidden_cost_reveal",
+    "comment_reply_style",
+    "before_you_scroll",
 })
 _GROUNDING_OVERLAP_THRESHOLD = 0.40   # fraction of trigger content-words that must match speech
 _GROUNDING_WINDOW_PRE_S  = 0.5        # seconds before startSec included in the speech window
@@ -89,6 +94,11 @@ _TRIGGER_TEXT_FIELD: dict[str, str] = {
     "myth_vs_fact":       "myth_text",     # the debunked claim is the most trigger-specific piece
     "secret_reveal":      "secret_text",
     "objection_response": "objection_text",
+    # Wave 7
+    "live_reaction_split": "reality_text",  # the surprising outcome is the distinctive spoken content
+    "hidden_cost_reveal":  "real_cost",     # the revealed price is what the speaker literally states
+    "comment_reply_style": "reply_text",    # the speaker's reply is their own literal words
+    "before_you_scroll":   "hook_text",     # the hook phrase is what must be verbatim in speech
 }
 
 
@@ -427,7 +437,7 @@ OUTPUT: a JSON array of card objects. Each card:
     "accent_word": "<optional: one word/phrase from title to emphasize via highlight swipe>",
     "detail": "<optional supporting text>",
     "number": "<if a stat/number is featured>",
-    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote"|"carousel"|"definition"|"checklist"|"score"|"mindmap"|"data_chart"|"instagram-follow"|"tiktok-follow"|"yt-lower-third"|"news_ticker"|"rating"|"map_location"|"progress_bar"|"before_after_image"|"countdown"|"poll_question"|"myth_vs_fact"|"step_number"|"quote_carousel"|"emoji_reaction"|"price_tag"|"warning_soft"|"testimonial"|"versus_battle"|"recap_summary"|"location_journey"|"formula_equation"|"roadmap_milestone"|"pros_cons"|"star_rating_review"|"income_reveal"|"question_answer_pair"|"chapter_marker"|"secret_reveal"|"objection_response"|"data_bar_chart"|"cause_effect"|"number_ranking"|"hand_written_note"|"speech_bubble_thought"|"calendar_date_highlight"|"percentage_split"|"red_flag_list"|"success_metric_badge"|"client_avatar_persona"|"book_recommendation"|"tool_stack"|"revenue_breakdown"|"age_milestone"|"contrarian_take"|"action_step_cta"|"story_chapter_transition",
+    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote"|"carousel"|"definition"|"checklist"|"score"|"mindmap"|"data_chart"|"instagram-follow"|"tiktok-follow"|"yt-lower-third"|"news_ticker"|"rating"|"map_location"|"progress_bar"|"before_after_image"|"countdown"|"poll_question"|"myth_vs_fact"|"step_number"|"quote_carousel"|"emoji_reaction"|"price_tag"|"warning_soft"|"testimonial"|"versus_battle"|"recap_summary"|"location_journey"|"formula_equation"|"roadmap_milestone"|"pros_cons"|"star_rating_review"|"income_reveal"|"question_answer_pair"|"chapter_marker"|"secret_reveal"|"objection_response"|"data_bar_chart"|"cause_effect"|"number_ranking"|"hand_written_note"|"speech_bubble_thought"|"calendar_date_highlight"|"percentage_split"|"red_flag_list"|"success_metric_badge"|"client_avatar_persona"|"book_recommendation"|"tool_stack"|"revenue_breakdown"|"age_milestone"|"contrarian_take"|"action_step_cta"|"story_chapter_transition"|"live_reaction_split"|"hidden_cost_reveal"|"social_proof_counter"|"timeline_prediction"|"red_thread_connector"|"silent_beat_pause"|"comment_reply_style"|"before_you_scroll",
     "left_label": "<comparison: left side label>",
     "left_value": "<comparison: left side value>",
     "right_label": "<comparison: right side label>",
@@ -516,7 +526,20 @@ OUTPUT: a JSON array of card objects. Each card:
     "age_context": "<age_milestone: short context, e.g. 'à laquelle j\'ai lancé mon business', 'de travail pour y arriver'>",
     "take_text": "<contrarian_take: the contrarian or provocative statement>",
     "cta_text": "<action_step_cta: the imperative call-to-action text>",
-    "transition_label": "<story_chapter_transition: the short narrative beat label, e.g. 'Mais voilà ce qui s\'est passé', 'La suite…', 'Et maintenant ?'>"
+    "transition_label": "<story_chapter_transition: the short narrative beat label, e.g. 'Mais voilà ce qui s\'est passé', 'La suite…', 'Et maintenant ?'>",
+    "expected_text": "<live_reaction_split: what was expected or assumed>",
+    "reality_text": "<live_reaction_split: what actually happened — the surprising outcome>",
+    "sticker_price": "<hidden_cost_reveal: the advertised or displayed price>",
+    "real_cost": "<hidden_cost_reveal: the actual full cost being revealed>",
+    "counter_final_value": "<social_proof_counter: the final number to settle on, e.g. '12 847', '1M+'>",
+    "counter_label": "<social_proof_counter: what the number represents, e.g. 'abonnés', 'clients satisfaits'>",
+    "confirmed_steps": ["<timeline_prediction: confirmed/past step 1>", "<step 2>"],
+    "predicted_steps": ["<timeline_prediction: predicted/future step 1>", "<step 2>"],
+    "connector_points": ["<red_thread_connector: concept 1 being tied together>", "<concept 2>", "<optional concept 3>"],
+    "pause_symbol": "<silent_beat_pause: optional — symbol or short pause marker, defaults to '…' if omitted>",
+    "comment_text": "<comment_reply_style: the comment or question being shown>",
+    "reply_text": "<comment_reply_style: the speaker's reply or response>",
+    "hook_text": "<before_you_scroll: the pattern-interrupt hook text — must be punchy and direct>"
   }}
 }}
 
@@ -815,9 +838,67 @@ RULES:
     fluid narrative beat without numbering). Distinct from timeline
     (timeline is a sequence of events; story_chapter_transition is one
     pivot-beat separator). Provide "transition_label".
+  "live_reaction_split" — speaker contrasts what people expected with what
+    actually happened ("on pensait que X… mais en réalité Y"). REQUIRES both
+    sides to be stated. Distinct from before_after_image (that is a transformation
+    over time; live_reaction_split is expectation vs outcome). Distinct from
+    versus_battle (versus contrasts two options; live_reaction_split is
+    expected-vs-reality). Trigger-style: the reveal of reality must be literally
+    spoken. Provide "expected_text" + "reality_text".
+  "hidden_cost_reveal" — speaker reveals a hidden or total cost that differs
+    from the advertised price ("le prix affiché c'est X… mais le coût réel
+    c'est Y"). REQUIRES both prices. Distinct from income_reveal (single number;
+    hidden_cost_reveal shows two contrasting prices). Distinct from stat
+    (stat is informational; hidden_cost_reveal has reveal/shock energy).
+    Trigger-style: the real cost must be literally spoken. Provide
+    "sticker_price" + "real_cost".
+  "social_proof_counter" — speaker cites a rapidly-accumulating or high-volume
+    social metric ("on est passé à 12 000 abonnés", "déjà 50 000 téléchargements").
+    Renders as a large number with slot-machine-settling animation. Distinct from
+    stat (stat is static data; social_proof_counter has kinetic scroll-settle
+    energy, specifically for social/community metrics). Distinct from
+    success_metric_badge (badge frames a milestone achievement; counter emphasizes
+    the live-accumulating number itself). Provide "counter_final_value" +
+    "counter_label".
+  "timeline_prediction" — speaker presents a timeline that mixes confirmed past
+    steps with projected future steps, explicitly distinguishing between what has
+    happened and what is planned ("jusqu'ici on a fait X et Y… et voici ce qu'on
+    prévoit pour Z"). REQUIRES at least one confirmed step and one predicted step.
+    Distinct from timeline (timeline is all-confirmed events; timeline_prediction
+    explicitly separates confirmed from predicted). Provide "confirmed_steps"
+    list + "predicted_steps" list (1-4 each).
+  "red_thread_connector" — speaker explicitly ties together 2-3 concepts
+    mentioned at different points in the video ("tu te souviens de X ? Et de Y ?
+    Eh bien les deux sont liés…"). The connector energy — calling back to
+    earlier-mentioned ideas — is mandatory. Distinct from mindmap (mindmap is
+    one center + branches; red_thread_connector is a narrative callback linking
+    previously-mentioned distinct concepts). Distinct from list (list is
+    ad-hoc enumeration; red_thread_connector is an explicit narrative tie).
+    Provide "connector_points" list (2-3 items naming the concepts).
+  "silent_beat_pause" — a deliberately minimal near-empty card for a dramatic
+    silence beat or reflective pause moment. Use sparingly, only when the speaker
+    goes silent for effect or invites the viewer to sit with a thought. NOT a
+    trigger-style type. Provide optional "pause_symbol" (defaults to "…").
+  "comment_reply_style" — speaker reads or voices a written comment/question
+    and then gives their reply ("j'ai reçu ce commentaire… voici ma réponse").
+    Renders as a social-media comment + reply visual. REQUIRES both comment and
+    reply to be present. Distinct from testimonial (testimonial is endorsement;
+    comment_reply is a Q&A exchange). Distinct from dialogue (dialogue is two
+    spoken voices; comment_reply_style is a written comment + spoken reply).
+    Trigger-style: the reply must be literally spoken. Provide "comment_text" +
+    "reply_text".
+  "before_you_scroll" — a direct pattern-interrupt addressed to the viewer,
+    designed to stop them from scrolling ("attends avant de partir", "lis ça
+    avant de scroller", "avant que tu continues"). REQUIRES direct second-person
+    address to viewer. Distinct from action_step_cta (action_step_cta is a
+    directive to DO something; before_you_scroll is a plea to STAY and READ).
+    Distinct from callout (callout is neutral context; before_you_scroll has
+    urgency/interruption energy). Trigger-style: the hook phrase must be literally
+    spoken. Provide "hook_text".
 - VERBATIM GROUNDING — mandatory check before assigning any explicit-signal
   card type (contrarian_take, warning_soft, red_flag_list, action_step_cta,
-  myth_vs_fact, secret_reveal, objection_response): the trigger phrase MUST
+  myth_vs_fact, secret_reveal, objection_response, live_reaction_split,
+  hidden_cost_reveal, comment_reply_style, before_you_scroll): the trigger phrase MUST
   appear verbatim in the KEY LINES or be unambiguously present in the beat
   description. The BEAT SPINE "lines" field is editorial context synthesised
   by a planning model — it may paraphrase, editorially rephrase, or invent

@@ -77,7 +77,7 @@ def _zone_bounds(zone: str, layout: str) -> dict:
 # Data cards are remapped to a side panel when Claude places them in a center zone.
 # Hero cards (key_phrase, quote, question, definition, etc.) remain in Claude's
 # chosen zone — they carry the visual message and need the full canvas.
-_DATA_PANEL_TYPES = {"stat", "list", "comparison", "checklist", "score", "trend", "rating", "progress_bar", "countdown", "step_number", "price_tag", "recap_summary", "formula_equation", "pros_cons", "star_rating_review", "income_reveal", "data_bar_chart", "number_ranking", "question_answer_pair", "cause_effect", "percentage_split", "red_flag_list", "client_avatar_persona", "tool_stack", "revenue_breakdown"}
+_DATA_PANEL_TYPES = {"stat", "list", "comparison", "checklist", "score", "trend", "rating", "progress_bar", "countdown", "step_number", "price_tag", "recap_summary", "formula_equation", "pros_cons", "star_rating_review", "income_reveal", "data_bar_chart", "number_ranking", "question_answer_pair", "cause_effect", "percentage_split", "red_flag_list", "client_avatar_persona", "tool_stack", "revenue_breakdown", "hidden_cost_reveal", "social_proof_counter", "red_thread_connector"}
 _CENTER_ZONES = {"fullscreen", "video-overlay"}
 _SIDE_PANEL_ZONES = {"side-panel", "side-panel-left", "side-panel-right", "side-panel-top", "upper-data", "upper-right"}
 
@@ -1778,6 +1778,154 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         if p["accent_line_glow"]:
             parts.append(f'  box-shadow:{p["accent_line_glow"]};')
         parts.append('}')
+    # ── Wave 7 CSS ────────────────────────────────────────────────────────────
+    if content_style == "live_reaction_split":
+        parts.append(f'.card[data-card-id="{card_id}"] .lrs-wrap {{')
+        parts.append('  display:flex; align-items:stretch; gap:0; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .lrs-side {{')
+        parts.append('  flex:1; display:flex; flex-direction:column; gap:6px; padding:14px; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .lrs-lbl {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text_secondary"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .lrs-txt {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]};')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .lrs-divider {{')
+        parts.append(f'  width:2px; background:{p["accent"]}; align-self:stretch; opacity:0;')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:{p["accent_line_glow"]};')
+        parts.append('}')
+    if content_style == "hidden_cost_reveal":
+        parts.append(f'.card[data-card-id="{card_id}"] .hcr-wrap {{')
+        parts.append('  display:flex; align-items:center; justify-content:center; gap:20px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .hcr-block {{')
+        parts.append('  display:flex; flex-direction:column; align-items:center; gap:4px; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .hcr-lbl {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text_secondary"]};')
+        parts.append('}')
+        _hcr_sz = "36px" if compact else "44px"
+        parts.append(f'.card[data-card-id="{card_id}"] .hcr-val {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{_hcr_sz};')
+        parts.append(f'  font-weight:900; color:{p["text"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .hcr-stk-val {{ text-decoration:line-through; opacity:0.55; }}')
+        parts.append(f'.card[data-card-id="{card_id}"] .hcr-real-val {{ color:{p["accent"]}; }}')
+        _hcr_arr_sz = "22px" if compact else "28px"
+        parts.append(f'.card[data-card-id="{card_id}"] .hcr-arrow {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{_hcr_arr_sz};')
+        parts.append(f'  color:{p["accent"]}; opacity:0;')
+        parts.append('}')
+    if content_style == "social_proof_counter":
+        parts.append(f'.card[data-card-id="{card_id}"] .spc-wrap {{')
+        parts.append('  display:flex; flex-direction:column; align-items:center; gap:10px; width:100%;')
+        parts.append('}')
+        _spc_sz = "64px" if compact else "88px"
+        parts.append(f'.card[data-card-id="{card_id}"] .spc-num {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{_spc_sz};')
+        parts.append(f'  font-weight:900; color:{p["accent"]}; line-height:1; opacity:0;')
+        if p["title_glow_intense"]:
+            parts.append(f'  text-shadow:{p["title_glow_intense"]};')
+        elif p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .spc-lbl {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; opacity:0;')
+        parts.append('}')
+    if content_style == "timeline_prediction":
+        parts.append(f'.card[data-card-id="{card_id}"] .tp-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:8px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .tp-sec-lbl {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:700; color:{p["text_secondary"]}; text-transform:uppercase; letter-spacing:0.05em;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .tp-conf {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .tp-div {{')
+        parts.append(f'  height:0; border-top:2px dashed {p["accent"]}; opacity:0; width:100%; margin:4px 0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .tp-pred {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text_secondary"]}; font-style:italic; opacity:0;')
+        parts.append('}')
+    if content_style == "red_thread_connector":
+        parts.append(f'.card[data-card-id="{card_id}"] .rtc-wrap {{')
+        parts.append('  display:flex; flex-direction:column; align-items:center; gap:6px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .rtc-pt {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]};')
+        parts.append(f'  padding:8px 18px; border:1.5px solid {p["accent"]}; border-radius:{p["radius"]};')
+        parts.append('  text-align:center; width:100%; box-sizing:border-box; opacity:0;')
+        parts.append('}')
+        _rtc_arr_sz = "18px" if compact else "22px"
+        parts.append(f'.card[data-card-id="{card_id}"] .rtc-arr {{')
+        parts.append(f'  font-size:{_rtc_arr_sz}; color:{p["accent"]}; opacity:0;')
+        parts.append('}')
+    if content_style == "silent_beat_pause":
+        parts.append(f'.card[data-card-id="{card_id}"] .sbp-wrap {{')
+        parts.append('  display:flex; align-items:center; justify-content:center; width:100%;')
+        parts.append('}')
+        _sbp_sz = "32px" if compact else "48px"
+        parts.append(f'.card[data-card-id="{card_id}"] .sbp-sym {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{_sbp_sz};')
+        parts.append(f'  color:{p["text_secondary"]}; letter-spacing:0.3em; opacity:0;')
+        parts.append('}')
+    if content_style == "comment_reply_style":
+        parts.append(f'.card[data-card-id="{card_id}"] .crs-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:10px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .crs-comment {{')
+        parts.append(f'  display:flex; flex-direction:column; gap:4px;')
+        parts.append(f'  padding:10px 14px; border-radius:{p["radius"]};')
+        parts.append(f'  background:{p["bg"]}; border:1px solid rgba(255,255,255,0.08); opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .crs-reply {{')
+        parts.append(f'  display:flex; flex-direction:column; gap:4px;')
+        parts.append(f'  padding:10px 14px; border-radius:{p["radius"]};')
+        parts.append(f'  background:{p["bg"]}; margin-left:24px;')
+        parts.append(f'  border-left:3px solid {p["accent"]}; opacity:0;')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:-2px 0 8px {p["accent"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .crs-meta {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  font-weight:700; color:{p["text_secondary"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .crs-txt {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .crs-rtxt {{ color:{p["accent"]}; }}')
+    if content_style == "before_you_scroll":
+        parts.append(f'.card[data-card-id="{card_id}"] .bys-wrap {{')
+        parts.append('  display:flex; flex-direction:column; align-items:center; gap:10px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .bys-txt {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:900; color:{p["text"]}; text-align:center; opacity:0;')
+        if p["title_glow_intense"]:
+            parts.append(f'  text-shadow:{p["title_glow_intense"]};')
+        elif p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .bys-rule {{')
+        parts.append(f'  width:0; height:3px; background:{p["accent"]}; border-radius:2px;')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:{p["accent_line_glow"]};')
+        parts.append('}')
     parts.append('</style>')
     # Timeline: full-screen overlay, no card-panel wrapper
     if content_style == "timeline":
@@ -2522,6 +2670,89 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         parts.append(f'      <div class="sct-rule" id="{card_id}-sct-rule-a"></div>')
         parts.append(f'      <div class="sct-text" id="{card_id}-sct-text">{_sct_label}</div>')
         parts.append(f'      <div class="sct-rule" id="{card_id}-sct-rule-b"></div>')
+        parts.append(f'    </div>')
+    # ── Wave 7 HTML ───────────────────────────────────────────────────────────
+    elif content_style == "live_reaction_split":
+        _lrs_exp  = _esc(hints.get("expected_text", hints.get("title", "")))
+        _lrs_real = _esc(hints.get("reality_text",  hints.get("detail", "")))
+        parts.append(f'    <div class="lrs-wrap">')
+        parts.append(f'      <div class="lrs-side" id="{card_id}-lrs-expected">')
+        parts.append(f'        <div class="lrs-lbl">Ce qu\'on pensait</div>')
+        parts.append(f'        <div class="lrs-txt">{_lrs_exp}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'      <div class="lrs-divider" id="{card_id}-lrs-divider"></div>')
+        parts.append(f'      <div class="lrs-side" id="{card_id}-lrs-reality">')
+        parts.append(f'        <div class="lrs-lbl">La réalité</div>')
+        parts.append(f'        <div class="lrs-txt">{_lrs_real}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "hidden_cost_reveal":
+        _hcr_stk  = _esc(hints.get("sticker_price", hints.get("number", "")))
+        _hcr_real = _esc(hints.get("real_cost",     hints.get("detail", "")))
+        parts.append(f'    <div class="hcr-wrap">')
+        parts.append(f'      <div class="hcr-block" id="{card_id}-hcr-sticker">')
+        parts.append(f'        <div class="hcr-lbl">Prix affiché</div>')
+        parts.append(f'        <div class="hcr-val hcr-stk-val">{_hcr_stk}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'      <div class="hcr-arrow" id="{card_id}-hcr-arrow">→</div>')
+        parts.append(f'      <div class="hcr-block" id="{card_id}-hcr-real">')
+        parts.append(f'        <div class="hcr-lbl">Coût réel</div>')
+        parts.append(f'        <div class="hcr-val hcr-real-val">{_hcr_real}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "social_proof_counter":
+        _spc_num = _esc(hints.get("counter_final_value", hints.get("number", "0")))
+        _spc_lbl = _esc(hints.get("counter_label", hints.get("title", "")))
+        parts.append(f'    <div class="spc-wrap">')
+        parts.append(f'      <div class="spc-num" id="{card_id}-spc-num">{_spc_num}</div>')
+        if _spc_lbl:
+            parts.append(f'      <div class="spc-lbl" id="{card_id}-spc-lbl">{_spc_lbl}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "timeline_prediction":
+        _tp_conf = hints.get("confirmed_steps", [])
+        _tp_pred = hints.get("predicted_steps", [])
+        parts.append(f'    <div class="tp-wrap">')
+        if _tp_conf:
+            parts.append(f'      <div class="tp-sec-lbl">Confirmé</div>')
+            for _tp_i, _tp_s in enumerate(_tp_conf[:4]):
+                parts.append(f'      <div class="tp-conf" id="{card_id}-tp-conf-{_tp_i}">{_esc(str(_tp_s))}</div>')
+        parts.append(f'      <div class="tp-div" id="{card_id}-tp-div"></div>')
+        if _tp_pred:
+            parts.append(f'      <div class="tp-sec-lbl">Prévu</div>')
+            for _tp_j, _tp_p in enumerate(_tp_pred[:4]):
+                parts.append(f'      <div class="tp-pred" id="{card_id}-tp-pred-{_tp_j}">{_esc(str(_tp_p))}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "red_thread_connector":
+        _rtc_pts = hints.get("connector_points", [])
+        parts.append(f'    <div class="rtc-wrap">')
+        for _rtc_i, _rtc_p in enumerate(_rtc_pts[:3]):
+            if _rtc_i > 0:
+                parts.append(f'      <div class="rtc-arr" id="{card_id}-rtc-arr-{_rtc_i - 1}">↓</div>')
+            parts.append(f'      <div class="rtc-pt" id="{card_id}-rtc-pt-{_rtc_i}">{_esc(str(_rtc_p))}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "silent_beat_pause":
+        _sbp_sym = _esc(hints.get("pause_symbol", "…"))
+        parts.append(f'    <div class="sbp-wrap">')
+        parts.append(f'      <div class="sbp-sym" id="{card_id}-sbp-sym">{_sbp_sym}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "comment_reply_style":
+        _crs_com = _esc(hints.get("comment_text", hints.get("title", "")))
+        _crs_rep = _esc(hints.get("reply_text",   hints.get("detail", "")))
+        parts.append(f'    <div class="crs-wrap">')
+        parts.append(f'      <div class="crs-comment" id="{card_id}-crs-comment">')
+        parts.append(f'        <div class="crs-meta">💬 Commentaire</div>')
+        parts.append(f'        <div class="crs-txt">{_crs_com}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'      <div class="crs-reply" id="{card_id}-crs-reply">')
+        parts.append(f'        <div class="crs-meta">↳ Réponse</div>')
+        parts.append(f'        <div class="crs-txt crs-rtxt">{_crs_rep}</div>')
+        parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "before_you_scroll":
+        _bys_txt = _esc(hints.get("hook_text", hints.get("title", "")))
+        parts.append(f'    <div class="bys-wrap">')
+        parts.append(f'      <div class="bys-txt" id="{card_id}-bys-txt">{_bys_txt}</div>')
+        parts.append(f'      <div class="bys-rule" id="{card_id}-bys-rule"></div>')
         parts.append(f'    </div>')
     else:
         # key_phrase, quote and any unknown style
@@ -4602,6 +4833,217 @@ def _build_timeline_js(
                     if p.get("accent_line_glow"):
                         lines.append(f'  tl.to(\'{_w6_sct_rulea}\', {{ boxShadow: "{_esc_js(p["accent_line_glow"])}", duration: 0.20 }}, {t_in + 0.35:.4f});')
                         lines.append(f'  tl.to(\'{_w6_sct_ruleb}\', {{ boxShadow: "{_esc_js(p["accent_line_glow"])}", duration: 0.20 }}, {t_in + 0.35:.4f});')
+            # ── Wave 7 GSAP ───────────────────────────────────────────────────
+            elif content_style == "live_reaction_split":
+                _w7_lrs_exp = f'.card[data-card-id="{card_id}"] #{card_id}-lrs-expected'
+                _w7_lrs_div = f'.card[data-card-id="{card_id}"] #{card_id}-lrs-divider'
+                _w7_lrs_rea = f'.card[data-card-id="{card_id}"] #{card_id}-lrs-reality'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w7_lrs_exp}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w7_lrs_div}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w7_lrs_rea}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_exp}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.55, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_div}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in + 0.45:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_rea}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.70, ease: _eIn }}, {t_in + 0.65:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_exp}\', {{ opacity: 0, x: -12 }}, {{ opacity: 1, x: 0, duration: 0.22, ease: "back.out(1.5)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_div}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.15, ease: _eIn }}, {t_in + 0.18:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_rea}\', {{ opacity: 0, x: 12 }}, {{ opacity: 1, x: 0, duration: 0.25, ease: "back.out(2.0)" }}, {t_in + 0.28:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_exp}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.35, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_div}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.20, ease: _eIn }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_rea}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.35, ease: _eIn }}, {t_in + 0.35:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_exp}\', {{ opacity: 0, rotation: -1 }}, {{ opacity: 1, rotation: 0, duration: 0.35, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_div}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.20, ease: _eIn }}, {t_in + 0.28:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_rea}\', {{ opacity: 0, rotation: 1 }}, {{ opacity: 1, rotation: 0, duration: 0.38, ease: _eIn }}, {t_in + 0.38:.4f});')
+                else:  # glass
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_exp}\', {{ opacity: 0, x: -10 }}, {{ opacity: 1, x: 0, duration: 0.30, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_div}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.20, ease: _eIn }}, {t_in + 0.24:.4f});')
+                    if p.get("accent_line_glow"):
+                        lines.append(f'  tl.to(\'{_w7_lrs_div}\', {{ boxShadow: "{_esc_js(p["accent_line_glow"])}", duration: 0.18 }}, {t_in + 0.32:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_lrs_rea}\', {{ opacity: 0, x: 10 }}, {{ opacity: 1, x: 0, duration: 0.35, ease: _eIn }}, {t_in + 0.32:.4f});')
+            elif content_style == "hidden_cost_reveal":
+                _w7_hcr_stk = f'.card[data-card-id="{card_id}"] #{card_id}-hcr-sticker'
+                _w7_hcr_arr = f'.card[data-card-id="{card_id}"] #{card_id}-hcr-arrow'
+                _w7_hcr_rea = f'.card[data-card-id="{card_id}"] #{card_id}-hcr-real'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w7_hcr_stk}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w7_hcr_arr}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w7_hcr_rea}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_stk}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.50, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_arr}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.35, ease: _eIn }}, {t_in + 0.45:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_rea}\', {{ opacity: 0, scale: 0.92 }}, {{ opacity: 1, scale: 1, duration: 0.75, ease: _eIn }}, {t_in + 0.70:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_stk}\', {{ opacity: 0, scale: 0.8 }}, {{ opacity: 1, scale: 1, duration: 0.20, ease: "back.out(1.5)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_arr}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.15, ease: _eIn }}, {t_in + 0.18:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_rea}\', {{ opacity: 0, scale: 0.6 }}, {{ opacity: 1, scale: 1.08, duration: 0.25, ease: "back.out(2.5)" }}, {t_in + 0.28:.4f});')
+                    lines.append(f'  tl.to(\'{_w7_hcr_rea}\', {{ scale: 1, duration: 0.15, ease: "power2.out" }}, {t_in + 0.53:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_stk}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.32, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_arr}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.22, ease: _eIn }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_rea}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.38, ease: _eIn }}, {t_in + 0.40:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_stk}\', {{ opacity: 0, rotation: -2 }}, {{ opacity: 1, rotation: 0, duration: 0.32, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_arr}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.20, ease: _eIn }}, {t_in + 0.28:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_rea}\', {{ opacity: 0, rotation: 2 }}, {{ opacity: 1, rotation: 0, duration: 0.38, ease: _eIn }}, {t_in + 0.42:.4f});')
+                else:  # glass: sticker fades slightly, real cost pops with glow
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_stk}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.28, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_arr}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.18, ease: _eIn }}, {t_in + 0.22:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_hcr_rea}\', {{ opacity: 0, scale: 0.78 }}, {{ opacity: 1, scale: 1.04, duration: 0.30, ease: _eIn }}, {t_in + 0.35:.4f});')
+                    lines.append(f'  tl.to(\'{_w7_hcr_rea}\', {{ scale: 1, duration: 0.18, ease: "power2.out" }}, {t_in + 0.65:.4f});')
+                    if p.get("title_glow"):
+                        lines.append(f'  tl.to(\'{_w7_hcr_rea}\', {{ textShadow: "{_esc_js(p["title_glow"])}", duration: 0.22 }}, {t_in + 0.55:.4f});')
+            elif content_style == "social_proof_counter":
+                _w7_spc_num = f'.card[data-card-id="{card_id}"] #{card_id}-spc-num'
+                _w7_spc_lbl = f'.card[data-card-id="{card_id}"] #{card_id}-spc-lbl'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w7_spc_num}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w7_spc_lbl}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_num}\', {{ opacity: 0, scale: 0.85 }}, {{ opacity: 1, scale: 1, duration: 0.85, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.55, ease: _eIn }}, {t_in + 0.60:.4f});')
+                elif is_vibe:
+                    # slot-machine settle: rapid scale oscillation then rest
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_num}\', {{ opacity: 0, scale: 0.5 }}, {{ opacity: 1, scale: 1.15, duration: 0.22, ease: "back.out(3.0)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.to(\'{_w7_spc_num}\', {{ scale: 0.95, duration: 0.10, ease: "power2.in" }}, {t_in + 0.22:.4f});')
+                    lines.append(f'  tl.to(\'{_w7_spc_num}\', {{ scale: 1, duration: 0.08, ease: "power2.out" }}, {t_in + 0.32:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_lbl}\', {{ opacity: 0, y: 8 }}, {{ opacity: 1, y: 0, duration: 0.20, ease: "back.out(1.5)" }}, {t_in + 0.28:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_num}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.40, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in + 0.28:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_num}\', {{ opacity: 0, scale: 0.80, rotation: -3 }}, {{ opacity: 1, scale: 1, rotation: 0, duration: 0.40, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.28, ease: _eIn }}, {t_in + 0.30:.4f});')
+                else:  # glass: scale pop + glow flash
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_num}\', {{ opacity: 0, scale: 0.65 }}, {{ opacity: 1, scale: 1.06, duration: 0.30, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.to(\'{_w7_spc_num}\', {{ scale: 1, duration: 0.18, ease: "power2.out" }}, {t_in + 0.30:.4f});')
+                    if p.get("title_glow_intense"):
+                        lines.append(f'  tl.to(\'{_w7_spc_num}\', {{ textShadow: "{_esc_js(p["title_glow_intense"])}", duration: 0.22 }}, {t_in + 0.25:.4f});')
+                    elif p.get("title_glow"):
+                        lines.append(f'  tl.to(\'{_w7_spc_num}\', {{ textShadow: "{_esc_js(p["title_glow"])}", duration: 0.22 }}, {t_in + 0.25:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_spc_lbl}\', {{ opacity: 0, y: 8 }}, {{ opacity: 1, y: 0, duration: 0.25, ease: _eIn }}, {t_in + 0.28:.4f});')
+            elif content_style == "timeline_prediction":
+                _w7_tp_h    = card.get("contentHints", {})
+                _w7_tp_conf = _w7_tp_h.get("confirmed_steps", [])
+                _w7_tp_pred = _w7_tp_h.get("predicted_steps", [])
+                _w7_tp_nc   = min(len(_w7_tp_conf), 4)
+                _w7_tp_np   = min(len(_w7_tp_pred), 4)
+                _w7_tp_div  = f'.card[data-card-id="{card_id}"] #{card_id}-tp-div'
+                _w7_tp_t    = t_in
+                for _w7_i in range(_w7_tp_nc):
+                    _w7_tp_el = f'.card[data-card-id="{card_id}"] #{card_id}-tp-conf-{_w7_i}'
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w7_tp_el}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    else:
+                        lines.append(f'  tl.fromTo(\'{_w7_tp_el}\', {{ opacity: 0, x: -8 }}, {{ opacity: 1, x: 0, duration: {"0.50" if is_cinema else "0.25"}, ease: _eIn }}, {_w7_tp_t:.4f});')
+                        _w7_tp_t += 0.12 if not is_cinema else 0.20
+                # dashed divider
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w7_tp_div}\', {{ opacity: 1 }}, {t_in:.4f});')
+                else:
+                    lines.append(f'  tl.fromTo(\'{_w7_tp_div}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.25, ease: _eIn }}, {_w7_tp_t:.4f});')
+                    _w7_tp_t += 0.15
+                for _w7_j in range(_w7_tp_np):
+                    _w7_tp_el = f'.card[data-card-id="{card_id}"] #{card_id}-tp-pred-{_w7_j}'
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w7_tp_el}\', {{ opacity: 0.6 }}, {t_in:.4f});')
+                    else:
+                        lines.append(f'  tl.fromTo(\'{_w7_tp_el}\', {{ opacity: 0 }}, {{ opacity: {"0.65" if not is_cinema else "0.55"}, duration: {"0.50" if is_cinema else "0.25"}, ease: _eIn }}, {_w7_tp_t:.4f});')
+                        _w7_tp_t += 0.12 if not is_cinema else 0.20
+            elif content_style == "red_thread_connector":
+                _w7_rtc_h  = card.get("contentHints", {})
+                _w7_rtc_pts = _w7_rtc_h.get("connector_points", [])
+                _w7_rtc_n  = min(len(_w7_rtc_pts), 3)
+                _w7_rtc_t  = t_in
+                for _w7_ri in range(_w7_rtc_n):
+                    _w7_rtc_pt = f'.card[data-card-id="{card_id}"] #{card_id}-rtc-pt-{_w7_ri}'
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w7_rtc_pt}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    elif is_vibe:
+                        lines.append(f'  tl.fromTo(\'{_w7_rtc_pt}\', {{ opacity: 0, scale: 0.8 }}, {{ opacity: 1, scale: 1, duration: 0.22, ease: "back.out(2.0)" }}, {_w7_rtc_t:.4f});')
+                    elif is_cinema:
+                        lines.append(f'  tl.fromTo(\'{_w7_rtc_pt}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.55, ease: _eIn }}, {_w7_rtc_t:.4f});')
+                    else:
+                        lines.append(f'  tl.fromTo(\'{_w7_rtc_pt}\', {{ opacity: 0, y: 6 }}, {{ opacity: 1, y: 0, duration: 0.28, ease: _eIn }}, {_w7_rtc_t:.4f});')
+                    if _w7_ri < _w7_rtc_n - 1:
+                        _w7_rtc_arr = f'.card[data-card-id="{card_id}"] #{card_id}-rtc-arr-{_w7_ri}'
+                        _w7_rtc_t += 0.18 if not is_cinema else 0.30
+                        if is_ledger:
+                            lines.append(f'  tl.set(\'{_w7_rtc_arr}\', {{ opacity: 1 }}, {t_in:.4f});')
+                        else:
+                            lines.append(f'  tl.fromTo(\'{_w7_rtc_arr}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.15, ease: _eIn }}, {_w7_rtc_t:.4f});')
+                        _w7_rtc_t += 0.10
+                    else:
+                        _w7_rtc_t += 0.18 if not is_cinema else 0.30
+            elif content_style == "silent_beat_pause":
+                _w7_sbp_sym = f'.card[data-card-id="{card_id}"] #{card_id}-sbp-sym'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w7_sbp_sym}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w7_sbp_sym}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 1.20, ease: "sine.inOut" }}, {t_in:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w7_sbp_sym}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.40, ease: _eIn }}, {t_in:.4f});')
+                else:
+                    lines.append(f'  tl.fromTo(\'{_w7_sbp_sym}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.60, ease: "sine.inOut" }}, {t_in:.4f});')
+            elif content_style == "comment_reply_style":
+                _w7_crs_com = f'.card[data-card-id="{card_id}"] #{card_id}-crs-comment'
+                _w7_crs_rep = f'.card[data-card-id="{card_id}"] #{card_id}-crs-reply'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w7_crs_com}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w7_crs_rep}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_com}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.55, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_rep}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.65, ease: _eIn }}, {t_in + 0.60:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_com}\', {{ opacity: 0, y: -8 }}, {{ opacity: 1, y: 0, duration: 0.22, ease: "back.out(1.5)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_rep}\', {{ opacity: 0, x: 12 }}, {{ opacity: 1, x: 0, duration: 0.25, ease: "back.out(2.0)" }}, {t_in + 0.22:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_com}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.32, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_rep}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.35, ease: _eIn }}, {t_in + 0.28:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_com}\', {{ opacity: 0, rotation: -1 }}, {{ opacity: 1, rotation: 0, duration: 0.35, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_rep}\', {{ opacity: 0, x: 8 }}, {{ opacity: 1, x: 0, duration: 0.35, ease: _eIn }}, {t_in + 0.30:.4f});')
+                else:  # glass
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_com}\', {{ opacity: 0, y: -6 }}, {{ opacity: 1, y: 0, duration: 0.30, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_crs_rep}\', {{ opacity: 0, x: 10 }}, {{ opacity: 1, x: 0, duration: 0.32, ease: _eIn }}, {t_in + 0.28:.4f});')
+                    if p.get("accent_line_glow"):
+                        lines.append(f'  tl.to(\'{_w7_crs_rep}\', {{ boxShadow: "-2px 0 12px {p["accent"]}", duration: 0.22 }}, {t_in + 0.45:.4f});')
+            elif content_style == "before_you_scroll":
+                _w7_bys_txt  = f'.card[data-card-id="{card_id}"] #{card_id}-bys-txt'
+                _w7_bys_rule = f'.card[data-card-id="{card_id}"] #{card_id}-bys-rule'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w7_bys_txt}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w7_bys_rule}\', {{ width: "80%" }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_txt}\', {{ opacity: 0, scale: 0.95 }}, {{ opacity: 1, scale: 1, duration: 0.60, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_rule}\', {{ width: "0%" }}, {{ width: "80%", duration: 0.50, ease: "power2.out" }}, {t_in + 0.40:.4f});')
+                elif is_vibe:
+                    # hard bounce-pop — most natural fit per spec
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_txt}\', {{ opacity: 0, scale: 0.60 }}, {{ opacity: 1, scale: 1.12, duration: 0.22, ease: "back.out(3.0)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.to(\'{_w7_bys_txt}\', {{ scale: 1, duration: 0.12, ease: "power2.out" }}, {t_in + 0.22:.4f});')
+                    # flash
+                    lines.append(f'  tl.to(\'{_w7_bys_txt}\', {{ opacity: 0.4, duration: 0.05 }}, {t_in + 0.30:.4f});')
+                    lines.append(f'  tl.to(\'{_w7_bys_txt}\', {{ opacity: 1, duration: 0.05 }}, {t_in + 0.35:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_rule}\', {{ width: "0%" }}, {{ width: "80%", duration: 0.28, ease: "back.out(1.5)" }}, {t_in + 0.22:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_txt}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.40, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_rule}\', {{ width: "0%" }}, {{ width: "80%", duration: 0.55, ease: "power2.out" }}, {t_in + 0.25:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_txt}\', {{ opacity: 0, rotation: -1.5 }}, {{ opacity: 1, rotation: 0, duration: 0.40, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_rule}\', {{ width: "0%" }}, {{ width: "80%", duration: 0.50, ease: "power1.inOut" }}, {t_in + 0.28:.4f});')
+                else:  # glass: sharp pop + glow
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_txt}\', {{ opacity: 0, scale: 0.82 }}, {{ opacity: 1, scale: 1.04, duration: 0.28, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.to(\'{_w7_bys_txt}\', {{ scale: 1, duration: 0.16, ease: "power2.out" }}, {t_in + 0.28:.4f});')
+                    if p.get("title_glow_intense"):
+                        lines.append(f'  tl.to(\'{_w7_bys_txt}\', {{ textShadow: "{_esc_js(p["title_glow_intense"])}", duration: 0.20 }}, {t_in + 0.22:.4f});')
+                    elif p.get("title_glow"):
+                        lines.append(f'  tl.to(\'{_w7_bys_txt}\', {{ textShadow: "{_esc_js(p["title_glow"])}", duration: 0.20 }}, {t_in + 0.22:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w7_bys_rule}\', {{ width: "0%" }}, {{ width: "80%", duration: 0.35, ease: "power2.out" }}, {t_in + 0.22:.4f});')
+                    if p.get("accent_line_glow"):
+                        lines.append(f'  tl.to(\'{_w7_bys_rule}\', {{ boxShadow: "{_esc_js(p["accent_line_glow"])}", duration: 0.20 }}, {t_in + 0.42:.4f});')
             else:
                 if is_cinema:
                     lines.append(

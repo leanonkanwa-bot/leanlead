@@ -117,7 +117,21 @@ _HINTS: dict[str, dict] = {
     "before_after_image":   {"title": "Avant / Après", "detail": "6 mois de transformation"},
     "instagram-follow":     {"title": "@moncompte", "detail": "Rejoins la communauté"},
     "tiktok-follow":        {"title": "@moncompte", "detail": "Pour plus de contenu"},
-    "percentage_split":     {"title": "Répartition", "items": ["A: 60%", "B: 40%"]},
+    "yt-lower-third":       {"title": "@machaîne", "detail": "Abonne-toi"},
+    # ── Wave 7 ────────────────────────────────────────────────────────────────
+    "live_reaction_split":  {"expected_text": "Les réseaux sociaux ne servent à rien",
+                             "reality_text": "C'est notre premier canal d'acquisition"},
+    "hidden_cost_reveal":   {"sticker_price": "29€/mois", "real_cost": "87€/mois réels"},
+    "social_proof_counter": {"counter_final_value": "12 847", "counter_label": "abonnés"},
+    "timeline_prediction":  {"confirmed_steps": ["Lancement Jan", "10k clients Mar"],
+                             "predicted_steps": ["IPO Q4", "Expansion US 2026"]},
+    "red_thread_connector": {"connector_points": ["Le problème du départ",
+                                                   "La solution testée",
+                                                   "Le résultat final"]},
+    "silent_beat_pause":    {"pause_symbol": "…"},
+    "comment_reply_style":  {"comment_text": "Mais ça marche vraiment ?",
+                             "reply_text": "Oui — voici la preuve en chiffres"},
+    "before_you_scroll":    {"hook_text": "Attends avant de partir — lis ça"},
 }
 
 CARD_ID = "c1"
