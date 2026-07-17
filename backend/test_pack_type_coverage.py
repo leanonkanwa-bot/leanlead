@@ -132,6 +132,18 @@ _HINTS: dict[str, dict] = {
     "comment_reply_style":  {"comment_text": "Mais ça marche vraiment ?",
                              "reply_text": "Oui — voici la preuve en chiffres"},
     "before_you_scroll":    {"hook_text": "Attends avant de partir — lis ça"},
+    # ── Wave 8 ────────────────────────────────────────────────────────────────
+    "traffic_light_status": {"status_color": "green", "status_label": "Stratégie validée — lance-toi"},
+    "day_in_life_schedule": {"schedule_items": ["6h - Réveil et sport", "9h - Deep work", "12h - Pause déjeuner", "14h - Réunions clients"]},
+    "skill_tree_unlock":    {"unlocked_milestones": ["Maîtrise de Notion", "Premier client signé", "Automatisation Zapier"]},
+    "audience_poll_result": {"poll_options": ["Oui, c'est possible", "Non, c'est trop dur"],
+                             "poll_percentages": [73.0, 27.0]},
+    "broken_promise_tracker": {"promises": ["Poster chaque jour", "Répondre à chaque DM", "Lancer la formation en mars"],
+                               "kept_status": [True, False, False]},
+    "ingredient_list":      {"ingredients": ["Une offre claire", "Un tunnel de vente", "Du contenu régulier", "Une communauté engagée"]},
+    "resource_allocation":  {"resource_labels": ["Temps", "Énergie", "Budget"],
+                             "resource_values": [40.0, 35.0, 25.0]},
+    "fill_in_the_blank":    {"sentence_with_blank": "La clé du succès c'est ___", "blank_word": "la régularité"},
 }
 
 CARD_ID = "c1"

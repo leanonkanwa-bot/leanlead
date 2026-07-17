@@ -77,7 +77,7 @@ def _zone_bounds(zone: str, layout: str) -> dict:
 # Data cards are remapped to a side panel when Claude places them in a center zone.
 # Hero cards (key_phrase, quote, question, definition, etc.) remain in Claude's
 # chosen zone — they carry the visual message and need the full canvas.
-_DATA_PANEL_TYPES = {"stat", "list", "comparison", "checklist", "score", "trend", "rating", "progress_bar", "countdown", "step_number", "price_tag", "recap_summary", "formula_equation", "pros_cons", "star_rating_review", "income_reveal", "data_bar_chart", "number_ranking", "question_answer_pair", "cause_effect", "percentage_split", "red_flag_list", "client_avatar_persona", "tool_stack", "revenue_breakdown", "hidden_cost_reveal", "social_proof_counter", "red_thread_connector"}
+_DATA_PANEL_TYPES = {"stat", "list", "comparison", "checklist", "score", "trend", "rating", "progress_bar", "countdown", "step_number", "price_tag", "recap_summary", "formula_equation", "pros_cons", "star_rating_review", "income_reveal", "data_bar_chart", "number_ranking", "question_answer_pair", "cause_effect", "percentage_split", "red_flag_list", "client_avatar_persona", "tool_stack", "revenue_breakdown", "hidden_cost_reveal", "social_proof_counter", "red_thread_connector", "day_in_life_schedule", "skill_tree_unlock", "audience_poll_result", "broken_promise_tracker", "ingredient_list", "resource_allocation"}
 _CENTER_ZONES = {"fullscreen", "video-overlay"}
 _SIDE_PANEL_ZONES = {"side-panel", "side-panel-left", "side-panel-right", "side-panel-top", "upper-data", "upper-right"}
 
@@ -1926,6 +1926,145 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         if p["accent_line_glow"]:
             parts.append(f'  box-shadow:{p["accent_line_glow"]};')
         parts.append('}')
+    # ── Wave 8 CSS ────────────────────────────────────────────────────────────
+    if content_style == "traffic_light_status":
+        parts.append(f'.card[data-card-id="{card_id}"] .tls-wrap {{')
+        parts.append('  display:flex; flex-direction:column; align-items:center; gap:12px; width:100%;')
+        parts.append('}')
+        _tls_sz = "52px" if compact else "72px"
+        parts.append(f'.card[data-card-id="{card_id}"] .tls-light {{')
+        parts.append(f'  width:{_tls_sz}; height:{_tls_sz}; border-radius:50%;')
+        parts.append(f'  opacity:0; transform:scale(0.7);')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .tls-label {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; text-align:center; opacity:0;')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+    if content_style == "day_in_life_schedule":
+        parts.append(f'.card[data-card-id="{card_id}"] .dls-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:6px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .dls-item {{')
+        parts.append(f'  display:flex; align-items:center; gap:10px;')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; opacity:0;')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .dls-dot {{')
+        parts.append(f'  width:8px; height:8px; border-radius:50%; background:{p["accent"]}; flex-shrink:0;')
+        parts.append('}')
+    if content_style == "skill_tree_unlock":
+        parts.append(f'.card[data-card-id="{card_id}"] .stu-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:8px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .stu-item {{')
+        parts.append(f'  display:flex; align-items:center; gap:10px;')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]};')
+        parts.append(f'  padding:6px 12px; border:1.5px solid {p["accent"]}; border-radius:{p["radius"]};')
+        parts.append(f'  opacity:0;')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:{p["accent_line_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .stu-icon {{')
+        parts.append(f'  font-size:{kicker_size_eff}; color:{p["accent"]}; flex-shrink:0;')
+        parts.append('}')
+    if content_style == "audience_poll_result":
+        parts.append(f'.card[data-card-id="{card_id}"] .apr-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:8px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .apr-row {{')
+        parts.append(f'  display:flex; flex-direction:column; gap:3px; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .apr-label {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{detail_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .apr-bar-track {{')
+        parts.append('  height:12px; background:rgba(255,255,255,0.08); border-radius:6px; overflow:hidden;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .apr-bar-fill {{')
+        parts.append(f'  height:100%; width:0; border-radius:6px; background:{p["accent"]};')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:{p["accent_line_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .apr-row.apr-winner .apr-label {{')
+        parts.append(f'  color:{p["accent"]}; font-weight:700;')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .apr-pct {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{kicker_size_eff};')
+        parts.append(f'  color:{p["text_secondary"]}; font-weight:700;')
+        parts.append('}')
+    if content_style == "broken_promise_tracker":
+        parts.append(f'.card[data-card-id="{card_id}"] .bpt-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:6px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .bpt-item {{')
+        parts.append(f'  display:flex; align-items:center; gap:10px;')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .bpt-icon-kept {{')
+        parts.append(f'  font-size:{kicker_size_eff}; color:{p["accent"]}; flex-shrink:0; line-height:1;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .bpt-icon-broken {{')
+        parts.append(f'  font-size:{kicker_size_eff}; color:{p["text_secondary"]}; flex-shrink:0; line-height:1; opacity:0.5;')
+        parts.append('}')
+    if content_style == "ingredient_list":
+        parts.append(f'.card[data-card-id="{card_id}"] .igl-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:6px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .igl-item {{')
+        parts.append(f'  display:flex; align-items:center; gap:10px;')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .igl-bullet {{')
+        parts.append(f'  width:6px; height:6px; border-radius:50%; background:{p["accent"]}; flex-shrink:0;')
+        parts.append('}')
+    if content_style == "resource_allocation":
+        parts.append(f'.card[data-card-id="{card_id}"] .ral-wrap {{')
+        parts.append('  display:flex; flex-direction:column; gap:8px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ral-row {{')
+        parts.append('  display:flex; flex-direction:column; gap:3px; opacity:0;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ral-label {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{detail_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ral-track {{')
+        parts.append('  height:14px; background:rgba(255,255,255,0.08); border-radius:7px; overflow:hidden;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .ral-fill {{')
+        parts.append(f'  height:100%; width:0; border-radius:7px; background:{p["accent"]};')
+        if p["accent_line_glow"]:
+            parts.append(f'  box-shadow:{p["accent_line_glow"]};')
+        parts.append('}')
+    if content_style == "fill_in_the_blank":
+        parts.append(f'.card[data-card-id="{card_id}"] .fitb-wrap {{')
+        parts.append('  display:flex; flex-direction:column; align-items:center; gap:14px; width:100%;')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .fitb-sentence {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:{p["font_weight"]}; color:{p["text"]}; text-align:center; opacity:0;')
+        if p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
+        parts.append(f'.card[data-card-id="{card_id}"] .fitb-word {{')
+        parts.append(f'  font-family:{p["font"]}; font-size:{title_size_eff};')
+        parts.append(f'  font-weight:900; color:{p["accent"]}; text-align:center; opacity:0;')
+        parts.append(f'  padding:4px 18px; border-bottom:3px solid {p["accent"]};')
+        if p["title_glow_intense"]:
+            parts.append(f'  text-shadow:{p["title_glow_intense"]};')
+        elif p["title_glow"]:
+            parts.append(f'  text-shadow:{p["title_glow"]};')
+        parts.append('}')
     parts.append('</style>')
     # Timeline: full-screen overlay, no card-panel wrapper
     if content_style == "timeline":
@@ -2753,6 +2892,95 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         parts.append(f'    <div class="bys-wrap">')
         parts.append(f'      <div class="bys-txt" id="{card_id}-bys-txt">{_bys_txt}</div>')
         parts.append(f'      <div class="bys-rule" id="{card_id}-bys-rule"></div>')
+        parts.append(f'    </div>')
+    # ── Wave 8 HTML ───────────────────────────────────────────────────────────
+    elif content_style == "traffic_light_status":
+        _tls_color = hints.get("status_color", "green").lower()
+        _tls_lbl   = _esc(hints.get("status_label", hints.get("title", "")))
+        _tls_hex   = {"red": "#ef4444", "yellow": "#facc15", "green": "#22c55e"}.get(_tls_color, "#22c55e")
+        parts.append(f'    <div class="tls-wrap">')
+        parts.append(f'      <div class="tls-light" id="{card_id}-tls-light" style="background:{_tls_hex};"></div>')
+        parts.append(f'      <div class="tls-label" id="{card_id}-tls-label">{_tls_lbl}</div>')
+        parts.append(f'    </div>')
+    elif content_style == "day_in_life_schedule":
+        _dls_items = hints.get("schedule_items", hints.get("items", []))
+        parts.append(f'    <div class="dls-wrap">')
+        for _dls_i, _dls_s in enumerate(_dls_items[:6]):
+            parts.append(f'      <div class="dls-item" id="{card_id}-dls-item-{_dls_i}">')
+            parts.append(f'        <div class="dls-dot"></div>')
+            parts.append(f'        <span>{_esc(str(_dls_s))}</span>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "skill_tree_unlock":
+        _stu_items = hints.get("unlocked_milestones", hints.get("items", []))
+        parts.append(f'    <div class="stu-wrap">')
+        for _stu_i, _stu_m in enumerate(_stu_items[:5]):
+            parts.append(f'      <div class="stu-item" id="{card_id}-stu-item-{_stu_i}">')
+            parts.append(f'        <span class="stu-icon">&#9733;</span>')
+            parts.append(f'        <span>{_esc(str(_stu_m))}</span>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "audience_poll_result":
+        _apr_opts = hints.get("poll_options", hints.get("items", []))
+        _apr_pcts_raw = hints.get("poll_percentages", [])
+        if not _apr_pcts_raw:
+            _n = max(len(_apr_opts), 1)
+            _apr_pcts_raw = [round(100.0 / _n, 1)] * len(_apr_opts)
+        _apr_winner_idx = _apr_pcts_raw.index(max(_apr_pcts_raw)) if _apr_pcts_raw else 0
+        parts.append(f'    <div class="apr-wrap">')
+        for _apr_i, _apr_opt in enumerate(_apr_opts[:4]):
+            _apr_pct = float(_apr_pcts_raw[_apr_i]) if _apr_i < len(_apr_pcts_raw) else 0.0
+            _apr_wcls = " apr-winner" if _apr_i == _apr_winner_idx else ""
+            parts.append(f'      <div class="apr-row{_apr_wcls}" id="{card_id}-apr-row-{_apr_i}">')
+            parts.append(f'        <div class="apr-label">{_esc(str(_apr_opt))}</div>')
+            parts.append(f'        <div class="apr-bar-track">')
+            parts.append(f'          <div class="apr-bar-fill" id="{card_id}-apr-fill-{_apr_i}" data-pct="{_apr_pct}"></div>')
+            parts.append(f'        </div>')
+            parts.append(f'        <div class="apr-pct">{_apr_pct:.0f}%</div>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "broken_promise_tracker":
+        _bpt_promises = hints.get("promises", hints.get("items", []))
+        _bpt_kept     = hints.get("kept_status", [True] * len(_bpt_promises))
+        parts.append(f'    <div class="bpt-wrap">')
+        for _bpt_i, _bpt_p in enumerate(_bpt_promises[:5]):
+            _bpt_k = bool(_bpt_kept[_bpt_i]) if _bpt_i < len(_bpt_kept) else True
+            _bpt_icon_cls = "bpt-icon-kept" if _bpt_k else "bpt-icon-broken"
+            _bpt_icon     = "&#10003;" if _bpt_k else "&#10007;"
+            parts.append(f'      <div class="bpt-item" id="{card_id}-bpt-item-{_bpt_i}">')
+            parts.append(f'        <span class="{_bpt_icon_cls}">{_bpt_icon}</span>')
+            parts.append(f'        <span>{_esc(str(_bpt_p))}</span>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "ingredient_list":
+        _igl_items = hints.get("ingredients", hints.get("items", []))
+        parts.append(f'    <div class="igl-wrap">')
+        for _igl_i, _igl_s in enumerate(_igl_items[:6]):
+            parts.append(f'      <div class="igl-item" id="{card_id}-igl-item-{_igl_i}">')
+            parts.append(f'        <div class="igl-bullet"></div>')
+            parts.append(f'        <span>{_esc(str(_igl_s))}</span>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "resource_allocation":
+        _ral_labels = hints.get("resource_labels", [])
+        _ral_values = hints.get("resource_values", [])
+        _ral_max    = max((float(v) for v in _ral_values), default=1.0) or 1.0
+        parts.append(f'    <div class="ral-wrap">')
+        for _ral_i, _ral_lbl in enumerate(_ral_labels[:5]):
+            _ral_pct = round((float(_ral_values[_ral_i]) / _ral_max) * 100, 1) if _ral_i < len(_ral_values) else 0.0
+            parts.append(f'      <div class="ral-row" id="{card_id}-ral-seg-{_ral_i}">')
+            parts.append(f'        <div class="ral-label">{_esc(str(_ral_lbl))}</div>')
+            parts.append(f'        <div class="ral-track">')
+            parts.append(f'          <div class="ral-fill" id="{card_id}-ral-fill-{_ral_i}" data-pct="{_ral_pct}"></div>')
+            parts.append(f'        </div>')
+            parts.append(f'      </div>')
+        parts.append(f'    </div>')
+    elif content_style == "fill_in_the_blank":
+        _fitb_sent = _esc(hints.get("sentence_with_blank", hints.get("title", "")))
+        _fitb_word = _esc(hints.get("blank_word", hints.get("detail", "?")))
+        parts.append(f'    <div class="fitb-wrap">')
+        parts.append(f'      <div class="fitb-sentence" id="{card_id}-fitb-sentence">{_fitb_sent}</div>')
+        parts.append(f'      <div class="fitb-word" id="{card_id}-fitb-word">{_fitb_word}</div>')
         parts.append(f'    </div>')
     else:
         # key_phrase, quote and any unknown style
@@ -5044,6 +5272,245 @@ def _build_timeline_js(
                     lines.append(f'  tl.fromTo(\'{_w7_bys_rule}\', {{ width: "0%" }}, {{ width: "80%", duration: 0.35, ease: "power2.out" }}, {t_in + 0.22:.4f});')
                     if p.get("accent_line_glow"):
                         lines.append(f'  tl.to(\'{_w7_bys_rule}\', {{ boxShadow: "{_esc_js(p["accent_line_glow"])}", duration: 0.20 }}, {t_in + 0.42:.4f});')
+            # ── Wave 8 GSAP ───────────────────────────────────────────────────
+            elif content_style == "traffic_light_status":
+                _w8_tls_lgt = f'.card[data-card-id="{card_id}"] #{card_id}-tls-light'
+                _w8_tls_lbl = f'.card[data-card-id="{card_id}"] #{card_id}-tls-label'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w8_tls_lgt}\', {{ opacity: 1, scale: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w8_tls_lbl}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lgt}\', {{ opacity: 0, scale: 0.7 }}, {{ opacity: 1, scale: 1, duration: 0.80, ease: "sine.inOut" }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.55, ease: _eIn }}, {t_in + 0.55:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lgt}\', {{ opacity: 0, scale: 0.5 }}, {{ opacity: 1, scale: 1.18, duration: 0.22, ease: "back.out(3.0)" }}, {t_in:.4f});')
+                    lines.append(f'  tl.to(\'{_w8_tls_lgt}\', {{ scale: 1, duration: 0.12, ease: "power2.out" }}, {t_in + 0.22:.4f});')
+                    lines.append(f'  tl.to(\'{_w8_tls_lgt}\', {{ opacity: 0.5, duration: 0.06 }}, {t_in + 0.30:.4f});')
+                    lines.append(f'  tl.to(\'{_w8_tls_lgt}\', {{ opacity: 1, duration: 0.06 }}, {t_in + 0.36:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lbl}\', {{ opacity: 0, y: 6 }}, {{ opacity: 1, y: 0, duration: 0.22, ease: "back.out(1.5)" }}, {t_in + 0.28:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lgt}\', {{ opacity: 0, scale: 0.7 }}, {{ opacity: 1, scale: 1, duration: 0.38, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.32, ease: _eIn }}, {t_in + 0.28:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lgt}\', {{ opacity: 0, scale: 0.7, rotation: -5 }}, {{ opacity: 1, scale: 1, rotation: 0, duration: 0.42, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lbl}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {t_in + 0.32:.4f});')
+                else:  # glass: pop + glow matching status color
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lgt}\', {{ opacity: 0, scale: 0.6 }}, {{ opacity: 1, scale: 1.08, duration: 0.28, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.to(\'{_w8_tls_lgt}\', {{ scale: 1, duration: 0.18, ease: "power2.out" }}, {t_in + 0.28:.4f});')
+                    if p.get("accent_line_glow"):
+                        lines.append(f'  tl.to(\'{_w8_tls_lgt}\', {{ boxShadow: "0 0 28px currentColor", duration: 0.22 }}, {t_in + 0.22:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_tls_lbl}\', {{ opacity: 0, y: 8 }}, {{ opacity: 1, y: 0, duration: 0.28, ease: _eIn }}, {t_in + 0.28:.4f});')
+                    if p.get("title_glow"):
+                        lines.append(f'  tl.to(\'{_w8_tls_lbl}\', {{ textShadow: "{_esc_js(p["title_glow"])}", duration: 0.22 }}, {t_in + 0.38:.4f});')
+            elif content_style == "day_in_life_schedule":
+                _w8_dls_h  = card.get("contentHints", {})
+                _w8_dls_n  = min(len(_w8_dls_h.get("schedule_items", _w8_dls_h.get("items", []))), 6)
+                _w8_dls_t  = t_in
+                for _w8_di in range(_w8_dls_n):
+                    _w8_dls_el = f'.card[data-card-id="{card_id}"] #{card_id}-dls-item-{_w8_di}'
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w8_dls_el}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    elif is_cinema:
+                        lines.append(f'  tl.fromTo(\'{_w8_dls_el}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.50, ease: _eIn }}, {_w8_dls_t:.4f});')
+                        _w8_dls_t += 0.22
+                    elif is_vibe:
+                        lines.append(f'  tl.fromTo(\'{_w8_dls_el}\', {{ opacity: 0, x: -10, scale: 0.9 }}, {{ opacity: 1, x: 0, scale: 1, duration: 0.22, ease: "back.out(2.0)" }}, {_w8_dls_t:.4f});')
+                        _w8_dls_t += 0.12
+                    elif is_paper:
+                        lines.append(f'  tl.fromTo(\'{_w8_dls_el}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.32, ease: _eIn }}, {_w8_dls_t:.4f});')
+                        _w8_dls_t += 0.14
+                    elif is_craft:
+                        lines.append(f'  tl.fromTo(\'{_w8_dls_el}\', {{ opacity: 0, x: -6, rotation: -1 }}, {{ opacity: 1, x: 0, rotation: 0, duration: 0.35, ease: _eIn }}, {_w8_dls_t:.4f});')
+                        _w8_dls_t += 0.14
+                    else:  # glass
+                        lines.append(f'  tl.fromTo(\'{_w8_dls_el}\', {{ opacity: 0, x: -8 }}, {{ opacity: 1, x: 0, duration: 0.28, ease: _eIn }}, {_w8_dls_t:.4f});')
+                        if p.get("title_glow") and _w8_di == 0:
+                            lines.append(f'  tl.to(\'{_w8_dls_el}\', {{ textShadow: "{_esc_js(p["title_glow"])}", duration: 0.20 }}, {_w8_dls_t + 0.18:.4f});')
+                        _w8_dls_t += 0.12
+            elif content_style == "skill_tree_unlock":
+                _w8_stu_h  = card.get("contentHints", {})
+                _w8_stu_n  = min(len(_w8_stu_h.get("unlocked_milestones", _w8_stu_h.get("items", []))), 5)
+                _w8_stu_t  = t_in
+                for _w8_si in range(_w8_stu_n):
+                    _w8_stu_el = f'.card[data-card-id="{card_id}"] #{card_id}-stu-item-{_w8_si}'
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w8_stu_el}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    elif is_cinema:
+                        lines.append(f'  tl.fromTo(\'{_w8_stu_el}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.55, ease: _eIn }}, {_w8_stu_t:.4f});')
+                        _w8_stu_t += 0.25
+                    elif is_vibe:
+                        lines.append(f'  tl.fromTo(\'{_w8_stu_el}\', {{ opacity: 0, scale: 0.7 }}, {{ opacity: 1, scale: 1.10, duration: 0.20, ease: "back.out(2.5)" }}, {_w8_stu_t:.4f});')
+                        lines.append(f'  tl.to(\'{_w8_stu_el}\', {{ scale: 1, duration: 0.10, ease: "power2.out" }}, {_w8_stu_t + 0.20:.4f});')
+                        lines.append(f'  tl.to(\'{_w8_stu_el}\', {{ opacity: 0.4, duration: 0.04 }}, {_w8_stu_t + 0.26:.4f});')
+                        lines.append(f'  tl.to(\'{_w8_stu_el}\', {{ opacity: 1, duration: 0.04 }}, {_w8_stu_t + 0.30:.4f});')
+                        _w8_stu_t += 0.18
+                    elif is_paper:
+                        lines.append(f'  tl.fromTo(\'{_w8_stu_el}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.35, ease: _eIn }}, {_w8_stu_t:.4f});')
+                        _w8_stu_t += 0.16
+                    elif is_craft:
+                        lines.append(f'  tl.fromTo(\'{_w8_stu_el}\', {{ opacity: 0, scale: 0.85, rotation: -2 }}, {{ opacity: 1, scale: 1, rotation: 0, duration: 0.38, ease: _eIn }}, {_w8_stu_t:.4f});')
+                        _w8_stu_t += 0.16
+                    else:  # glass
+                        lines.append(f'  tl.fromTo(\'{_w8_stu_el}\', {{ opacity: 0, scale: 0.78 }}, {{ opacity: 1, scale: 1.04, duration: 0.26, ease: _eIn }}, {_w8_stu_t:.4f});')
+                        lines.append(f'  tl.to(\'{_w8_stu_el}\', {{ scale: 1, duration: 0.14, ease: "power2.out" }}, {_w8_stu_t + 0.26:.4f});')
+                        if p.get("accent_line_glow"):
+                            lines.append(f'  tl.to(\'{_w8_stu_el}\', {{ boxShadow: "{_esc_js(p["accent_line_glow"])}", duration: 0.20 }}, {_w8_stu_t + 0.18:.4f});')
+                        _w8_stu_t += 0.14
+            elif content_style == "audience_poll_result":
+                _w8_apr_h    = card.get("contentHints", {})
+                _w8_apr_opts = _w8_apr_h.get("poll_options", _w8_apr_h.get("items", []))
+                _w8_apr_n    = min(len(_w8_apr_opts), 4)
+                _w8_apr_pcts = _w8_apr_h.get("poll_percentages", [])
+                if not _w8_apr_pcts:
+                    _n = max(_w8_apr_n, 1)
+                    _w8_apr_pcts = [round(100.0 / _n, 1)] * _w8_apr_n
+                _w8_apr_t    = t_in
+                for _w8_ai in range(_w8_apr_n):
+                    _w8_apr_row  = f'.card[data-card-id="{card_id}"] #{card_id}-apr-row-{_w8_ai}'
+                    _w8_apr_fill = f'.card[data-card-id="{card_id}"] #{card_id}-apr-fill-{_w8_ai}'
+                    _w8_pct      = float(_w8_apr_pcts[_w8_ai]) if _w8_ai < len(_w8_apr_pcts) else 0.0
+                    _w8_pct_str  = f'{_w8_pct:.1f}%'
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w8_apr_row}\', {{ opacity: 1 }}, {t_in:.4f});')
+                        lines.append(f'  tl.set(\'{_w8_apr_fill}\', {{ width: "{_w8_pct_str}" }}, {t_in:.4f});')
+                    elif is_cinema:
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_row}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.45, ease: _eIn }}, {_w8_apr_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_fill}\', {{ width: "0%" }}, {{ width: "{_w8_pct_str}", duration: 0.80, ease: "power2.out" }}, {_w8_apr_t + 0.15:.4f});')
+                        _w8_apr_t += 0.20
+                    elif is_vibe:
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_row}\', {{ opacity: 0, y: 6 }}, {{ opacity: 1, y: 0, duration: 0.20, ease: "back.out(1.5)" }}, {_w8_apr_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_fill}\', {{ width: "0%" }}, {{ width: "{_w8_pct_str}", duration: 0.35, ease: "back.out(1.2)" }}, {_w8_apr_t + 0.10:.4f});')
+                        _w8_apr_t += 0.14
+                    elif is_paper:
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_row}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {_w8_apr_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_fill}\', {{ width: "0%" }}, {{ width: "{_w8_pct_str}", duration: 0.50, ease: "power2.out" }}, {_w8_apr_t + 0.12:.4f});')
+                        _w8_apr_t += 0.14
+                    elif is_craft:
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_row}\', {{ opacity: 0, rotation: -0.5 }}, {{ opacity: 1, rotation: 0, duration: 0.35, ease: _eIn }}, {_w8_apr_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_fill}\', {{ width: "0%" }}, {{ width: "{_w8_pct_str}", duration: 0.55, ease: "power1.inOut" }}, {_w8_apr_t + 0.12:.4f});')
+                        _w8_apr_t += 0.16
+                    else:  # glass: bars fill with glow, winner highlighted
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_row}\', {{ opacity: 0, x: -6 }}, {{ opacity: 1, x: 0, duration: 0.26, ease: _eIn }}, {_w8_apr_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_apr_fill}\', {{ width: "0%" }}, {{ width: "{_w8_pct_str}", duration: 0.55, ease: "power2.out" }}, {_w8_apr_t + 0.10:.4f});')
+                        if p.get("accent_line_glow"):
+                            lines.append(f'  tl.to(\'{_w8_apr_fill}\', {{ boxShadow: "{_esc_js(p["accent_line_glow"])}", duration: 0.22 }}, {_w8_apr_t + 0.30:.4f});')
+                        _w8_apr_t += 0.12
+            elif content_style == "broken_promise_tracker":
+                _w8_bpt_h  = card.get("contentHints", {})
+                _w8_bpt_n  = min(len(_w8_bpt_h.get("promises", _w8_bpt_h.get("items", []))), 5)
+                _w8_bpt_t  = t_in
+                for _w8_bi in range(_w8_bpt_n):
+                    _w8_bpt_el = f'.card[data-card-id="{card_id}"] #{card_id}-bpt-item-{_w8_bi}'
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w8_bpt_el}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    elif is_cinema:
+                        lines.append(f'  tl.fromTo(\'{_w8_bpt_el}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.50, ease: _eIn }}, {_w8_bpt_t:.4f});')
+                        _w8_bpt_t += 0.22
+                    elif is_vibe:
+                        lines.append(f'  tl.fromTo(\'{_w8_bpt_el}\', {{ opacity: 0, x: -8 }}, {{ opacity: 1, x: 0, duration: 0.22, ease: "back.out(2.0)" }}, {_w8_bpt_t:.4f});')
+                        _w8_bpt_t += 0.12
+                    elif is_paper:
+                        lines.append(f'  tl.fromTo(\'{_w8_bpt_el}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.32, ease: _eIn }}, {_w8_bpt_t:.4f});')
+                        _w8_bpt_t += 0.14
+                    elif is_craft:
+                        lines.append(f'  tl.fromTo(\'{_w8_bpt_el}\', {{ opacity: 0, rotation: -1 }}, {{ opacity: 1, rotation: 0, duration: 0.36, ease: _eIn }}, {_w8_bpt_t:.4f});')
+                        _w8_bpt_t += 0.14
+                    else:  # glass
+                        lines.append(f'  tl.fromTo(\'{_w8_bpt_el}\', {{ opacity: 0, x: -6 }}, {{ opacity: 1, x: 0, duration: 0.26, ease: _eIn }}, {_w8_bpt_t:.4f});')
+                        if p.get("title_glow"):
+                            lines.append(f'  tl.to(\'{_w8_bpt_el}\', {{ textShadow: "{_esc_js(p["title_glow"])}", duration: 0.20 }}, {_w8_bpt_t + 0.16:.4f});')
+                        _w8_bpt_t += 0.12
+            elif content_style == "ingredient_list":
+                _w8_igl_h  = card.get("contentHints", {})
+                _w8_igl_n  = min(len(_w8_igl_h.get("ingredients", _w8_igl_h.get("items", []))), 6)
+                _w8_igl_t  = t_in
+                for _w8_ii in range(_w8_igl_n):
+                    _w8_igl_el = f'.card[data-card-id="{card_id}"] #{card_id}-igl-item-{_w8_ii}'
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w8_igl_el}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    elif is_cinema:
+                        lines.append(f'  tl.fromTo(\'{_w8_igl_el}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.50, ease: _eIn }}, {_w8_igl_t:.4f});')
+                        _w8_igl_t += 0.22
+                    elif is_vibe:
+                        lines.append(f'  tl.fromTo(\'{_w8_igl_el}\', {{ opacity: 0, x: -10 }}, {{ opacity: 1, x: 0, duration: 0.20, ease: "back.out(1.8)" }}, {_w8_igl_t:.4f});')
+                        _w8_igl_t += 0.11
+                    elif is_paper:
+                        lines.append(f'  tl.fromTo(\'{_w8_igl_el}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {_w8_igl_t:.4f});')
+                        _w8_igl_t += 0.13
+                    elif is_craft:
+                        lines.append(f'  tl.fromTo(\'{_w8_igl_el}\', {{ opacity: 0, x: -5, rotation: -0.8 }}, {{ opacity: 1, x: 0, rotation: 0, duration: 0.35, ease: _eIn }}, {_w8_igl_t:.4f});')
+                        _w8_igl_t += 0.14
+                    else:  # glass
+                        lines.append(f'  tl.fromTo(\'{_w8_igl_el}\', {{ opacity: 0, x: -8 }}, {{ opacity: 1, x: 0, duration: 0.26, ease: _eIn }}, {_w8_igl_t:.4f});')
+                        _w8_igl_t += 0.12
+            elif content_style == "resource_allocation":
+                _w8_ral_h      = card.get("contentHints", {})
+                _w8_ral_labels = _w8_ral_h.get("resource_labels", [])
+                _w8_ral_values = _w8_ral_h.get("resource_values", [])
+                _w8_ral_n      = min(len(_w8_ral_labels), 5)
+                _w8_ral_max    = max((float(v) for v in _w8_ral_values), default=1.0) or 1.0
+                _w8_ral_t      = t_in
+                for _w8_ri in range(_w8_ral_n):
+                    _w8_ral_row  = f'.card[data-card-id="{card_id}"] #{card_id}-ral-seg-{_w8_ri}'
+                    _w8_ral_fill = f'.card[data-card-id="{card_id}"] #{card_id}-ral-fill-{_w8_ri}'
+                    _w8_ral_pct  = round((float(_w8_ral_values[_w8_ri]) / _w8_ral_max) * 100, 1) if _w8_ri < len(_w8_ral_values) else 0.0
+                    _w8_ral_pstr = f'{_w8_ral_pct:.1f}%'
+                    if is_ledger:
+                        lines.append(f'  tl.set(\'{_w8_ral_row}\', {{ opacity: 1 }}, {t_in:.4f});')
+                        lines.append(f'  tl.set(\'{_w8_ral_fill}\', {{ width: "{_w8_ral_pstr}" }}, {t_in:.4f});')
+                    elif is_cinema:
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_row}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.45, ease: _eIn }}, {_w8_ral_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_fill}\', {{ width: "0%" }}, {{ width: "{_w8_ral_pstr}", duration: 0.90, ease: "power1.inOut" }}, {_w8_ral_t + 0.15:.4f});')
+                        _w8_ral_t += 0.20
+                    elif is_vibe:
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_row}\', {{ opacity: 0, y: 5 }}, {{ opacity: 1, y: 0, duration: 0.20, ease: "back.out(1.5)" }}, {_w8_ral_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_fill}\', {{ width: "0%" }}, {{ width: "{_w8_ral_pstr}", duration: 0.38, ease: "back.out(1.2)" }}, {_w8_ral_t + 0.10:.4f});')
+                        _w8_ral_t += 0.14
+                    elif is_paper:
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_row}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.30, ease: _eIn }}, {_w8_ral_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_fill}\', {{ width: "0%" }}, {{ width: "{_w8_ral_pstr}", duration: 0.55, ease: "power2.out" }}, {_w8_ral_t + 0.12:.4f});')
+                        _w8_ral_t += 0.14
+                    elif is_craft:
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_row}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.35, ease: _eIn }}, {_w8_ral_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_fill}\', {{ width: "0%" }}, {{ width: "{_w8_ral_pstr}", duration: 0.65, ease: "power1.inOut" }}, {_w8_ral_t + 0.12:.4f});')
+                        _w8_ral_t += 0.16
+                    else:  # glass
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_row}\', {{ opacity: 0, x: -6 }}, {{ opacity: 1, x: 0, duration: 0.26, ease: _eIn }}, {_w8_ral_t:.4f});')
+                        lines.append(f'  tl.fromTo(\'{_w8_ral_fill}\', {{ width: "0%" }}, {{ width: "{_w8_ral_pstr}", duration: 0.60, ease: "power2.out" }}, {_w8_ral_t + 0.10:.4f});')
+                        if p.get("accent_line_glow"):
+                            lines.append(f'  tl.to(\'{_w8_ral_fill}\', {{ boxShadow: "{_esc_js(p["accent_line_glow"])}", duration: 0.22 }}, {_w8_ral_t + 0.30:.4f});')
+                        _w8_ral_t += 0.12
+            elif content_style == "fill_in_the_blank":
+                _w8_fitb_sent = f'.card[data-card-id="{card_id}"] #{card_id}-fitb-sentence'
+                _w8_fitb_word = f'.card[data-card-id="{card_id}"] #{card_id}-fitb-word'
+                if is_ledger:
+                    lines.append(f'  tl.set(\'{_w8_fitb_sent}\', {{ opacity: 1 }}, {t_in:.4f});')
+                    lines.append(f'  tl.set(\'{_w8_fitb_word}\', {{ opacity: 1 }}, {t_in:.4f});')
+                elif is_cinema:
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_sent}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.70, ease: "sine.inOut" }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_word}\', {{ opacity: 0, scale: 0.85 }}, {{ opacity: 1, scale: 1, duration: 0.90, ease: "sine.inOut" }}, {t_in + 0.90:.4f});')
+                elif is_vibe:
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_sent}\', {{ opacity: 0, scale: 0.95 }}, {{ opacity: 1, scale: 1, duration: 0.25, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_word}\', {{ opacity: 0, scale: 0.60 }}, {{ opacity: 1, scale: 1.12, duration: 0.22, ease: "back.out(3.0)" }}, {t_in + 0.55:.4f});')
+                    lines.append(f'  tl.to(\'{_w8_fitb_word}\', {{ scale: 1, duration: 0.12, ease: "power2.out" }}, {t_in + 0.77:.4f});')
+                    if p.get("title_glow_intense") or p.get("title_glow"):
+                        _glow = p.get("title_glow_intense") or p.get("title_glow")
+                        lines.append(f'  tl.to(\'{_w8_fitb_word}\', {{ textShadow: "{_esc_js(_glow)}", duration: 0.18 }}, {t_in + 0.65:.4f});')
+                elif is_paper:
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_sent}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.38, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_word}\', {{ opacity: 0 }}, {{ opacity: 1, duration: 0.40, ease: _eIn }}, {t_in + 0.60:.4f});')
+                elif is_craft:
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_sent}\', {{ opacity: 0, rotation: -1 }}, {{ opacity: 1, rotation: 0, duration: 0.40, ease: _eIn }}, {t_in:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_word}\', {{ opacity: 0, rotation: 2 }}, {{ opacity: 1, rotation: 0, duration: 0.45, ease: _eIn }}, {t_in + 0.65:.4f});')
+                else:  # glass: sentence in, blank pulses, word pops with glow
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_sent}\', {{ opacity: 0, y: -6 }}, {{ opacity: 1, y: 0, duration: 0.32, ease: _eIn }}, {t_in:.4f});')
+                    if p.get("title_glow"):
+                        lines.append(f'  tl.to(\'{_w8_fitb_sent}\', {{ textShadow: "{_esc_js(p["title_glow"])}", duration: 0.22 }}, {t_in + 0.22:.4f});')
+                    lines.append(f'  tl.fromTo(\'{_w8_fitb_word}\', {{ opacity: 0, scale: 0.72 }}, {{ opacity: 1, scale: 1.06, duration: 0.28, ease: _eIn }}, {t_in + 0.65:.4f});')
+                    lines.append(f'  tl.to(\'{_w8_fitb_word}\', {{ scale: 1, duration: 0.16, ease: "power2.out" }}, {t_in + 0.93:.4f});')
+                    if p.get("title_glow_intense") or p.get("title_glow"):
+                        _glow = p.get("title_glow_intense") or p.get("title_glow")
+                        lines.append(f'  tl.to(\'{_w8_fitb_word}\', {{ textShadow: "{_esc_js(_glow)}", duration: 0.22 }}, {t_in + 0.78:.4f});')
             else:
                 if is_cinema:
                     lines.append(

@@ -42,6 +42,8 @@ _TRIGGER_STYLES: frozenset[str] = frozenset({
     "hidden_cost_reveal",
     "comment_reply_style",
     "before_you_scroll",
+    # Wave 8 trigger types
+    "broken_promise_tracker",
 })
 _GROUNDING_OVERLAP_THRESHOLD = 0.40   # fraction of trigger content-words that must match speech
 _GROUNDING_WINDOW_PRE_S  = 0.5        # seconds before startSec included in the speech window
@@ -99,6 +101,8 @@ _TRIGGER_TEXT_FIELD: dict[str, str] = {
     "hidden_cost_reveal":  "real_cost",     # the revealed price is what the speaker literally states
     "comment_reply_style": "reply_text",    # the speaker's reply is their own literal words
     "before_you_scroll":   "hook_text",     # the hook phrase is what must be verbatim in speech
+    # Wave 8
+    "broken_promise_tracker": "promises",  # promise list joined — speaker must name these literally
 }
 
 
@@ -437,7 +441,7 @@ OUTPUT: a JSON array of card objects. Each card:
     "accent_word": "<optional: one word/phrase from title to emphasize via highlight swipe>",
     "detail": "<optional supporting text>",
     "number": "<if a stat/number is featured>",
-    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote"|"carousel"|"definition"|"checklist"|"score"|"mindmap"|"data_chart"|"instagram-follow"|"tiktok-follow"|"yt-lower-third"|"news_ticker"|"rating"|"map_location"|"progress_bar"|"before_after_image"|"countdown"|"poll_question"|"myth_vs_fact"|"step_number"|"quote_carousel"|"emoji_reaction"|"price_tag"|"warning_soft"|"testimonial"|"versus_battle"|"recap_summary"|"location_journey"|"formula_equation"|"roadmap_milestone"|"pros_cons"|"star_rating_review"|"income_reveal"|"question_answer_pair"|"chapter_marker"|"secret_reveal"|"objection_response"|"data_bar_chart"|"cause_effect"|"number_ranking"|"hand_written_note"|"speech_bubble_thought"|"calendar_date_highlight"|"percentage_split"|"red_flag_list"|"success_metric_badge"|"client_avatar_persona"|"book_recommendation"|"tool_stack"|"revenue_breakdown"|"age_milestone"|"contrarian_take"|"action_step_cta"|"story_chapter_transition"|"live_reaction_split"|"hidden_cost_reveal"|"social_proof_counter"|"timeline_prediction"|"red_thread_connector"|"silent_beat_pause"|"comment_reply_style"|"before_you_scroll",
+    "style": "stat"|"key_phrase"|"quote"|"callout"|"comparison"|"list"|"question"|"timeline"|"dialogue"|"trend"|"attributed_quote"|"carousel"|"definition"|"checklist"|"score"|"mindmap"|"data_chart"|"instagram-follow"|"tiktok-follow"|"yt-lower-third"|"news_ticker"|"rating"|"map_location"|"progress_bar"|"before_after_image"|"countdown"|"poll_question"|"myth_vs_fact"|"step_number"|"quote_carousel"|"emoji_reaction"|"price_tag"|"warning_soft"|"testimonial"|"versus_battle"|"recap_summary"|"location_journey"|"formula_equation"|"roadmap_milestone"|"pros_cons"|"star_rating_review"|"income_reveal"|"question_answer_pair"|"chapter_marker"|"secret_reveal"|"objection_response"|"data_bar_chart"|"cause_effect"|"number_ranking"|"hand_written_note"|"speech_bubble_thought"|"calendar_date_highlight"|"percentage_split"|"red_flag_list"|"success_metric_badge"|"client_avatar_persona"|"book_recommendation"|"tool_stack"|"revenue_breakdown"|"age_milestone"|"contrarian_take"|"action_step_cta"|"story_chapter_transition"|"live_reaction_split"|"hidden_cost_reveal"|"social_proof_counter"|"timeline_prediction"|"red_thread_connector"|"silent_beat_pause"|"comment_reply_style"|"before_you_scroll"|"traffic_light_status"|"day_in_life_schedule"|"skill_tree_unlock"|"audience_poll_result"|"broken_promise_tracker"|"ingredient_list"|"resource_allocation"|"fill_in_the_blank",
     "left_label": "<comparison: left side label>",
     "left_value": "<comparison: left side value>",
     "right_label": "<comparison: right side label>",
@@ -539,7 +543,19 @@ OUTPUT: a JSON array of card objects. Each card:
     "pause_symbol": "<silent_beat_pause: optional — symbol or short pause marker, defaults to '…' if omitted>",
     "comment_text": "<comment_reply_style: the comment or question being shown>",
     "reply_text": "<comment_reply_style: the speaker's reply or response>",
-    "hook_text": "<before_you_scroll: the pattern-interrupt hook text — must be punchy and direct>"
+    "hook_text": "<before_you_scroll: the pattern-interrupt hook text — must be punchy and direct>",
+    "status_color": "<traffic_light_status: 'red' | 'yellow' | 'green' — must match what the speaker implies>",
+    "status_label": "<traffic_light_status: label describing what the status means, e.g. 'Stratégie validée', 'À optimiser', 'Abandonne ça'>",
+    "schedule_items": ["<day_in_life_schedule: time-anchored item, e.g. '6h - Réveil', '9h - Deep work', '12h - Pause'>"],
+    "unlocked_milestones": ["<skill_tree_unlock: milestone or skill unlocked in sequence, e.g. 'Maîtrise de Notion', 'Premier client signé'>"],
+    "poll_percentages": [0.0, 0.0],
+    "promises": ["<broken_promise_tracker: promise 1 as stated>", "<promise 2>"],
+    "kept_status": [true, false],
+    "ingredients": ["<ingredient_list: required item or material 1>", "<item 2>"],
+    "resource_labels": ["<resource_allocation: label for resource 1, e.g. 'Temps', 'Énergie', 'Budget'>"],
+    "resource_values": [0.0, 0.0],
+    "sentence_with_blank": "<fill_in_the_blank: the sentence with a blank placeholder, e.g. 'La clé du succès c\\'est ___'>",
+    "blank_word": "<fill_in_the_blank: the single word or short phrase that fills the blank>"
   }}
 }}
 
@@ -895,10 +911,101 @@ RULES:
     Distinct from callout (callout is neutral context; before_you_scroll has
     urgency/interruption energy). Trigger-style: the hook phrase must be literally
     spoken. Provide "hook_text".
+  "traffic_light_status" — speaker explicitly assigns a go/no-go or health
+    status to a strategy, project, or metric ("c'est rouge pour cette
+    tactique", "c'est vert, on valide", "encore en jaune"). REQUIRES an
+    explicit color-coded or status signal. Provide "status_color"
+    ("red"|"yellow"|"green") + "status_label". Distinct from stat (stat is
+    a raw metric; traffic_light_status is a status verdict). Distinct from
+    score (score is competitive ranking; traffic_light is a go/no-go).
+    Distinct from warning_soft (warning_soft is a caution text without
+    color-coded framing; traffic_light has explicit RED/YELLOW/GREEN
+    structure). NOT to be used when the speaker mentions a color
+    incidentally without assigning a status label.
+  "day_in_life_schedule" — speaker walks through their day or routine in
+    clock-anchored time slots ("je me lève à 6h", "à 9h je fais mon deep
+    work", "12h pause"). REQUIRES at least 3 time-anchored items with
+    explicit hour/time markers. Provide "schedule_items" list. Distinct
+    from timeline (timeline is temporal event sequence without clock
+    anchors; day_in_life_schedule is a daily routine with explicit hours).
+    Distinct from checklist (checklist is completed to-dos; schedule is
+    time-of-day slots). Distinct from list (list is unordered enumeration;
+    schedule is clock-ordered with time references mandatory).
+  "skill_tree_unlock" — speaker describes a sequence of discrete skill
+    unlocks, capability gates, or achievement badges they progressed
+    through in order ("d'abord j'ai maîtrisé X, ensuite Y s'est débloqué,
+    puis Z"). REQUIRES at least 2 ordered unlocks framed as a progression.
+    Distinct from success_metric_badge (badge is a single isolated
+    achievement; skill_tree is a chained unlock sequence). Distinct from
+    roadmap_milestone (milestone is one completed checkpoint; skill_tree is
+    a set of discrete levelled unlocks). Distinct from checklist (checklist
+    is to-dos; skill_tree has game-like unlock/progression energy). Provide
+    "unlocked_milestones" list (2-5 items in unlock order).
+  "audience_poll_result" — speaker cites the result of a vote or poll,
+    including ACTUAL percentages and a winning option ("j'ai posé la
+    question à ma communauté — 67% ont répondu X, 33% Y"). REQUIRES both
+    options AND their numeric percentages AND a clear winner. Distinct from
+    poll_question (poll_question is an open interactive vote with NO
+    results yet; audience_poll_result shows the completed result with
+    percentages and a winner). Distinct from percentage_split (percentage_split
+    is a neutral proportional breakdown; audience_poll_result has a winning
+    option, a poll framing, and explicit vote counts). Distinct from
+    data_bar_chart (data_bar_chart is generic numeric comparison;
+    audience_poll_result is specifically vote results with a winner).
+    Provide "poll_options" list + "poll_percentages" list of floats
+    (same length, 2-4 items; values should sum to ~100).
+  "broken_promise_tracker" — speaker enumerates a mixed list of promises
+    or commitments, explicitly flagging which were KEPT and which were
+    BROKEN ("j'avais promis X — tenu. J'avais promis Y — pas tenu.").
+    REQUIRES at least one kept AND at least one broken item — pure kept is
+    checklist, pure broken is red_flag_list. Trigger-style: the speaker
+    must literally name these promises. Distinct from checklist (all-positive
+    verified items; broken_promise_tracker has BOTH ✓ and ✗). Distinct
+    from red_flag_list (all-negative warnings; broken_promise_tracker
+    explicitly tracks a MIXED record). Distinct from myth_vs_fact
+    (myth_vs_fact debunks one claim; broken_promise_tracker maps a list of
+    commitments). Provide "promises" list + "kept_status" list of booleans
+    (same length; must contain at least one true AND one false).
+  "ingredient_list" — speaker enumerates the required components, materials,
+    inputs, or prerequisites needed for something ("pour réussir ça il te
+    faut X, Y et Z", "les ingrédients de ma méthode sont…"). Use when the
+    framing is REQUIRED MATERIALS, not completed tasks or software tools.
+    Distinct from tool_stack (tool_stack is specifically named software
+    apps; ingredient_list is any required material, concept, or input).
+    Distinct from checklist (checklist is completed actions; ingredient_list
+    is required inputs not yet verified). Distinct from list (list is
+    general ad-hoc enumeration; ingredient_list has explicit required-
+    materials framing). Provide "ingredients" list (2-6 items).
+  "resource_allocation" — speaker describes how a LIMITED resource (time,
+    budget, energy, attention) is distributed across uses with an
+    "emptying envelope" feel ("j'alloue 40% de mon budget à X, 30% à Y,
+    30% à Z"). REQUIRES labeled resource categories AND numeric values
+    that represent shares of a constrained total. Distinct from
+    revenue_breakdown (revenue_breakdown is specifically financial income
+    by stream; resource_allocation is ANY limited resource with depletion
+    framing — not just money). Distinct from percentage_split (percentage_split
+    is a neutral proportional breakdown without depletion framing;
+    resource_allocation has explicit limited-envelope / allocation energy).
+    Distinct from data_bar_chart (data_bar_chart is absolute value
+    comparison; resource_allocation is shares of a finite total). Provide
+    "resource_labels" list + "resource_values" list of floats (same length,
+    2-5 items; values should sum to ~100 if percentages, or share a common unit).
+  "fill_in_the_blank" — speaker constructs a sentence with a deliberate gap
+    and then reveals the missing word for rhetorical or pedagogical effect
+    ("la clé du succès c'est ___ — c'est la régularité"). REQUIRES an
+    explicit sentence-with-gap structure AND the single reveal word to be
+    literally spoken. Distinct from secret_reveal (secret_reveal is a whole
+    content block blurred then revealed; fill_in_the_blank is ONE WORD
+    within an already-visible sentence). Distinct from key_phrase (key_phrase
+    is a complete statement; fill_in_the_blank has an intentional structural
+    gap). Distinct from question (question asks outward to the audience;
+    fill_in_the_blank is a structured completion format). Provide
+    "sentence_with_blank" (use ___ for the gap) + "blank_word".
 - VERBATIM GROUNDING — mandatory check before assigning any explicit-signal
   card type (contrarian_take, warning_soft, red_flag_list, action_step_cta,
   myth_vs_fact, secret_reveal, objection_response, live_reaction_split,
-  hidden_cost_reveal, comment_reply_style, before_you_scroll): the trigger phrase MUST
+  hidden_cost_reveal, comment_reply_style, before_you_scroll,
+  broken_promise_tracker): the trigger phrase MUST
   appear verbatim in the KEY LINES or be unambiguously present in the beat
   description. The BEAT SPINE "lines" field is editorial context synthesised
   by a planning model — it may paraphrase, editorially rephrase, or invent
