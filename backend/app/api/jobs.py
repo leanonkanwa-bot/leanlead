@@ -2,14 +2,21 @@
 
 In-memory only would lose every active job each time Railway redeploys.
 This stores state at storage/jobs.json (an atomic write per update). On
-boot we reload + mark any non-terminal job as an error so polling clients
-see a real message instead of a 404 / a forever-spinner.
+boot we reload and triage non-terminal jobs:
 
-NOTE: persistence only saves *state*, not the in-flight background task.
-A job that was rendering when the container died cannot resume from where
-it left off (the FFmpeg subprocess is gone). The user must re-upload.
-For real continuity across deploys, mount a Railway Volume at
-/app/backend/storage AND keep deploys clear of in-flight uploads.
+  ready_for_review  → left unchanged (plan is on disk, no worker running)
+  rendering         → if source + plan_data on disk, added to _resumable_jobs
+                       for auto-requeue by startup; otherwise marked error
+  queued            → if source on disk, added to _resumable_jobs for phase-1
+                       requeue; otherwise marked error
+  transcribing /
+  planning          → marked error (can't resume mid-transcription); user can
+                       click Retry which restarts from the stored source file
+  anything else     → marked error with re-upload message
+
+Mount a Railway Volume at /app/backend/storage (DATA_DIR=/data) so that
+source files and jobs.json outlive container restarts. Without the volume,
+source files vanish on every deploy and auto-resume falls back to error.
 """
 
 from __future__ import annotations
@@ -28,6 +35,11 @@ from app.core.config import settings
 
 JOBS_FILE = settings._data_root / "jobs.json"
 TERMINAL_STATUSES = {"done", "error"}
+# Statuses that mean a plan exists on disk and no worker was running —
+# safe to leave unchanged across a restart.
+_STABLE_STATUSES = {"ready_for_review"}
+# Statuses where a worker thread was actively running.
+_ACTIVE_STATUSES = {"queued", "transcribing", "planning", "rendering"}
 INTERRUPT_MESSAGE = "Serveur redémarré - veuillez re-uploader votre vidéo"
 
 
@@ -68,6 +80,9 @@ class JobStore:
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
+        # Populated by _load(); consumed once by main.py startup to dispatch
+        # renders that were in-flight when the previous container died.
+        self._resumable_jobs: list[tuple[str, "Job"]] = []
         self._load()
 
     def _load(self) -> None:
@@ -86,16 +101,49 @@ class JobStore:
                 self._jobs[jid] = Job.from_dict(jd)
             except TypeError:
                 continue
-        # Mark anything that was in flight as failed — there is no process
-        # alive to finish it, the client should re-upload.
+        # Triage jobs that were non-terminal when the container died.
         for job in self._jobs.values():
-            if job.status not in TERMINAL_STATUSES:
-                job.status = "error"
+            if job.status in TERMINAL_STATUSES:
+                continue
+            if job.status in _STABLE_STATUSES:
+                # ready_for_review: plan is on disk, no worker was running.
+                # Leave it unchanged so the user can still approve the plan.
+                continue
+
+            has_source = bool(job.source_path and Path(job.source_path).exists())
+            has_plan   = bool(job.plan_data)
+
+            if job.status == "rendering" and has_source and has_plan:
+                # Phase 2 was running. Auto-restart: reset to queued so startup
+                # dispatcher picks it up via _resumable_jobs.
+                job.status   = "queued"
+                job.progress = 65
+                job.message  = "Rendu relancé après redémarrage du serveur…"
                 job.is_retry = True
-                job.error = INTERRUPT_MESSAGE
-                job.message = "Render interrompu — crédit remboursé."
+                self._resumable_jobs.append(("render", job))
+
+            elif job.status == "queued" and has_source:
+                # Never started — re-dispatch phase 1 from the stored source.
+                self._resumable_jobs.append(("phase1", job))
+
+            elif job.status in ("transcribing", "planning") and has_source:
+                # Mid-transcription: can't resume. Mark error but keep source
+                # so the user can retry without re-uploading.
+                job.status   = "error"
+                job.is_retry = True
+                job.error    = "Analyse interrompue par redémarrage — cliquez Relancer"
+                job.message  = "Analyse interrompue — crédit remboursé. Cliquez Relancer."
                 job.progress = 100
-        # Persist the corrections so a later request sees the right state.
+
+            else:
+                # Source gone or unknown state — full re-upload required.
+                job.status   = "error"
+                job.is_retry = True
+                job.error    = INTERRUPT_MESSAGE
+                job.message  = "Render interrompu — crédit remboursé."
+                job.progress = 100
+
+        # Persist triage results so a later GET /api/jobs/{id} sees correct state.
         self._save_locked()
 
     def _save_locked(self) -> None:

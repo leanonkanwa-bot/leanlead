@@ -20,6 +20,12 @@ from pathlib import Path
 _RENDER_SEM = threading.Semaphore(1)
 _TRANSCRIPTION_TIMEOUT_S = 900  # 15 min — Whisper hang guard; raises RuntimeError → is_retry=True
 
+# Set by the SIGTERM handler in main.py.  When set:
+#   - run_render_phase() refuses to start a new render (returns immediately so
+#     Layer C recovery picks it up on the next boot)
+#   - queued renders waiting on the semaphore abort rather than block forever
+_shutdown_event = threading.Event()
+
 from app.agent.planner import FormatHint, analyze_subject_position, plan_edit, rewrite_hook
 from app.api.jobs import store
 from app.core.config import settings
@@ -1277,6 +1283,13 @@ def quality_check(plan, result: dict) -> list[str]:
 
 def run_render_phase(job_id: str, src: Path) -> None:
     """Phase 2: render the approved edit plan → status: done."""
+    # Guard: if a SIGTERM arrived while we were queued or just about to start,
+    # bail out immediately.  The job is already in "rendering" / "queued" state
+    # on disk so Layer C recovery will requeue it on the next boot.
+    if _shutdown_event.is_set():
+        print(f"[PIPELINE] shutdown pending — deferring render for {job_id} to recovery", flush=True)
+        return
+
     job = store.get(job_id)
     if not job:
         return
@@ -1286,13 +1299,25 @@ def run_render_phase(job_id: str, src: Path) -> None:
     # the second render until the first is complete — no job is dropped.
     _sem_acquired = _RENDER_SEM.acquire(blocking=False)
     if not _sem_acquired:
+        # Check shutdown before committing to a potentially long wait.
+        if _shutdown_event.is_set():
+            print(f"[PIPELINE] shutdown — not queuing render for {job_id}", flush=True)
+            return
         print(
             f"[PIPELINE] job {job_id}: render semaphore busy — queuing"
             " (another render is in progress)",
             flush=True,
         )
         store.update(job_id, message="En file d'attente (rendu précédent en cours)…")
-        _RENDER_SEM.acquire(blocking=True)
+        # Poll with a short timeout so we can abort on shutdown rather than
+        # blocking indefinitely behind a render that may outlast a SIGTERM.
+        while not _RENDER_SEM.acquire(timeout=5):
+            if _shutdown_event.is_set():
+                print(
+                    f"[PIPELINE] shutdown while queued — aborting render for {job_id}",
+                    flush=True,
+                )
+                return
         print(f"[PIPELINE] job {job_id}: render semaphore acquired — starting", flush=True)
     try:
         _t_phase2 = time.perf_counter()

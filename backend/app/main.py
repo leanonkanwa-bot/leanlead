@@ -36,7 +36,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 
 from app.api.jobs import store
-from app.api.pipeline import run_job, run_render_phase
+from app.api.pipeline import run_job, run_render_phase, _shutdown_event as _pipeline_shutdown, _RENDER_SEM
 from app.api.upload import assembled_path, router as upload_router
 from app.core.config import settings
 from app.core.plans import DEFAULT_PLAN, effective_plan_info
@@ -111,6 +111,8 @@ app = FastAPI(title="AI Video Editor Agent", version="0.1.0")
 @app.on_event("startup")
 def _on_startup() -> None:
     import os as _os
+    import signal as _signal
+
     _commit_file = Path(__file__).resolve().parent.parent / "COMMIT_HASH"
     _commit = _commit_file.read_text().strip() if _commit_file.exists() else "unknown"
     _commit = _os.environ.get("RAILWAY_GIT_COMMIT_SHA", "") or _commit
@@ -119,6 +121,82 @@ def _on_startup() -> None:
     _purge_trash()
     asyncio.create_task(_purge_trash_loop())
     asyncio.create_task(_reengagement_loop())
+
+    # ── SIGTERM handler — register AFTER uvicorn sets up its own handler ────
+    # We wrap uvicorn's handler: set the shutdown flag (rejects new renders),
+    # drain the in-flight render for up to 60 s, then forward to uvicorn so
+    # it exits normally.  Long renders (> drain window) are recovered on the
+    # next boot by the auto-resume logic below.
+    _uvicorn_sigterm = _signal.getsignal(_signal.SIGTERM)
+
+    def _sigterm_handler(signum: int, frame: object) -> None:
+        _pipeline_shutdown.set()
+        print(
+            "[SHUTDOWN] SIGTERM — rejecting new renders; "
+            "draining in-flight render (max 60 s)…",
+            flush=True,
+        )
+        try:
+            acquired = _RENDER_SEM.acquire(timeout=60)
+            if acquired:
+                _RENDER_SEM.release()
+                print("[SHUTDOWN] Render drained cleanly before exit", flush=True)
+            else:
+                print(
+                    "[SHUTDOWN] Drain timeout — render will auto-resume on next boot",
+                    flush=True,
+                )
+        except Exception:
+            pass
+        # Forward to uvicorn's handler so the process exits cleanly.
+        if callable(_uvicorn_sigterm) and _uvicorn_sigterm not in (
+            _signal.SIG_DFL, _signal.SIG_IGN
+        ):
+            _uvicorn_sigterm(signum, frame)
+
+    _signal.signal(_signal.SIGTERM, _sigterm_handler)
+
+    # ── Auto-resume jobs that were in-flight during the previous shutdown ───
+    # _resumable_jobs is populated by JobStore._load() at import time.
+    # Each entry is ("render", job) or ("phase1", job).
+    _to_resume = store._resumable_jobs
+    if _to_resume:
+        print(f"[STARTUP] {len(_to_resume)} job(s) to auto-resume", flush=True)
+    for _kind, _job in _to_resume:
+        _src = Path(_job.source_path) if _job.source_path else None
+        if not _src or not _src.exists():
+            store.update(
+                _job.id,
+                status="error",
+                is_retry=True,
+                error="Source vidéo introuvable après redémarrage",
+                message="Render interrompu — crédit remboursé.",
+                progress=100,
+            )
+            print(f"[STARTUP] job {_job.id}: source missing — marked error", flush=True)
+            continue
+
+        if _kind == "render":
+            print(f"[STARTUP] Auto-resuming render for job {_job.id}", flush=True)
+            threading.Thread(
+                target=run_render_phase,
+                args=(_job.id, _src),
+                daemon=True,
+                name=f"resume-render-{_job.id[:8]}",
+            ).start()
+
+        elif _kind == "phase1":
+            _params = dict(_job.params or {})
+            _instructions = _params.pop("instructions", "")
+            _format_hint  = _params.pop("format_hint", "auto")
+            print(f"[STARTUP] Auto-resuming phase-1 for job {_job.id}", flush=True)
+            threading.Thread(
+                target=run_job,
+                args=(_job.id, _src, _instructions, _format_hint),
+                kwargs=_params,
+                daemon=True,
+                name=f"resume-phase1-{_job.id[:8]}",
+            ).start()
 
 app.add_middleware(
     CORSMiddleware,
@@ -412,6 +490,14 @@ async def submit_edit(
             "limit": info["limit"],
         })
 
+    # Refuse new edit submissions while a SIGTERM drain is in progress so the
+    # job doesn't start and immediately get interrupted by the container dying.
+    if _pipeline_shutdown.is_set():
+        raise HTTPException(
+            503,
+            "Déploiement en cours — réessayez dans quelques secondes",
+        )
+
     job = store.create()
 
     if upload_id:
@@ -540,6 +626,13 @@ async def approve_job(
     _: None = Depends(_check_auth),
 ) -> JSONResponse:
     """Approve an edit plan and trigger the render phase (Phase 2)."""
+    # Refuse render approvals during a SIGTERM drain for the same reason as /api/edit.
+    if _pipeline_shutdown.is_set():
+        raise HTTPException(
+            503,
+            "Déploiement en cours — réessayez dans quelques secondes",
+        )
+
     job = store.get(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
