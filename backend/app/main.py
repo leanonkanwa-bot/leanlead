@@ -129,9 +129,14 @@ def _on_startup() -> None:
     # are recovered on the next boot by the auto-resume logic below.
     #
     # Railway note: Railway's default SIGTERM→SIGKILL gap is 0 s.  This drain
-    # window only buys time because railway.json sets drainingSeconds: 600 to
-    # match this constant.  If that config is removed, SIGKILL fires immediately.
-    _SIGTERM_DRAIN_SECS = 600  # 10 min — must match drainingSeconds in railway.json
+    # window only works because railway.json sets drainingSeconds: 600.
+    #
+    # 570 s = 600 s (Railway hard-kill) − 30 s (clean-exit margin).
+    # The app finishes draining before Railway's SIGKILL can interrupt it.
+    # If you change drainingSeconds in railway.json, update this constant too,
+    # keeping the 30 s margin intact.  Renders that outlast even 570 s are
+    # killed by Railway and auto-resumed by Layer C on next boot.
+    _SIGTERM_DRAIN_SECS = 570  # 9m30s — Railway 600s kill minus 30s margin
     _uvicorn_sigterm = _signal.getsignal(_signal.SIGTERM)
 
     def _sigterm_handler(signum: int, frame: object) -> None:
