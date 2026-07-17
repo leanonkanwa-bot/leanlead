@@ -38,9 +38,44 @@ _TRIGGER_STYLES: frozenset[str] = frozenset({
     "secret_reveal",
     "objection_response",
 })
-_GROUNDING_OVERLAP_THRESHOLD = 0.20   # tunable — fraction of trigger-text tokens that must match speech
+_GROUNDING_OVERLAP_THRESHOLD = 0.40   # fraction of trigger content-words that must match speech
 _GROUNDING_WINDOW_PRE_S  = 0.5        # seconds before startSec included in the speech window
 _GROUNDING_WINDOW_POST_S = 3.0        # seconds after  startSec included in the speech window
+
+# French stopwords stripped before grounding overlap computation so that invented phrases
+# sharing only function words with genuine speech (e.g. "je vais dire que…" vs "je vais
+# vous montrer…") do not inflate the score above the rejection threshold.
+_FR_STOPWORDS: frozenset[str] = frozenset({
+    # subject pronouns
+    "je", "tu", "il", "elle", "on", "nous", "vous", "ils", "elles",
+    # object / reflexive pronouns
+    "me", "te", "se", "lui", "leur", "en", "le", "la", "les", "y",
+    # determiners & partitives
+    "un", "une", "des", "de", "du", "au", "aux", "le", "la", "les",
+    # possessives
+    "mon", "ton", "son", "ma", "ta", "sa", "mes", "tes", "ses",
+    "notre", "votre", "nos", "vos", "leurs",
+    # demonstratives
+    "ce", "cet", "cette", "ces",
+    # conjunctions
+    "et", "ou", "mais", "donc", "or", "ni", "car",
+    "que", "qui", "quoi", "dont",
+    "comme", "si", "parce",
+    # prepositions
+    "dans", "pour", "avec", "sur", "sous", "par", "en",
+    "vers", "chez", "entre", "avant", "après", "pendant", "depuis",
+    # high-frequency verbs (low content value)
+    "est", "sont", "être", "avoir", "va", "vais", "vas",
+    "aller", "dire", "faire", "dit", "fait", "ont", "été", "était",
+    # negation & common adverbs
+    "ne", "pas", "plus", "très", "bien", "aussi", "même",
+    "tout", "tous", "toute", "toutes", "peu", "trop", "beaucoup",
+    # discourse particles
+    "ça", "voilà", "voici", "alors", "ainsi", "donc",
+    "déjà", "encore", "là", "ici",
+    # filler conjunctions
+    "quand", "ensemble",
+})
 
 # Maps each trigger style to the contentHints field that holds its key claim.
 # This field is what the speaker must have literally said for the style to be valid.
@@ -943,6 +978,11 @@ def _tokenize_text(text: str) -> frozenset[str]:
     )
 
 
+def _content_words(text: str) -> frozenset[str]:
+    """Tokenize then remove French stopwords, keeping only substantive content tokens."""
+    return _tokenize_text(text) - _FR_STOPWORDS
+
+
 def _card_trigger_text(card: dict) -> str:
     """Extract the primary trigger-text string from a trigger-style card's contentHints.
 
@@ -963,20 +1003,25 @@ def _card_trigger_text(card: dict) -> str:
 
 
 def _grounding_overlap(card: dict, remapped_words: list[WordTiming]) -> float:
-    """Return fraction of card trigger-text tokens present in speech near startSec.
+    """Return fraction of trigger content-words present in speech near startSec.
+
+    Stopwords (French function words, pronouns, high-frequency verbs) are stripped
+    from both the trigger text and the Whisper window before computing overlap.
+    This prevents invented phrases that share only function words with genuine speech
+    (e.g. "je vais dire que c'est une mauvaise idée" near "je vais vous montrer ça")
+    from crossing the rejection threshold.
 
     Window: [startSec - _GROUNDING_WINDOW_PRE_S, startSec + _GROUNDING_WINDOW_POST_S].
-    Returns 1.0 (always passes) when the card has no extractable trigger text, to avoid
-    false-positive reclassification on cards that only have a generic 'title' field.
+    Returns 1.0 (always passes) when the card has no extractable trigger text.
     """
-    trigger_tokens = _tokenize_text(_card_trigger_text(card))
+    trigger_tokens = _content_words(_card_trigger_text(card))
     if not trigger_tokens:
         return 1.0
     start = float(card.get("startSec", 0))
     spoken: frozenset[str] = frozenset()
     for w in remapped_words:
         if start - _GROUNDING_WINDOW_PRE_S <= w.start <= start + _GROUNDING_WINDOW_POST_S:
-            spoken |= _tokenize_text(w.text)
+            spoken |= _content_words(w.text)
     return len(trigger_tokens & spoken) / len(trigger_tokens)
 
 
