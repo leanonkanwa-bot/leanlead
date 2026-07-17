@@ -2595,6 +2595,26 @@ def _build_timeline_js(
     lines = [
         "(function () {",
         '  const tl = window.gsap.timeline({ paused: true });',
+        # Runtime guard: wrap tl.fromTo / tl.to / tl.set so that tweens targeting a
+        # selector that doesn't exist in the rendered HTML are skipped with a console
+        # warning rather than silently no-oping while the CSS-set opacity:0 persists.
+        # This means a future HTML/JS drift (new pack or type) degrades to a visible
+        # warning in the Puppeteer log instead of a blank card in production.
+        '  (function(){',
+        '    function _guard(orig){',
+        '      return function(target,a,b,c){',
+        '        if(typeof target==="string"){',
+        '          var el=document.querySelector(target);',
+        '          if(!el){console.warn("[GSAP-GUARD] target not found: "+target);return tl;}',
+        '          return orig.call(tl,el,a,b,c);',
+        '        }',
+        '        return orig.call(tl,target,a,b,c);',
+        '      };',
+        '    }',
+        '    tl.fromTo=_guard(tl.fromTo);',
+        '    tl.to    =_guard(tl.to);',
+        '    tl.set   =_guard(tl.set);',
+        '  })();',
         f'  var _eIn = "{ease_in}";',
         f'  var _eOut = "{_EASE_OUT_FAST}";',
         "",
