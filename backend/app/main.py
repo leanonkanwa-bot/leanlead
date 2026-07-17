@@ -796,10 +796,70 @@ def _check_reengagement() -> None:
         print(f"[reengagement] scan failed: {e}")
 
 
+def _check_nurture_emails() -> None:
+    """Daily scan for time-based nurture emails.
+
+    Onboarding sequence (no render yet): J+2, J+5, J+10.
+    Post-render sequence: J+1 after first completed render (1-7 day window).
+
+    Uses profile['created_at'] as the registration anchor.
+    Falls back to file mtime for profiles created before that field existed.
+    Each send writes a stamp to the profile JSON (anti-duplicate gate).
+    """
+    _NOW = time.time()
+    _DAY = 24 * 3600
+    try:
+        for profile_path in _PROFILES_DIR.glob("*.json"):
+            try:
+                profile = json.loads(profile_path.read_text(encoding="utf-8"))
+                pid = profile.get("profile_id") or profile_path.stem
+
+                if profile.get("is_founder"):
+                    continue
+
+                # Registration anchor — fall back to file mtime for old profiles
+                registered_at = profile.get("created_at")
+                if not registered_at:
+                    try:
+                        registered_at = profile_path.stat().st_mtime
+                    except OSError:
+                        continue
+                days_since_reg = (_NOW - float(registered_at)) / _DAY
+
+                # Completed jobs for this profile
+                done_times = sorted(
+                    j.created_at for j in store._jobs.values()
+                    if j.profile_id == pid and j.status == "done" and not j.is_retry
+                )
+                has_render = bool(done_times)
+                days_since_first = (
+                    (_NOW - done_times[0]) / _DAY if has_render else None
+                )
+
+                # Onboarding sequence — only fires while user has zero renders
+                if not has_render:
+                    if days_since_reg >= 2:
+                        _emails.send_nurture_d2(profile, profile_path)
+                    if days_since_reg >= 5:
+                        _emails.send_nurture_d5(profile, profile_path)
+                    if days_since_reg >= 10:
+                        _emails.send_nurture_d10(profile, profile_path)
+
+                # Post first render: 1-7 day window prevents stale "hier" phrasing
+                if days_since_first is not None and 1 <= days_since_first <= 7:
+                    _emails.send_post_render_d1(profile, profile_path)
+
+            except Exception as e:
+                print(f"[nurture] profile {profile_path.stem}: {e}")
+    except Exception as e:
+        print(f"[nurture] scan failed: {e}")
+
+
 async def _reengagement_loop() -> None:
     while True:
         await asyncio.sleep(24 * 3600)
         _check_reengagement()
+        _check_nurture_emails()
 
 
 @app.post("/api/profile")
@@ -961,6 +1021,7 @@ def google_callback(
                 "email": email,
                 "name": name,
                 "plan": DEFAULT_PLAN,
+                "created_at": time.time(),
             }
             profile_path = _PROFILES_DIR / f"{profile_id}.json"
             profile_path.write_text(json.dumps(new_profile, ensure_ascii=False, indent=2), encoding="utf-8")

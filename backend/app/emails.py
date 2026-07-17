@@ -122,8 +122,8 @@ def send_welcome(profile: dict) -> None:
             "réécrit le hook, supprime les silences et exporte "
             "automatiquement en 9:16 et 16:9.<br><br>"
             "Ta première vidéo est "
-            '<strong style="color:#FF7751">offerte</strong> — '
-            "aucune carte requise."
+            '<strong style="color:#FF7751">offerte</strong>. '
+            "Aucune carte requise."
         )
         + _cta(_APP_URL, "Commencer l’édition →")
     )
@@ -174,7 +174,7 @@ def send_reengagement(profile: dict, profile_path: Path) -> bool:
             "Hey " + first + ", ça fait 7 jours que tu n’es plus passé par ici.<br><br>"
             "Chaque vidéo non éditée, c’est du temps perdu et de la "
             "rétention qui s’envole. Reprends là où tu t’es "
-            "arrêté — moins de 5 minutes pour uploader et lancer l’édition."
+            "arrêté. Moins de 5 minutes pour uploader et lancer l’édition."
         )
         + _cta(_APP_URL, "Reprendre l’édition →")
     )
@@ -222,3 +222,166 @@ def send_quota_warning(profile: dict, profile_path: Path, used: int, limit: int)
     except Exception as e:
         print(f"[email] quota throttle stamp failed for {profile_path.stem}: {e}")
     _send(email, subject, _shell(body))
+
+
+# ── E — Nurture J+2 (pas encore édité) ───────────────────────────────────────
+
+def send_nurture_d2(profile: dict, profile_path: Path) -> bool:
+    """J+2 sans render. Returns True if email was queued."""
+    if profile.get("is_founder"):
+        return False
+    email = (profile.get("email") or "").strip()
+    if not email:
+        return False
+    if profile.get("nurture_d2_sent"):
+        return False
+    first = _first_name(profile)
+    subject = "Ta première vidéo t'attend, " + first
+    body = (
+        _h1("Ta première vidéo t'attend")
+        + _p(
+            "Hey " + first + ", tu t'es inscrit il y a 2 jours "
+            "mais tu n'as pas encore lancé ton premier montage.<br><br>"
+            "C'est normal d'hésiter. LeanRetention est là pour supprimer "
+            "le montage de ta liste de tâches, pas pour l'allonger.<br><br>"
+            "Balance ta vidéo brute. On s'occupe du reste en moins de 5 minutes."
+        )
+        + _cta(_APP_URL, "Lancer mon premier montage →")
+    )
+    try:
+        profile["nurture_d2_sent"] = time.time()
+        profile_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[email] nurture_d2 stamp failed for {profile_path.stem}: {e}")
+    _send(email, subject, _shell(body))
+    return True
+
+
+# ── F — Nurture J+5 (conseil rétention) ──────────────────────────────────────
+
+def send_nurture_d5(profile: dict, profile_path: Path) -> bool:
+    """J+5 sans render. Returns True if email was queued."""
+    if profile.get("is_founder"):
+        return False
+    email = (profile.get("email") or "").strip()
+    if not email:
+        return False
+    if profile.get("nurture_d5_sent"):
+        return False
+    first = _first_name(profile)
+    subject = "Le secret des vidéos qui gardent l'attention"
+    body = (
+        _h1("Le secret des vidéos qui gardent l'attention")
+        + _p(
+            "Hey " + first + ", voici ce que les créateurs avec 60 % de "
+            "rétention font différemment."
+        )
+        + _p(
+            '<strong style="color:#FF7751">1. Le hook en 3 secondes.</strong><br>'
+            "Commence par la conclusion ou la tension. Pas par l'intro. "
+            "Pas par \"Bonjour, aujourd'hui on va parler de...\"<br><br>"
+            '<strong style="color:#FF7751">2. Les pauses courtes.</strong><br>'
+            "Chaque silence de plus de 0,8 seconde fait décrocher. "
+            "LeanRetention les supprime automatiquement à chaque export.<br><br>"
+            '<strong style="color:#FF7751">3. La relance à mi-vidéo.</strong><br>'
+            "Ajoute une promesse ou une question à la moitié de ta vidéo "
+            "pour relancer l'attention."
+        )
+        + _cta(_APP_URL, "Tester sur ma prochaine vidéo →")
+    )
+    try:
+        profile["nurture_d5_sent"] = time.time()
+        profile_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[email] nurture_d5 stamp failed for {profile_path.stem}: {e}")
+    _send(email, subject, _shell(body))
+    return True
+
+
+# ── G — Nurture J+10 (démo avant/après) ──────────────────────────────────────
+
+def send_nurture_d10(profile: dict, profile_path: Path) -> bool:
+    """J+10 sans render. Returns True if email was queued."""
+    if profile.get("is_founder"):
+        return False
+    email = (profile.get("email") or "").strip()
+    if not email:
+        return False
+    if profile.get("nurture_d10_sent"):
+        return False
+    first = _first_name(profile)
+    subject = "Avant / Après LeanRetention (résultat réel)"
+    body = (
+        _h1("Avant / Après LeanRetention")
+        + _p(
+            "Hey " + first + ", voici ce que donne LeanRetention "
+            "sur une vidéo brute de 8 minutes."
+        )
+        + (
+            '<div style="background:rgba(255,119,81,.08);border:1px solid '
+            'rgba(255,119,81,.2);border-radius:12px;padding:20px 24px;margin:0 0 28px">'
+            '<p style="margin:0 0 8px;font-size:12px;color:rgba(245,245,246,.4);'
+            'text-transform:uppercase;letter-spacing:.08em">Avant</p>'
+            '<p style="margin:0 0 20px;font-size:15px;color:rgba(245,245,246,.65)">'
+            "8 min 12 sec. 12 % de rétention. 4 silences de plus de 2 secondes. "
+            "Hook flou.</p>"
+            '<p style="margin:0 0 8px;font-size:12px;color:#FF7751;'
+            'text-transform:uppercase;letter-spacing:.08em">Après</p>'
+            '<p style="margin:0;font-size:15px;color:rgba(245,245,246,.65)">'
+            "2 min 38 sec. 61 % de rétention. Silences supprimés. "
+            "Hook réécrit automatiquement.</p>"
+            "</div>"
+        )
+        + _p(
+            "Le même résultat t'attend. Upload ta vidéo, "
+            "LeanRetention fait le montage en quelques minutes."
+        )
+        + _cta(_APP_URL, "Voir ma vidéo transformée →")
+    )
+    try:
+        profile["nurture_d10_sent"] = time.time()
+        profile_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[email] nurture_d10 stamp failed for {profile_path.stem}: {e}")
+    _send(email, subject, _shell(body))
+    return True
+
+
+# ── H — Post-render J+1 ───────────────────────────────────────────────────────
+
+def send_post_render_d1(profile: dict, profile_path: Path) -> bool:
+    """J+1 after first completed render (window: 1-7 days). Returns True if email was queued."""
+    if profile.get("is_founder"):
+        return False
+    email = (profile.get("email") or "").strip()
+    if not email:
+        return False
+    if profile.get("post_render_d1_sent"):
+        return False
+    first = _first_name(profile)
+    subject = "Félicitations pour ta première vidéo, " + first + " !"
+    body = (
+        _h1("Félicitations pour ta première vidéo.")
+        + _p(
+            "Hey " + first + ", tu as fait ton premier montage hier. "
+            "C'est le plus dur, et tu l'as passé."
+        )
+        + _p(
+            "Voici ce que les créateurs avec le plus de succès font "
+            "dans les 7 jours qui suivent leur premier montage.<br><br>"
+            '<strong style="color:#FF7751">Publie dans les 24h.</strong><br>'
+            "Une vidéo bien montée et publiée rapidement bat "
+            "une vidéo parfaite publiée dans 3 semaines.<br><br>"
+            '<strong style="color:#FF7751">Lance un deuxième montage.</strong><br>'
+            "La cohérence de publication est le facteur n°1 de croissance. "
+            "La deuxième vidéo est toujours plus facile que la première."
+        )
+        + _cta(_APP_URL, "Monter ma prochaine vidéo →")
+    )
+    try:
+        profile["post_render_d1_sent"] = time.time()
+        profile_path.write_text(json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception as e:
+        print(f"[email] post_render_d1 stamp failed for {profile_path.stem}: {e}")
+    _send(email, subject, _shell(body))
+    return True
