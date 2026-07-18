@@ -1245,6 +1245,56 @@ def _grounding_overlap(card: dict, remapped_words: list[WordTiming]) -> float:
     return len(trigger_tokens & spoken) / len(trigger_tokens)
 
 
+def _apply_segment_clamp(
+    graphic_cards: list[dict],
+    seg_out: list[tuple[float, float]],
+) -> int:
+    """Hard deterministic floor: clamp cards that land before speech or in a silence gap.
+
+    Takes output-timeline segment bounds (already remapped from source via
+    timing_map.source_to_output).  Returns the number of cards clamped.
+
+    Two cases trigger a clamp:
+      1. card.startSec is before the first speech segment
+      2. card.startSec falls in a silence gap between two segments → moved to the
+         start of the NEXT segment
+
+    A card already inside a speech segment is not moved (it may still be a few hundred
+    milliseconds early within that segment, but that is the title-anchor's job).
+    """
+    if not seg_out:
+        return 0
+    clamped = 0
+    for _gc in graphic_cards:
+        _start = float(_gc.get("startSec", 0))
+        _floor: float | None = None
+        if _start < seg_out[0][0]:
+            _floor = seg_out[0][0]
+        else:
+            for _i in range(len(seg_out)):
+                _ss, _se = seg_out[_i]
+                if _ss <= _start <= _se:
+                    break  # inside this segment — no clamp needed
+                if _i + 1 < len(seg_out):
+                    _ns = seg_out[_i + 1][0]
+                    if _se < _start < _ns:
+                        _floor = _ns
+                        break
+        if _floor is not None and _floor > _start:
+            _orig = float(_gc["startSec"])
+            _gc["startSec"] = round(_floor, 3)
+            if float(_gc.get("endSec", 0)) < _gc["startSec"] + 1.5:
+                _gc["endSec"] = round(_gc["startSec"] + 3.0, 3)
+            print(
+                f"[STORYBOARD] SEGMENT-CLAMP card {_gc.get('id','?')} "
+                f"startSec {_orig:.2f}→{_gc['startSec']:.2f}s "
+                f"(segment boundary enforced)",
+                flush=True,
+            )
+            clamped += 1
+    return clamped
+
+
 def generate_storyboard(
     trimmed_duration: float,
     remapped_words: list[WordTiming],
@@ -1413,6 +1463,19 @@ def generate_storyboard(
                 f"style={_style!r} overlap={_pct}%",
                 flush=True,
             )
+
+    # Segment-boundary clamp — hard deterministic floor after ALL anchoring passes.
+    # Closes the paraphrase edge case: title-anchor finds nothing when card content is
+    # fully paraphrased, leaving startSec at the LLM's (potentially early) value.
+    # transcript_segments are in SOURCE timeline → remap to output timeline first.
+    _seg_out: list[tuple[float, float]] = []
+    for _seg in transcript_segments:
+        _ss = timing_map.source_to_output(float(_seg.get("start", 0)))
+        _se = timing_map.source_to_output(float(_seg.get("end", 0)))
+        if _se > _ss:
+            _seg_out.append((_ss, _se))
+    _seg_out.sort()
+    _apply_segment_clamp(graphic_cards, _seg_out)
 
     # Timing audit — after all anchoring passes, log per-card timing with title context.
     # Includes card title so logs can confirm semantic alignment, not just proximity.
