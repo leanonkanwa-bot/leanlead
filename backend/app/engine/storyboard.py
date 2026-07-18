@@ -1328,6 +1328,52 @@ def generate_storyboard(
                 flush=True,
             )
 
+    # Title-based semantic anchoring — non-trigger cards only.
+    # Root cause: the Fix-4/5 snap gate (0.3s threshold) never fires in short-format
+    # videos where speech density is ~3 words/sec — a transitional word like "en" or
+    # "auprès" is almost always within 0.3s of any timestamp, keeping the gate shut even
+    # when the card's actual content (e.g. the skill names in a skill_tree_unlock) isn't
+    # spoken until 1–4s later.  Trigger-style cards are already protected by
+    # _find_trigger_anchor(); this pass extends the same keyword-match logic to all
+    # non-trigger cards using contentHints.title as the search text.
+    # Only fires when the matched word is > 0.5s later than current startSec so that
+    # already-correct placements (card already at or after the title word) are not shifted.
+    for _gc in graphic_cards:
+        _style = _gc.get("contentHints", {}).get("style", "")
+        if _style in _TRIGGER_STYLES:
+            continue  # already handled by _find_trigger_anchor above
+        _title = _gc.get("contentHints", {}).get("title", "")
+        if not _title:
+            continue
+        _title_cw = _content_words(_title)
+        if not _title_cw:
+            continue
+        _start_s = float(_gc.get("startSec", 0))
+        _lo = _start_s - _GROUNDING_WINDOW_PRE_S
+        _hi = _start_s + _ANCHOR_SEARCH_FORWARD_S
+        _matched: float | None = None
+        _matched_word: str = ""
+        for _w in remapped_words:
+            if _w.start < _lo:
+                continue
+            if _w.start > _hi:
+                break
+            if _content_words(_w.text) & _title_cw:
+                _matched = _w.start
+                _matched_word = _w.text
+                break
+        if _matched is not None and _matched - _start_s > 0.5:
+            _orig_start = float(_gc["startSec"])
+            _gc["startSec"] = round(max(_matched - _ANCHOR_LEAD_S, _start_s), 3)
+            if float(_gc.get("endSec", 0)) < _gc["startSec"] + 1.5:
+                _gc["endSec"] = round(_gc["startSec"] + 3.0, 3)
+            print(
+                f"[STORYBOARD] TITLE-ANCHOR card {_gc.get('id','?')} style={_style!r} "
+                f"startSec {_orig_start:.2f}→{_gc['startSec']:.2f}s "
+                f"(title keyword '{_matched_word}'@{_matched:.2f}s matched in Whisper)",
+                flush=True,
+            )
+
     # Grounding guard — code-level backstop for trigger-style cards.
     # The LLM prompt contains a verbatim-grounding rule, but it's a soft constraint
     # that Claude can violate under paraphrase pressure from the beat spine. This loop
@@ -1368,11 +1414,17 @@ def generate_storyboard(
                 flush=True,
             )
 
-    # Timing audit — after snap + grounding guard, log CRITICAL if card has no speech nearby.
+    # Timing audit — after all anchoring passes, log per-card timing with title context.
+    # Includes card title so logs can confirm semantic alignment, not just proximity.
+    # A nearby transitional word ("en", "mais") with title far from speech still looks
+    # "fine" in proximity-only logs — title in the log makes the blind spot visible.
     for _gc in graphic_cards:
-        _start = float(_gc.get("startSec", 0))
-        _end   = float(_gc.get("endSec", _start + 3))
-        _style = _gc.get("contentHints", {}).get("style", "?")
+        _start  = float(_gc.get("startSec", 0))
+        _end    = float(_gc.get("endSec", _start + 3))
+        _hints  = _gc.get("contentHints", {})
+        _style  = _hints.get("style", "?")
+        _title  = str(_hints.get("title", "") or "").strip()
+        _title_snippet = (_title[:40] + "…") if len(_title) > 40 else _title
         _near = [w for w in remapped_words if _start - 0.3 <= w.start <= _start + 1.0]
         if not _near:
             _closest = min(remapped_words, key=lambda w: abs(w.start - _start), default=None)
@@ -1380,6 +1432,7 @@ def generate_storyboard(
                        if _closest else "no words")
             print(
                 f"[STORYBOARD] CRITICAL card {_gc.get('id','?')} style={_style!r} "
+                f"title={_title_snippet!r} "
                 f"startSec={_start:.2f}s endSec={_end:.2f}s "
                 f"has NO speech in [{_start-0.3:.2f},{_start+1.0:.2f}] — {_cl_str}",
                 flush=True,
@@ -1387,6 +1440,7 @@ def generate_storyboard(
         else:
             print(
                 f"[STORYBOARD] card {_gc.get('id','?')} style={_style!r} "
+                f"title={_title_snippet!r} "
                 f"startSec={_start:.2f}s endSec={_end:.2f}s "
                 f"first nearby word='{_near[0].text}'@{_near[0].start:.2f}s",
                 flush=True,
