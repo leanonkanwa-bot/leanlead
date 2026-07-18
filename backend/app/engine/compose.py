@@ -52,12 +52,16 @@ _ZONE_BOUNDS_PORTRAIT = {
     "hook-title":     {"left": 0,   "top": 0,    "width": 1080, "height": 288},
     "upper-right":          {"left": 540, "top": 100,  "width": 500,  "height": 320},   # B-roll compact upper-right
     "upper-data":           {"left": 540, "top": 100,  "width": 500,  "height": 320},   # alias
+    # Positional-variety zones — standard data cards alternate left/right per card index
+    # (face-biased when subject_position available) so consecutive cards never land in the
+    # same corner.  upper-data (right) already exists above; upper-left-data-sm mirrors it.
+    "upper-left-data-sm":   {"left": 30,  "top": 100,  "width": 500,  "height": 320},   # standard, left side
     # Multi-item data cards (4-6 rows each) need more height than upper-data's 320 px and
-    # must not crowd the right margin (1080-1040 = 40 px is too tight when text wraps).
-    # Left-side placement also avoids the face which in talking-head portrait video is
-    # usually center-to-right.  Width 540 gives text content area ≈ 412 px, preventing
-    # wrapping even for long items like "12h - Pause déjeuner" at compact 41 px font.
+    # more left-margin than upper-data's 40 px right gap.  Two mirrors: left (default when
+    # face is right) and right (for left-biased faces, safe because 28 px compact font
+    # keeps 22-char items at 339 px < 372 px text area — no wrapping).
     "upper-left-data":      {"left": 30,  "top": 80,   "width": 540,  "height": 500},   # tall multi-item, left side
+    "upper-right-data-tall": {"left": 540, "top": 80,  "width": 500,  "height": 500},   # tall multi-item, right side
     "lower-third":          {"left": 0,   "top": 1344, "width": 1080, "height": 288},   # captions ONLY
     "lower-third-name":     {"left": 0,   "top": 1150, "width": 1080, "height": 140},   # speaker ID above captions
     "side-panel":     {"left": 540, "top": 100,  "width": 500,  "height": 320},   # alias → upper-right
@@ -85,7 +89,7 @@ def _zone_bounds(zone: str, layout: str) -> dict:
 # chosen zone — they carry the visual message and need the full canvas.
 _DATA_PANEL_TYPES = {"stat", "list", "comparison", "checklist", "score", "trend", "rating", "progress_bar", "countdown", "step_number", "price_tag", "recap_summary", "formula_equation", "pros_cons", "star_rating_review", "income_reveal", "data_bar_chart", "number_ranking", "question_answer_pair", "cause_effect", "percentage_split", "red_flag_list", "client_avatar_persona", "tool_stack", "revenue_breakdown", "hidden_cost_reveal", "social_proof_counter", "red_thread_connector", "day_in_life_schedule", "skill_tree_unlock", "audience_poll_result", "broken_promise_tracker", "ingredient_list", "resource_allocation"}
 _CENTER_ZONES = {"fullscreen", "video-overlay"}
-_SIDE_PANEL_ZONES = {"side-panel", "side-panel-left", "side-panel-right", "side-panel-top", "upper-data", "upper-right", "upper-left-data"}
+_SIDE_PANEL_ZONES = {"side-panel", "side-panel-left", "side-panel-right", "side-panel-top", "upper-data", "upper-right", "upper-left-data", "upper-left-data-sm", "upper-right-data-tall"}
 
 # Subset of _DATA_PANEL_TYPES that render 4-6 stacked rows.  In portrait these are
 # remapped to upper-left-data (left:30, height:500) instead of the standard upper-data
@@ -5922,20 +5926,35 @@ def compose(
     _video_pos_x = (_face_cx * _r_16_9 - 50.0) / (_r_16_9 - 1.0)
     _video_pos_x = max(0.0, min(100.0, _video_pos_x))
 
-    def _remap_zone(card: dict) -> dict:
+    def _remap_zone(card: dict, data_card_idx: int = 0) -> dict:
         style = card.get("contentHints", {}).get("style", "")
         zone = card.get("zone", "video-overlay")
 
-        # Portrait anti-collision: caption band is always 70–85%; data cards
-        # must never share that band.  Force all portrait data cards to one of the
-        # upper zones — zone separation is the anti-collision mechanism, no temporal
-        # scheduling needed.
-        # Tall multi-item types (4-6 rows) → upper-left-data (left:30, height:500).
-        # Standard data types               → upper-data     (left:540, height:320).
+        # Portrait: keep all data cards out of the caption band (70–85%).
+        # Introduce left/right alternation so consecutive data cards never land in the
+        # same corner — kills the "always top-right" pattern that reduces attention effect.
+        #
+        # Alternation rule (applied per data-card index, NOT full-card index):
+        #   face strongly off-centre (>65 % or <35 %) → always card on the opposite side
+        #   face centred or unknown                    → alternate even/odd by data_card_idx
+        #
+        # Two size classes:
+        #   tall (4-6 rows, _TALL_DATA_PANEL_TYPES) → upper-left-data / upper-right-data-tall (h:500)
+        #   standard                                 → upper-left-data-sm / upper-data        (h:320)
         if layout == "portrait" and style in _DATA_PANEL_TYPES:
-            target_zone = "upper-left-data" if style in _TALL_DATA_PANEL_TYPES else "upper-data"
+            if _has_face and (_face_cx > 65.0 or _face_cx < 35.0):
+                prefer_left = _face_cx >= 50.0   # face clearly right → card left, and vice versa
+            else:
+                prefer_left = (data_card_idx % 2 == 0)
+
+            if style in _TALL_DATA_PANEL_TYPES:
+                target_zone = "upper-left-data" if prefer_left else "upper-right-data-tall"
+            else:
+                target_zone = "upper-left-data-sm" if prefer_left else "upper-data"
+
             if zone != target_zone:
-                _reason = "tall-multi-item" if style in _TALL_DATA_PANEL_TYPES else "anti-collision"
+                _side = "left" if prefer_left else "right"
+                _reason = f"{'tall-' if style in _TALL_DATA_PANEL_TYPES else ''}data-{_side} idx={data_card_idx}"
                 print(
                     f"[COMPOSE] portrait-zone: {card.get('id', '?')} ({style})"
                     f" {zone!r} → {target_zone!r} ({_reason})",
@@ -5957,7 +5976,17 @@ def compose(
         )
         return {**card, "zone": new_zone}
 
-    graphic_cards = [_remap_zone(c) for c in graphic_cards]
+    # Count data-card index separately so alternation is based on sequential data-card
+    # position, not overall card index (non-data cards would otherwise skew parity).
+    _portrait_data_idx = 0
+    _remapped_cards: list[dict] = []
+    for _c in graphic_cards:
+        _c_style = _c.get("contentHints", {}).get("style", "")
+        _is_portrait_data = layout == "portrait" and _c_style in _DATA_PANEL_TYPES
+        _remapped_cards.append(_remap_zone(_c, _portrait_data_idx))
+        if _is_portrait_data:
+            _portrait_data_idx += 1
+    graphic_cards = _remapped_cards
 
     # Guard against overlapping clips on the same HyperFrames track.
     # Must run before _build_card_host AND _build_timeline_js so both
