@@ -385,3 +385,41 @@ def send_post_render_d1(profile: dict, profile_path: Path) -> bool:
         print(f"[email] post_render_d1 stamp failed for {profile_path.stem}: {e}")
     _send(email, subject, _shell(body))
     return True
+
+
+# ── I — Report notification (founder alert) ───────────────────────────────────
+
+_FOUNDER_ALERT_EMAIL = "leankanwa@gmail.com"
+
+
+def send_report_notification(report: dict) -> None:
+    """Alert the founder on every user report. Not gated by is_founder."""
+    if not _HAS_RESEND or not _enabled() or not _api_key():
+        return
+    email_user = report.get("email") or "anonyme"
+    page = (report.get("url") or "inconnue")[:120]
+    raw_msg = report.get("message") or ""
+    safe_msg = raw_msg.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    ts = report.get("timestamp", "")
+    try:
+        ts = datetime.fromisoformat(ts).strftime("%d/%m/%Y %H:%M UTC")
+    except Exception:
+        pass
+    short = raw_msg[:60] + ("..." if len(raw_msg) > 60 else "")
+    subject = "Signalement : " + short
+    body = (
+        _h1("Nouveau signalement")
+        + _p(
+            "<strong>De :</strong> " + email_user + "<br>"
+            "<strong>Page :</strong> " + page + "<br>"
+            "<strong>Date :</strong> " + str(ts),
+            extra_style="margin:0 0 16px",
+        )
+        + (
+            '<div style="background:rgba(255,119,81,.08);border-left:3px solid #FF7751;'
+            'padding:16px 20px;border-radius:0 8px 8px 0;margin:0 0 28px">'
+            '<p style="margin:0;font-size:15px;color:#F5F5F6;line-height:1.7;'
+            'white-space:pre-wrap">' + safe_msg + "</p></div>"
+        )
+    )
+    _send(_FOUNDER_ALERT_EMAIL, subject, _shell(body))

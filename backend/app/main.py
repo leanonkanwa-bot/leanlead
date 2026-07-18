@@ -489,6 +489,157 @@ def auth_logout() -> Response:
     return resp
 
 
+# ── User report submission ─────────────────────────────────────────────────────
+
+@app.post("/api/reports")
+async def submit_report(request: Request, payload: dict = Body(...)) -> dict:
+    message = (payload.get("message") or "").strip()
+    if not message:
+        raise HTTPException(400, "message required")
+
+    profile_id = _verify_session(request.cookies.get(SESSION_COOKIE))
+    email = ""
+    if profile_id:
+        try:
+            prof = json.loads((_PROFILES_DIR / f"{profile_id}.json").read_text(encoding="utf-8"))
+            email = prof.get("email", "")
+        except Exception:
+            pass
+
+    ts = datetime.utcnow().isoformat()
+    report = {
+        "user_id": profile_id or "",
+        "email": email,
+        "timestamp": ts,
+        "message": message,
+        "url": (payload.get("url") or "")[:500],
+        "user_agent": (payload.get("user_agent") or "")[:300],
+    }
+
+    _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    fname = ts.replace(":", "-").replace(".", "-") + "_" + (profile_id or "anon") + ".json"
+    (_REPORTS_DIR / fname).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    try:
+        _emails.send_report_notification(report)
+    except Exception as _re:
+        print(f"[report] notification failed: {_re}")
+
+    return {"ok": True}
+
+
+# ── Admin reports view (server-rendered HTML) ──────────────────────────────────
+
+def _esc(s: str) -> str:
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+
+
+@app.get("/admin/reports", include_in_schema=False)
+def admin_reports_page(request: Request) -> Response:
+    if _auth_required():
+        token = request.cookies.get(AUTH_COOKIE)
+        if not token or not secrets.compare_digest(token, settings.access_password):
+            login = (
+                "<!doctype html><html lang='fr'><head><meta charset='utf-8'>"
+                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+                "<title>Admin — Signalements</title>"
+                "<style>"
+                "*{box-sizing:border-box;margin:0;padding:0}"
+                "body{font-family:'Helvetica Neue',Arial,sans-serif;background:#0d0d0d;"
+                "color:#F5F5F6;display:flex;align-items:center;justify-content:center;"
+                "min-height:100vh}"
+                "form{background:#1a1a1a;border:1px solid rgba(255,255,255,.08);"
+                "border-radius:16px;padding:32px;width:100%;max-width:320px}"
+                "h1{font-size:18px;font-weight:700;margin-bottom:20px;text-align:center}"
+                "input{width:100%;background:rgba(255,255,255,.05);border:1px solid "
+                "rgba(255,255,255,.1);border-radius:8px;padding:10px 14px;color:#F5F5F6;"
+                "font-size:14px;margin-bottom:12px;outline:none}"
+                "button{width:100%;background:#FF7751;color:#fff;border:none;"
+                "border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer}"
+                ".err{color:#f87171;font-size:12px;text-align:center;margin-bottom:12px;display:none}"
+                "</style></head><body>"
+                "<form onsubmit='login(event)'>"
+                "<h1>Signalements</h1>"
+                "<p class='err' id='err'>Mot de passe incorrect</p>"
+                "<input type='password' id='pwd' placeholder='Mot de passe admin' autofocus />"
+                "<button type='submit'>Accéder</button>"
+                "</form>"
+                "<script>"
+                "async function login(e){"
+                "e.preventDefault();"
+                "const d=new FormData();"
+                "d.append('password',document.getElementById('pwd').value);"
+                "const r=await fetch('/api/auth/login',{method:'POST',body:d});"
+                "if(r.ok){location.reload();}else{"
+                "document.getElementById('err').style.display='block';}}"
+                "</script></body></html>"
+            )
+            return Response(content=login, media_type="text/html", status_code=401)
+
+    reports = []
+    if _REPORTS_DIR.exists():
+        for f in sorted(_REPORTS_DIR.glob("*.json"), reverse=True):
+            try:
+                reports.append(json.loads(f.read_text(encoding="utf-8")))
+            except Exception:
+                pass
+
+    def _fmt_ts(ts: str) -> str:
+        try:
+            return datetime.fromisoformat(ts).strftime("%d/%m/%Y %H:%M")
+        except Exception:
+            return _esc(ts)
+
+    rows = ""
+    for r in reports:
+        url = r.get("url") or ""
+        url_short = url.replace("https://", "").replace("http://", "")[:60]
+        rows += (
+            "<tr>"
+            f"<td class='meta'>{_fmt_ts(r.get('timestamp',''))}</td>"
+            f"<td class='meta'>{_esc(r.get('email','') or 'anonyme')}</td>"
+            f"<td class='meta'><a href='{_esc(url)}' target='_blank'>{_esc(url_short)}</a></td>"
+            f"<td class='msg'>{_esc(r.get('message',''))}</td>"
+            "</tr>"
+        )
+
+    empty = "" if reports else "<tr><td colspan='4' class='empty'>Aucun signalement</td></tr>"
+    count = len(reports)
+
+    html = (
+        "<!doctype html><html lang='fr'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>Signalements — Admin</title>"
+        "<style>"
+        "*{box-sizing:border-box;margin:0;padding:0}"
+        "body{font-family:'Helvetica Neue',Arial,sans-serif;background:#0d0d0d;"
+        "color:#F5F5F6;padding:32px 24px;max-width:1100px;margin:0 auto}"
+        "h1{font-size:20px;font-weight:800;margin-bottom:24px;display:flex;"
+        "align-items:center;gap:10px}"
+        ".badge{background:rgba(255,119,81,.15);color:#FF7751;border-radius:6px;"
+        "padding:3px 10px;font-size:12px;font-weight:600}"
+        "table{width:100%;border-collapse:collapse}"
+        "th{text-align:left;padding:10px 14px;font-size:11px;"
+        "color:rgba(245,245,246,.4);text-transform:uppercase;letter-spacing:.06em;"
+        "border-bottom:1px solid rgba(255,255,255,.07)}"
+        "td{padding:14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.05);"
+        "vertical-align:top}"
+        "td.msg{max-width:500px;line-height:1.6;color:rgba(245,245,246,.85);white-space:pre-wrap}"
+        "td.meta{color:rgba(245,245,246,.45);white-space:nowrap;font-size:12px}"
+        "tr:hover td{background:rgba(255,255,255,.025)}"
+        "td.empty{text-align:center;padding:64px 0;color:rgba(245,245,246,.3);"
+        "font-size:14px}"
+        "a{color:#FF7751;text-decoration:none}"
+        "</style></head><body>"
+        f"<h1>Signalements <span class='badge'>{count}</span></h1>"
+        "<table><thead><tr>"
+        "<th>Date</th><th>Email</th><th>Page</th><th>Message</th>"
+        f"</tr></thead><tbody>{rows or empty}</tbody></table>"
+        "</body></html>"
+    )
+    return Response(content=html, media_type="text/html")
+
+
 @app.post("/api/edit")
 async def submit_edit(
     request: Request,
@@ -769,6 +920,7 @@ def waitlist_count() -> dict:
 
 
 _PROFILES_DIR = settings._data_root / "profiles"
+_REPORTS_DIR  = settings._data_root / "reports"
 
 
 # ── Re-engagement email loop (daily, mirrors the trash-purge pattern) ─────────
