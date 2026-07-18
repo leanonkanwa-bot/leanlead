@@ -341,6 +341,25 @@ def _verify_session(token: str | None) -> str | None:
     return profile_id
 
 
+def _normalize_email(email: str) -> str:
+    """Normalize an email for deduplication.
+
+    For Gmail/Googlemail addresses, dots in the local part are ignored and
+    +alias suffixes are stripped — both route to the same inbox.
+    a.b+tag@gmail.com  ->  ab@gmail.com
+    Also canonicalizes googlemail.com -> gmail.com.
+    """
+    email = (email or "").strip().lower()
+    local, _, domain = email.partition("@")
+    if not domain:
+        return email
+    if domain in ("gmail.com", "googlemail.com"):
+        local = local.partition("+")[0]  # strip +alias
+        local = local.replace(".", "")   # dots are insignificant
+        domain = "gmail.com"             # googlemail.com is an alias
+    return f"{local}@{domain}"
+
+
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -1468,7 +1487,7 @@ def google_callback(
         print(f"[OAUTH] Google exchange failed: {e}")
         raise HTTPException(502, "Google authentication failed")
 
-    email = (info.get("email") or "").strip().lower()
+    email = _normalize_email(info.get("email") or "")
     email_verified = bool(info.get("email_verified"))
     name = info.get("name") or ""
 
@@ -1477,7 +1496,7 @@ def google_callback(
 
     _PROFILES_DIR.mkdir(parents=True, exist_ok=True)
 
-    founder_email = (settings.founder_google_email or "").strip().lower()
+    founder_email = _normalize_email(settings.founder_google_email or "")
     if founder_email and email == founder_email:
         # Exact match only -- no fuzzy/partial matching.
         profile_id = settings.founder_profile_id
@@ -1505,7 +1524,7 @@ def google_callback(
                 p_data = json.loads(p_path.read_text(encoding="utf-8"))
             except Exception:
                 continue
-            if (p_data.get("email") or "").strip().lower() == email:
+            if _normalize_email(p_data.get("email") or "") == email:
                 profile_id = p_data.get("profile_id") or p_path.stem
                 break
         if not profile_id:
