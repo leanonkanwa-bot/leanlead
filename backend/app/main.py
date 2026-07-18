@@ -12,7 +12,8 @@ import shutil
 import subprocess
 import threading
 import time
-from datetime import datetime
+from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 from urllib.parse import urlencode
@@ -528,55 +529,405 @@ async def submit_report(request: Request, payload: dict = Body(...)) -> dict:
     return {"ok": True}
 
 
-# ── Admin reports view (server-rendered HTML) ──────────────────────────────────
+# ── Admin dashboard (server-rendered HTML) ────────────────────────────────────
 
 def _esc(s: str) -> str:
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
+_ADMIN_CSS = (
+    "*{box-sizing:border-box;margin:0;padding:0}"
+    "body{font-family:'Helvetica Neue',Arial,sans-serif;background:#0d0d0d;"
+    "color:#F5F5F6;padding:32px 24px;max-width:1200px;margin:0 auto}"
+    "a{color:#FF7751;text-decoration:none}"
+    "a:hover{opacity:.8}"
+    "h1{font-size:20px;font-weight:800;margin-bottom:4px}"
+    ".sub{color:rgba(245,245,246,.4);font-size:13px;margin-bottom:22px}"
+    ".nav{display:flex;gap:0;margin-bottom:28px;border-bottom:1px solid rgba(255,255,255,.07)}"
+    ".nav a{padding:9px 16px;font-size:13px;font-weight:600;color:rgba(245,245,246,.4);"
+    "border-bottom:2px solid transparent;margin-bottom:-1px;text-decoration:none;display:inline-block}"
+    ".nav a.act{color:#F5F5F6;border-bottom-color:#FF7751}"
+    ".nav a:hover{color:#F5F5F6}"
+    "table{width:100%;border-collapse:collapse}"
+    "th{text-align:left;padding:10px 14px;font-size:11px;color:rgba(245,245,246,.35);"
+    "text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid rgba(255,255,255,.07)}"
+    "td{padding:11px 14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}"
+    "td.dim{color:rgba(245,245,246,.38);font-size:12px;white-space:nowrap}"
+    "td.num{color:#F5F5F6;font-variant-numeric:tabular-nums}"
+    "tr:hover td{background:rgba(255,255,255,.02)}"
+    ".badge{display:inline-block;border-radius:5px;padding:2px 8px;font-size:11px;font-weight:600}"
+    ".b-free{background:rgba(255,255,255,.08);color:rgba(245,245,246,.45)}"
+    ".b-starter{background:rgba(59,130,246,.14);color:#93c5fd}"
+    ".b-pro{background:rgba(168,85,247,.14);color:#d8b4fe}"
+    ".b-agency{background:rgba(255,119,81,.14);color:#FF7751}"
+    ".b-founder{background:rgba(250,204,21,.14);color:#fde047}"
+    ".b-active{background:rgba(34,197,94,.12);color:#4ade80}"
+    ".b-canceling{background:rgba(251,191,36,.12);color:#fbbf24}"
+    ".b-canceled{background:rgba(239,68,68,.12);color:#f87171}"
+    ".b-none{background:rgba(255,255,255,.06);color:rgba(245,245,246,.3)}"
+    ".card{background:#111;border:1px solid rgba(255,255,255,.07);border-radius:12px;"
+    "padding:20px 24px;margin-bottom:20px}"
+    ".card-title{font-size:12px;font-weight:700;text-transform:uppercase;"
+    "letter-spacing:.06em;color:rgba(245,245,246,.4);margin-bottom:14px}"
+    ".dl{display:grid;grid-template-columns:160px 1fr;gap:7px 14px;font-size:13px}"
+    ".dl dt{color:rgba(245,245,246,.4)}"
+    ".dl dd{color:#F5F5F6;word-break:break-word}"
+    ".back{display:inline-flex;align-items:center;gap:5px;color:rgba(245,245,246,.4);"
+    "font-size:13px;margin-bottom:22px;text-decoration:none}"
+    ".back:hover{color:#F5F5F6}"
+    ".stats{display:flex;gap:14px;margin-bottom:22px;flex-wrap:wrap}"
+    ".stat{background:#111;border:1px solid rgba(255,255,255,.07);border-radius:10px;"
+    "padding:14px 18px;min-width:90px}"
+    ".stat-v{font-size:22px;font-weight:800;color:#F5F5F6}"
+    ".stat-l{font-size:11px;color:rgba(245,245,246,.38);margin-top:3px}"
+    ".pack-row{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}"
+    ".pack-bar{height:6px;border-radius:3px;background:#FF7751}"
+    ".empty{text-align:center;padding:48px 0;color:rgba(245,245,246,.3);font-size:14px}"
+    ".msg{max-width:500px;line-height:1.6;color:rgba(245,245,246,.85);white-space:pre-wrap}"
+)
+
+
+def _admin_login_html(title: str) -> str:
+    return (
+        "<!doctype html><html lang='fr'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        f"<title>{_esc(title)}</title>"
+        "<style>"
+        "*{box-sizing:border-box;margin:0;padding:0}"
+        "body{font-family:'Helvetica Neue',Arial,sans-serif;background:#0d0d0d;"
+        "color:#F5F5F6;display:flex;align-items:center;justify-content:center;min-height:100vh}"
+        "form{background:#1a1a1a;border:1px solid rgba(255,255,255,.08);"
+        "border-radius:16px;padding:32px;width:100%;max-width:320px}"
+        "h1{font-size:18px;font-weight:700;margin-bottom:20px;text-align:center}"
+        "input{width:100%;background:rgba(255,255,255,.05);"
+        "border:1px solid rgba(255,255,255,.1);border-radius:8px;"
+        "padding:10px 14px;color:#F5F5F6;font-size:14px;margin-bottom:12px;outline:none}"
+        "button{width:100%;background:#FF7751;color:#fff;border:none;"
+        "border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer}"
+        ".err{color:#f87171;font-size:12px;text-align:center;margin-bottom:12px;display:none}"
+        "</style></head><body>"
+        "<form onsubmit='login(event)'>"
+        f"<h1>{_esc(title)}</h1>"
+        "<p class='err' id='err'>Mot de passe incorrect</p>"
+        "<input type='password' id='pwd' placeholder='Mot de passe admin' autofocus />"
+        "<button type='submit'>Acceder</button>"
+        "</form>"
+        "<script>"
+        "async function login(e){"
+        "e.preventDefault();"
+        "const d=new FormData();"
+        "d.append('password',document.getElementById('pwd').value);"
+        "const r=await fetch('/api/auth/login',{method:'POST',body:d});"
+        "if(r.ok){location.reload();}else{"
+        "document.getElementById('err').style.display='block';}}"
+        "</script></body></html>"
+    )
+
+
+def _admin_authed(request: Request) -> bool:
+    if not _auth_required():
+        return True
+    token = request.cookies.get(AUTH_COOKIE)
+    return bool(token) and secrets.compare_digest(token, settings.access_password)
+
+
+def _fmt_date(ts: float | None) -> str:
+    if ts is None:
+        return "-"
+    try:
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%d/%m/%Y")
+    except Exception:
+        return "-"
+
+
+def _fmt_dt(ts: float | None) -> str:
+    if ts is None:
+        return "-"
+    try:
+        return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%d/%m %H:%M")
+    except Exception:
+        return "-"
+
+
+def _fmt_ts_str(ts: str) -> str:
+    try:
+        return datetime.fromisoformat(ts).strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return _esc(ts)
+
+
+def _plan_badge(profile: dict) -> str:
+    if profile.get("is_founder"):
+        return "<span class='badge b-founder'>Founder</span>"
+    plan = profile.get("plan") or DEFAULT_PLAN
+    cls_map = {"free": "b-free", "starter": "b-starter", "pro": "b-pro", "agency": "b-agency"}
+    labels  = {"free": "Essai", "starter": "Starter", "pro": "Pro", "agency": "Agency"}
+    return f"<span class='badge {cls_map.get(plan, 'b-free')}'>{labels.get(plan, plan)}</span>"
+
+
+def _billing_badge(profile: dict) -> str:
+    if profile.get("is_founder"):
+        return ""
+    status = profile.get("billing_status") or ""
+    if not status:
+        plan = profile.get("plan") or DEFAULT_PLAN
+        return "<span class='badge b-none'>-</span>" if plan == "free" else "<span class='badge b-active'>Actif</span>"
+    labels  = {"active": "Actif", "canceling": "Annulation", "canceled": "Annule"}
+    cls_map = {"active": "b-active", "canceling": "b-canceling", "canceled": "b-canceled"}
+    return f"<span class='badge {cls_map.get(status, 'b-none')}'>{labels.get(status, status)}</span>"
+
+
+def _gather_admin_users() -> list[dict]:
+    now = datetime.now(timezone.utc)
+    users: list[dict] = []
+    if not _PROFILES_DIR.exists():
+        return users
+    for profile_path in _PROFILES_DIR.glob("*.json"):
+        try:
+            profile = json.loads(profile_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        profile_id = profile.get("profile_id") or profile_path.stem
+        all_jobs = store.list_for_profile(profile_id)
+        counted  = [j for j in all_jobs if not j.trashed_at and not j.is_retry]
+        monthly  = sum(
+            1 for j in counted
+            if (d := datetime.fromtimestamp(j.created_at, tz=timezone.utc)).year == now.year
+            and d.month == now.month
+        )
+        shorts   = sum(1 for j in counted if j.params.get("format_hint") == "short")
+        longs    = sum(1 for j in counted if j.params.get("format_hint") == "long")
+        last_ts  = max((j.created_at for j in counted), default=None)
+        users.append({
+            "profile":    profile,
+            "profile_id": profile_id,
+            "total":      len(counted),
+            "monthly":    monthly,
+            "shorts":     shorts,
+            "longs":      longs,
+            "last_ts":    last_ts,
+        })
+    users.sort(key=lambda u: u["last_ts"] or 0, reverse=True)
+    return users
+
+
+def _admin_nav(active: str) -> str:
+    tabs = [("Utilisateurs", "/admin", "users"), ("Signalements", "/admin/reports", "reports")]
+    links = "".join(
+        f"<a href='{url}' class='{'act' if key == active else ''}'>{label}</a>"
+        for label, url, key in tabs
+    )
+    return f"<nav class='nav'>{links}</nav>"
+
+
+def _admin_page(body: str, title: str, nav_active: str = "") -> str:
+    nav = _admin_nav(nav_active) if nav_active else ""
+    return (
+        "<!doctype html><html lang='fr'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        f"<title>{_esc(title)}</title>"
+        f"<style>{_ADMIN_CSS}</style>"
+        "</head><body>"
+        f"{nav}"
+        f"{body}"
+        "</body></html>"
+    )
+
+
+@app.get("/admin", include_in_schema=False)
+def admin_dashboard(request: Request) -> Response:
+    if not _admin_authed(request):
+        return Response(content=_admin_login_html("Admin"), media_type="text/html", status_code=401)
+
+    users = _gather_admin_users()
+    total_users = len(users)
+    total_videos = sum(u["total"] for u in users)
+
+    rows = ""
+    for u in users:
+        p   = u["profile"]
+        pid = u["profile_id"]
+        email  = _esc(p.get("email") or "—")
+        reg    = _fmt_date(p.get("created_at"))
+        last   = _fmt_dt(u["last_ts"])
+        others = u["total"] - u["shorts"] - u["longs"]
+        fmt_str = f"{u['shorts']}s / {u['longs']}l" + (f" / {others}a" if others else "")
+        rows += (
+            f"<tr>"
+            f"<td><a href='/admin/user/{_esc(pid)}'>{email}</a></td>"
+            f"<td class='dim'>{reg}</td>"
+            f"<td>{_plan_badge(p)}</td>"
+            f"<td>{_billing_badge(p)}</td>"
+            f"<td class='num'>{u['monthly']} / {u['total']}</td>"
+            f"<td class='dim'>{fmt_str}</td>"
+            f"<td class='dim'>{last}</td>"
+            f"</tr>"
+        )
+    empty = "" if rows else "<tr><td colspan='7' class='empty'>Aucun utilisateur</td></tr>"
+
+    body = (
+        f"<h1>Admin</h1>"
+        f"<p class='sub'>{total_users} utilisateurs &middot; {total_videos} videos total</p>"
+        + _admin_nav("users")
+        + "<table><thead><tr>"
+        "<th>Email</th><th>Inscription</th><th>Plan</th><th>Billing</th>"
+        "<th>Videos (mois / total)</th><th>Shorts / Longs</th><th>Derniere activite</th>"
+        f"</tr></thead><tbody>{rows or empty}</tbody></table>"
+    )
+    return Response(content=_admin_page(body, "Admin", ""), media_type="text/html")
+
+
+@app.get("/admin/user/{profile_id}", include_in_schema=False)
+def admin_user_detail(profile_id: str, request: Request) -> Response:
+    if not _admin_authed(request):
+        return Response(content=_admin_login_html("Admin"), media_type="text/html", status_code=401)
+
+    profile_path = _PROFILES_DIR / f"{profile_id}.json"
+    if not profile_path.exists():
+        return Response(content="Utilisateur introuvable", status_code=404)
+
+    try:
+        profile = json.loads(profile_path.read_text(encoding="utf-8"))
+    except Exception:
+        return Response(content="Fichier profile illisible", status_code=500)
+
+    all_jobs = store.list_for_profile(profile_id)
+    counted  = [j for j in all_jobs if not j.trashed_at and not j.is_retry]
+    now      = datetime.now(timezone.utc)
+    monthly  = sum(
+        1 for j in counted
+        if (d := datetime.fromtimestamp(j.created_at, tz=timezone.utc)).year == now.year
+        and d.month == now.month
+    )
+    shorts   = sum(1 for j in counted if j.params.get("format_hint") == "short")
+    longs    = sum(1 for j in counted if j.params.get("format_hint") == "long")
+    autos    = len(counted) - shorts - longs
+
+    pack_counts = Counter(
+        j.params.get("style_pack") or "lean_glass"
+        for j in counted
+        if j.params.get("style_pack")
+    )
+
+    email = _esc(profile.get("email") or profile_id)
+
+    # ── Profile fields card ──────────────────────────────────────────────────
+    _SKIP = {"profile_id", "stripe_subscription_id"}
+    _LABELS: dict[str, str] = {
+        "email": "Email", "name": "Nom", "plan": "Plan",
+        "billing_status": "Billing", "cancel_at": "Annulation le",
+        "created_at": "Inscription", "is_founder": "Founder",
+        "icp": "Audience cible (ICP)", "pillars": "Piliers de contenu",
+        "platforms": "Plateformes", "audience": "Audience",
+        "stripe_customer_id": "Stripe customer",
+    }
+    profile_rows = ""
+    for key, raw_val in profile.items():
+        if key in _SKIP:
+            continue
+        label = _LABELS.get(key, key)
+        if key == "created_at":
+            val = _fmt_date(raw_val)
+        elif key == "cancel_at" and raw_val:
+            val = _fmt_date(raw_val)
+        elif key == "is_founder":
+            val = "oui" if raw_val else "non"
+        elif key == "billing_status":
+            val = _billing_badge(profile) + f" ({_esc(str(raw_val))})"
+        elif key == "plan":
+            val = _plan_badge(profile) + f" ({_esc(str(raw_val))})"
+        elif isinstance(raw_val, list):
+            val = _esc(", ".join(str(v) for v in raw_val if v))
+        elif isinstance(raw_val, dict):
+            val = _esc(json.dumps(raw_val, ensure_ascii=False))
+        else:
+            val = _esc(str(raw_val)) if raw_val is not None else "-"
+        profile_rows += f"<dt>{_esc(label)}</dt><dd>{val}</dd>"
+
+    profile_card = (
+        "<div class='card'>"
+        "<div class='card-title'>Profil</div>"
+        f"<dl class='dl'>{profile_rows}</dl>"
+        "</div>"
+    )
+
+    # ── Stats row ────────────────────────────────────────────────────────────
+    stats = (
+        "<div class='stats'>"
+        f"<div class='stat'><div class='stat-v'>{len(counted)}</div><div class='stat-l'>Total</div></div>"
+        f"<div class='stat'><div class='stat-v'>{monthly}</div><div class='stat-l'>Ce mois</div></div>"
+        f"<div class='stat'><div class='stat-v'>{shorts}</div><div class='stat-l'>Shorts</div></div>"
+        f"<div class='stat'><div class='stat-v'>{longs}</div><div class='stat-l'>Longs</div></div>"
+        + (f"<div class='stat'><div class='stat-v'>{autos}</div><div class='stat-l'>Auto</div></div>" if autos else "")
+        + "</div>"
+    )
+
+    # ── Pack usage card ──────────────────────────────────────────────────────
+    if pack_counts:
+        max_count = pack_counts.most_common(1)[0][1]
+        pack_rows = "".join(
+            f"<div class='pack-row'>"
+            f"<span style='width:130px;color:rgba(245,245,246,.7)'>{_esc(pk)}</span>"
+            f"<div class='pack-bar' style='width:{max(6, int(cnt/max_count*180))}px'></div>"
+            f"<span style='color:rgba(245,245,246,.4);font-size:12px'>{cnt}</span>"
+            f"</div>"
+            for pk, cnt in pack_counts.most_common()
+        )
+        pack_card = (
+            "<div class='card'>"
+            "<div class='card-title'>Packs utilises</div>"
+            f"{pack_rows}"
+            "</div>"
+        )
+    else:
+        pack_card = ""
+
+    # ── Video history table ──────────────────────────────────────────────────
+    sorted_jobs = sorted(counted, key=lambda j: j.created_at, reverse=True)
+    job_rows = ""
+    for j in sorted_jobs[:200]:
+        fmt_raw  = j.params.get("format_hint") or "auto"
+        fmt_disp = {"short": "Short", "long": "Long"}.get(fmt_raw, "Auto")
+        pack_id  = j.params.get("style_pack") or "-"
+        job_rows += (
+            f"<tr>"
+            f"<td class='dim'>{_fmt_dt(j.created_at)}</td>"
+            f"<td class='dim'>{fmt_disp}</td>"
+            f"<td class='dim'>{_esc(pack_id)}</td>"
+            f"<td class='dim'>{_esc(j.status)}</td>"
+            f"</tr>"
+        )
+    empty_jobs = "" if job_rows else "<tr><td colspan='4' class='empty'>Aucune video</td></tr>"
+    history_card = (
+        "<div class='card'>"
+        "<div class='card-title'>Historique videos</div>"
+        "<table><thead><tr>"
+        "<th>Date</th><th>Format</th><th>Pack</th><th>Statut</th>"
+        f"</tr></thead><tbody>{job_rows or empty_jobs}</tbody></table>"
+        "</div>"
+    )
+
+    body = (
+        f"<a href='/admin' class='back'>← Retour au dashboard</a>"
+        f"<h1>{email}</h1>"
+        f"<p class='sub'>{_esc(profile.get('name') or '')}</p>"
+        f"{stats}"
+        f"{profile_card}"
+        f"{pack_card}"
+        f"{history_card}"
+    )
+    return Response(
+        content=_admin_page(body, f"Admin — {profile.get('email') or profile_id}", ""),
+        media_type="text/html",
+    )
+
+
 @app.get("/admin/reports", include_in_schema=False)
 def admin_reports_page(request: Request) -> Response:
-    if _auth_required():
-        token = request.cookies.get(AUTH_COOKIE)
-        if not token or not secrets.compare_digest(token, settings.access_password):
-            login = (
-                "<!doctype html><html lang='fr'><head><meta charset='utf-8'>"
-                "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-                "<title>Admin — Signalements</title>"
-                "<style>"
-                "*{box-sizing:border-box;margin:0;padding:0}"
-                "body{font-family:'Helvetica Neue',Arial,sans-serif;background:#0d0d0d;"
-                "color:#F5F5F6;display:flex;align-items:center;justify-content:center;"
-                "min-height:100vh}"
-                "form{background:#1a1a1a;border:1px solid rgba(255,255,255,.08);"
-                "border-radius:16px;padding:32px;width:100%;max-width:320px}"
-                "h1{font-size:18px;font-weight:700;margin-bottom:20px;text-align:center}"
-                "input{width:100%;background:rgba(255,255,255,.05);border:1px solid "
-                "rgba(255,255,255,.1);border-radius:8px;padding:10px 14px;color:#F5F5F6;"
-                "font-size:14px;margin-bottom:12px;outline:none}"
-                "button{width:100%;background:#FF7751;color:#fff;border:none;"
-                "border-radius:8px;padding:12px;font-size:14px;font-weight:600;cursor:pointer}"
-                ".err{color:#f87171;font-size:12px;text-align:center;margin-bottom:12px;display:none}"
-                "</style></head><body>"
-                "<form onsubmit='login(event)'>"
-                "<h1>Signalements</h1>"
-                "<p class='err' id='err'>Mot de passe incorrect</p>"
-                "<input type='password' id='pwd' placeholder='Mot de passe admin' autofocus />"
-                "<button type='submit'>Accéder</button>"
-                "</form>"
-                "<script>"
-                "async function login(e){"
-                "e.preventDefault();"
-                "const d=new FormData();"
-                "d.append('password',document.getElementById('pwd').value);"
-                "const r=await fetch('/api/auth/login',{method:'POST',body:d});"
-                "if(r.ok){location.reload();}else{"
-                "document.getElementById('err').style.display='block';}}"
-                "</script></body></html>"
-            )
-            return Response(content=login, media_type="text/html", status_code=401)
+    if not _admin_authed(request):
+        return Response(content=_admin_login_html("Admin — Signalements"), media_type="text/html", status_code=401)
 
-    reports = []
+    reports: list[dict] = []
     if _REPORTS_DIR.exists():
         for f in sorted(_REPORTS_DIR.glob("*.json"), reverse=True):
             try:
@@ -584,60 +935,30 @@ def admin_reports_page(request: Request) -> Response:
             except Exception:
                 pass
 
-    def _fmt_ts(ts: str) -> str:
-        try:
-            return datetime.fromisoformat(ts).strftime("%d/%m/%Y %H:%M")
-        except Exception:
-            return _esc(ts)
-
     rows = ""
     for r in reports:
         url = r.get("url") or ""
         url_short = url.replace("https://", "").replace("http://", "")[:60]
         rows += (
             "<tr>"
-            f"<td class='meta'>{_fmt_ts(r.get('timestamp',''))}</td>"
-            f"<td class='meta'>{_esc(r.get('email','') or 'anonyme')}</td>"
-            f"<td class='meta'><a href='{_esc(url)}' target='_blank'>{_esc(url_short)}</a></td>"
-            f"<td class='msg'>{_esc(r.get('message',''))}</td>"
+            f"<td class='dim'>{_fmt_ts_str(r.get('timestamp', ''))}</td>"
+            f"<td class='dim'>{_esc(r.get('email', '') or 'anonyme')}</td>"
+            f"<td class='dim'><a href='{_esc(url)}' target='_blank'>{_esc(url_short)}</a></td>"
+            f"<td class='msg'>{_esc(r.get('message', ''))}</td>"
             "</tr>"
         )
-
-    empty = "" if reports else "<tr><td colspan='4' class='empty'>Aucun signalement</td></tr>"
+    empty = "" if rows else "<tr><td colspan='4' class='empty'>Aucun signalement</td></tr>"
     count = len(reports)
 
-    html = (
-        "<!doctype html><html lang='fr'><head><meta charset='utf-8'>"
-        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
-        "<title>Signalements — Admin</title>"
-        "<style>"
-        "*{box-sizing:border-box;margin:0;padding:0}"
-        "body{font-family:'Helvetica Neue',Arial,sans-serif;background:#0d0d0d;"
-        "color:#F5F5F6;padding:32px 24px;max-width:1100px;margin:0 auto}"
-        "h1{font-size:20px;font-weight:800;margin-bottom:24px;display:flex;"
-        "align-items:center;gap:10px}"
-        ".badge{background:rgba(255,119,81,.15);color:#FF7751;border-radius:6px;"
-        "padding:3px 10px;font-size:12px;font-weight:600}"
-        "table{width:100%;border-collapse:collapse}"
-        "th{text-align:left;padding:10px 14px;font-size:11px;"
-        "color:rgba(245,245,246,.4);text-transform:uppercase;letter-spacing:.06em;"
-        "border-bottom:1px solid rgba(255,255,255,.07)}"
-        "td{padding:14px;font-size:13px;border-bottom:1px solid rgba(255,255,255,.05);"
-        "vertical-align:top}"
-        "td.msg{max-width:500px;line-height:1.6;color:rgba(245,245,246,.85);white-space:pre-wrap}"
-        "td.meta{color:rgba(245,245,246,.45);white-space:nowrap;font-size:12px}"
-        "tr:hover td{background:rgba(255,255,255,.025)}"
-        "td.empty{text-align:center;padding:64px 0;color:rgba(245,245,246,.3);"
-        "font-size:14px}"
-        "a{color:#FF7751;text-decoration:none}"
-        "</style></head><body>"
-        f"<h1>Signalements <span class='badge'>{count}</span></h1>"
-        "<table><thead><tr>"
+    body = (
+        f"<h1>Admin</h1>"
+        f"<p class='sub'>{count} signalement{'s' if count != 1 else ''}</p>"
+        + _admin_nav("reports")
+        + "<table><thead><tr>"
         "<th>Date</th><th>Email</th><th>Page</th><th>Message</th>"
         f"</tr></thead><tbody>{rows or empty}</tbody></table>"
-        "</body></html>"
     )
-    return Response(content=html, media_type="text/html")
+    return Response(content=_admin_page(body, "Signalements — Admin", ""), media_type="text/html")
 
 
 @app.post("/api/edit")
