@@ -64,10 +64,10 @@ def _build_preview_composition(pack_id: str, work_dir: Path) -> Path:
     # For gradient packs, use a CSS background
     bg_style = f"background: {pack['bg']};" if "gradient" in pack["bg"] else f"background: {pack['bg']};"
 
-    # Google Fonts import
+    # Google Fonts import — keep in sync with _PACKS font definitions in compose.py
     _font_imports = {
         "lean_vibe": "Poppins:wght@400;800",
-        "lean_craft": "Permanent+Marker",
+        "lean_craft": "Montserrat:wght@400;700;800",
         "lean_cinema": "Playfair+Display:wght@400;700",
         "lean_ledger": "IBM+Plex+Mono:wght@400;600",
     }
@@ -193,7 +193,17 @@ def main():
     output_dir = base_dir / "editor_frontend" / "previews"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    pack_ids = ["lean_glass", "lean_paper", "lean_vibe", "lean_ledger", "lean_craft", "lean_cinema"]
+    all_pack_ids = ["lean_glass", "lean_paper", "lean_vibe", "lean_ledger", "lean_craft", "lean_cinema"]
+    # Optional positional arg: python -m scripts.generate_previews lean_craft
+    if len(sys.argv) > 1:
+        requested = sys.argv[1:]
+        unknown = [p for p in requested if p not in all_pack_ids]
+        if unknown:
+            print(f"Unknown pack(s): {unknown}. Valid: {all_pack_ids}")
+            sys.exit(1)
+        pack_ids = requested
+    else:
+        pack_ids = all_pack_ids
     results = {}
 
     for pack_id in pack_ids:
