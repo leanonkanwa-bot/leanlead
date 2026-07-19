@@ -113,12 +113,6 @@
       notif_empty: "Aucune notification",
       notif_clear: "Tout effacer",
 
-      // ── INDEX — LOGIN ─────────────────────────────────────────────────────────
-      login_title: "Connexion requise",
-      login_sub: "Entrez votre mot de passe pour accéder à l'éditeur.",
-      login_pwd_ph: "Mot de passe",
-      login_btn: "Se connecter",
-
       // ── INDEX — ONBOARDING CARD ───────────────────────────────────────────────
       ob_card_title: "Démarrage rapide",
       ob_step1: "Créer votre profil coach",
@@ -294,12 +288,6 @@
       // ── INDEX — NOTIFICATIONS ─────────────────────────────────────────────────
       notif_empty: "No notifications",
       notif_clear: "Clear all",
-
-      // ── INDEX — LOGIN ─────────────────────────────────────────────────────────
-      login_title: "Sign in required",
-      login_sub: "Enter your password to access the editor.",
-      login_pwd_ph: "Password",
-      login_btn: "Sign in",
 
       // ── INDEX — ONBOARDING CARD ───────────────────────────────────────────────
       ob_card_title: "Quick start",

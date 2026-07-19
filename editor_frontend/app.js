@@ -911,24 +911,6 @@ const previewCard = $("previewCard");
 const player      = $("player");
 const downloadLink = $("downloadLink");
 
-// ── Auth check ────────────────────────────────────────────────────────────────
-(async () => {
-  try {
-    const res = await apiFetch("/api/auth/status");
-    const j = await res.json();
-    if (j.required && !j.authed) {
-      appCard?.classList.add("hidden");
-      loginCard?.classList.remove("hidden");
-    }
-  } catch {
-    if (appCard) {
-      const warn = document.createElement("p");
-      warn.style.cssText = "color:#ff5c7a;margin-bottom:1rem;font-size:.9rem";
-      warn.textContent = "⚠ Backend non disponible. Démarrez le serveur et rechargez la page.";
-      appCard.querySelector(".tool-head")?.after(warn);
-    }
-  }
-})();
 
 // ── Billing: start a Stripe Checkout session for a tier ─────────────────────────
 async function startCheckout(tier) {
@@ -1002,18 +984,6 @@ function showCancelingBanner(profile) {
   if (shell) shell.style.marginTop = "2rem";
 }
 
-loginForm?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  if (loginErr) loginErr.textContent = "";
-  const fd = new FormData();
-  fd.set("password", loginPwd.value);
-  const res = await fetch("/api/auth/login", { method: "POST", body: fd, credentials: "same-origin" });
-  if (!res.ok) { if (loginErr) loginErr.textContent = "Mot de passe incorrect."; return; }
-  sessionStorage.setItem("lle_token", loginPwd.value);
-  loginCard?.classList.add("hidden");
-  appCard?.classList.remove("hidden");
-  appCard?.scrollIntoView({ behavior: "smooth", block: "start" });
-});
 
 const CHUNK_SIZE = 200 * 1024 * 1024; // 200 MB
 

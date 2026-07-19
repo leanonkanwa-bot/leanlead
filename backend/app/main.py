@@ -297,12 +297,6 @@ def _auth_required() -> bool:
     return bool(settings.access_password)
 
 
-def _check_auth(request: Request) -> None:
-    if not _auth_required():
-        return
-    token = request.cookies.get(AUTH_COOKIE) or request.headers.get("x-access-token")
-    if not token or not secrets.compare_digest(token, settings.access_password):
-        raise HTTPException(status_code=401, detail="auth required")
 
 
 # ── Google OAuth identity (separate from the site-wide access_password
@@ -474,14 +468,8 @@ async def test_ffmpeg() -> dict:
 
 
 @app.get("/api/auth/status")
-def auth_status(request: Request) -> dict:
-    if not _auth_required():
-        return {"required": False, "authed": True}
-    cookie = request.cookies.get(AUTH_COOKIE)
-    header_token = request.headers.get("x-access-token")
-    token = cookie or header_token
-    authed = bool(token) and secrets.compare_digest(token, settings.access_password)
-    return {"required": True, "authed": authed}
+def auth_status() -> dict:
+    return {"required": False, "authed": True}
 
 
 @app.post("/api/auth/login")
@@ -1007,7 +995,6 @@ async def submit_edit(
     style_pack: str = Form("lean_glass"),
     # Coach profile (Feature 3)
     profile_id: str = Form(""),
-    _: None = Depends(_check_auth),
 ) -> JSONResponse:
     if not settings.anthropic_api_key:
         raise HTTPException(500, "ANTHROPIC_API_KEY not set in backend/.env")
@@ -1113,7 +1100,7 @@ async def submit_edit(
 
 
 @app.get("/api/jobs/{job_id}")
-def get_job(job_id: str, request: Request, _: None = Depends(_check_auth)) -> dict:
+def get_job(job_id: str, request: Request) -> dict:
     job = store.get(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1125,7 +1112,7 @@ TRASH_RETENTION_HOURS = 7 * 24
 
 
 @app.post("/api/jobs/{job_id}/trash")
-def trash_job(job_id: str, _: None = Depends(_check_auth)) -> dict:
+def trash_job(job_id: str) -> dict:
     job = store.get(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1134,7 +1121,7 @@ def trash_job(job_id: str, _: None = Depends(_check_auth)) -> dict:
 
 
 @app.post("/api/jobs/{job_id}/restore")
-def restore_job(job_id: str, _: None = Depends(_check_auth)) -> dict:
+def restore_job(job_id: str) -> dict:
     job = store.get(job_id)
     if not job:
         raise HTTPException(404, "Job not found")
@@ -1147,7 +1134,6 @@ async def retry_job(
     job_id: str,
     background: BackgroundTasks,
     request: Request,
-    _: None = Depends(_check_auth),
 ) -> JSONResponse:
     """Re-run a failed job using the source video that is still on disk.
     Returns a NEW job_id — the frontend polls that one."""
@@ -1171,7 +1157,7 @@ async def retry_job(
 
 
 @app.get("/api/jobs/{job_id}/plan")
-def get_plan(job_id: str, request: Request, _: None = Depends(_check_auth)) -> dict:
+def get_plan(job_id: str, request: Request) -> dict:
     """Return the edit plan preview for a job that is in ready_for_review status."""
     job = store.get(job_id)
     if not job:
@@ -1186,7 +1172,6 @@ async def approve_job(
     job_id: str,
     background: BackgroundTasks,
     request: Request,
-    _: None = Depends(_check_auth),
 ) -> JSONResponse:
     """Approve an edit plan and trigger the render phase (Phase 2)."""
     # Refuse render approvals during a SIGTERM drain for the same reason as /api/edit.
@@ -1575,7 +1560,6 @@ def download(
     job_id: str,
     request: Request,
     fmt: str = Query("vertical"),
-    _: None = Depends(_check_auth),
 ):
     out = settings.outputs_dir / f"{job_id}.mp4"
     if not out.exists():
@@ -1626,7 +1610,7 @@ def upload_preview(upload_id: str):
 
 
 @app.get("/api/thumbnail/{job_id}")
-def thumbnail(job_id: str, request: Request, _: None = Depends(_check_auth)):
+def thumbnail(job_id: str, request: Request):
     """Extract first frame as 1080×1080 square thumbnail."""
     out = settings.outputs_dir / f"{job_id}.mp4"
     if not out.exists():
@@ -1876,7 +1860,7 @@ def _ass_ts_to_sec(ts: str) -> float:
 
 
 @app.get("/api/jobs/{job_id}/captions")
-def get_job_captions(job_id: str, request: Request, _: None = Depends(_check_auth)) -> dict:
+def get_job_captions(job_id: str, request: Request) -> dict:
     """Return parsed captions for a completed job."""
     ass_path = settings.work_dir / job_id / "captions.ass"
     if not ass_path.exists():
@@ -1890,7 +1874,6 @@ async def edit_captions(
     job_id: str,
     payload: dict = Body(...),
     request: Request = None,
-    _: None = Depends(_check_auth),
 ) -> dict:
     """Accept edited captions and rewrite the ASS file.
 
