@@ -349,7 +349,9 @@ def send_nurture_d10(profile: dict, profile_path: Path) -> bool:
 
 # ── H — Post-render J+1 ───────────────────────────────────────────────────────
 
-def send_post_render_d1(profile: dict, profile_path: Path) -> bool:
+def send_post_render_d1(
+    profile: dict, profile_path: Path, render_minutes: int | None = None
+) -> bool:
     """J+1 after first completed render (window: 1-7 days). Returns True if email was queued."""
     if profile.get("is_founder"):
         return False
@@ -359,24 +361,41 @@ def send_post_render_d1(profile: dict, profile_path: Path) -> bool:
     if profile.get("post_render_d1_sent"):
         return False
     first = _first_name(profile)
-    subject = "Félicitations pour ta première vidéo, " + first + " !"
+
+    if render_minutes and render_minutes >= 1:
+        time_str = f"en {render_minutes} minute{'s' if render_minutes > 1 else ''}"
+    else:
+        time_str = "en quelques minutes"
+
+    subject = "Ta vidéo a été montée " + time_str + ", " + first
     body = (
-        _h1("Félicitations pour ta première vidéo.")
+        _h1("Ta vidéo a été montée " + time_str + ".")
         + _p(
-            "Hey " + first + ", tu as fait ton premier montage hier. "
-            "C'est le plus dur, et tu l'as passé."
+            "Hey " + first + ", tu viens de faire quelque chose que la plupart "
+            "des créateurs repoussent a demain.<br><br>"
+            "Tu as filmé. Tu as uploadé. LeanRetention a fait le montage " + time_str + "."
         )
         + _p(
-            "Voici ce que les créateurs avec le plus de succès font "
-            "dans les 7 jours qui suivent leur premier montage.<br><br>"
-            '<strong style="color:#FF7751">Publie dans les 24h.</strong><br>'
-            "Une vidéo bien montée et publiée rapidement bat "
-            "une vidéo parfaite publiée dans 3 semaines.<br><br>"
-            '<strong style="color:#FF7751">Lance un deuxième montage.</strong><br>'
-            "La cohérence de publication est le facteur n°1 de croissance. "
-            "La deuxième vidéo est toujours plus facile que la première."
+            "Si tu postes 3 vidéos par semaine, LeanRetention peut t'en monter "
+            '<strong style="color:#FF7751">12 ce mois</strong> '
+            "sans toucher a un logiciel de montage.<br><br>"
+            "Voila comment :"
         )
-        + _cta(_APP_URL, "Monter ma prochaine vidéo →")
+        + (
+            '<div style="background:rgba(255,119,81,.08);border:1px solid '
+            'rgba(255,119,81,.2);border-radius:12px;padding:20px 24px;margin:0 0 28px">'
+            '<p style="margin:0 0 12px;font-size:15px;color:rgba(245,245,246,.9)">'
+            '<strong style="color:#FF7751">1.</strong> '
+            "Publie la video d'hier dans les prochaines 24h.</p>"
+            '<p style="margin:0 0 12px;font-size:15px;color:rgba(245,245,246,.9)">'
+            '<strong style="color:#FF7751">2.</strong> '
+            "Filme ta prochaine video cette semaine.</p>"
+            '<p style="margin:0;font-size:15px;color:rgba(245,245,246,.9)">'
+            '<strong style="color:#FF7751">3.</strong> '
+            "Passe au plan Starter pour monter les 15 suivantes ce mois.</p>"
+            '</div>'
+        )
+        + _cta(_PRICING_URL, "Voir les plans →")
     )
     try:
         profile["post_render_d1_sent"] = time.time()

@@ -1319,13 +1319,14 @@ def _check_nurture_emails() -> None:
                 days_since_reg = (_NOW - float(registered_at)) / _DAY
 
                 # Completed jobs for this profile
-                done_times = sorted(
-                    j.created_at for j in store._jobs.values()
-                    if j.profile_id == pid and j.status == "done" and not j.is_retry
+                done_jobs = sorted(
+                    [j for j in store._jobs.values()
+                     if j.profile_id == pid and j.status == "done" and not j.is_retry],
+                    key=lambda j: j.created_at,
                 )
-                has_render = bool(done_times)
+                has_render = bool(done_jobs)
                 days_since_first = (
-                    (_NOW - done_times[0]) / _DAY if has_render else None
+                    (_NOW - done_jobs[0].created_at) / _DAY if has_render else None
                 )
 
                 # Onboarding sequence — only fires while user has zero renders
@@ -1339,7 +1340,12 @@ def _check_nurture_emails() -> None:
 
                 # Post first render: 1-7 day window prevents stale "hier" phrasing
                 if days_since_first is not None and 1 <= days_since_first <= 7:
-                    _emails.send_post_render_d1(profile, profile_path)
+                    _fj = done_jobs[0]
+                    _render_minutes: int | None = None
+                    if _fj.completed_at and _fj.created_at:
+                        _secs = _fj.completed_at - _fj.created_at
+                        _render_minutes = max(1, round(_secs / 60))
+                    _emails.send_post_render_d1(profile, profile_path, render_minutes=_render_minutes)
 
             except Exception as e:
                 print(f"[nurture] profile {profile_path.stem}: {e}")
@@ -2546,6 +2552,84 @@ editor_dir = Path(__file__).resolve().parents[2] / "editor_frontend"
 if not editor_dir.exists():
     # fallback for local dev where files live in frontend/
     editor_dir = Path(__file__).resolve().parents[2] / "frontend"
+
+
+@app.get("/upsell", include_in_schema=False)
+def upsell_page(request: Request, job: str = "") -> Response:
+    """Post-render clarity page for free-plan users after their first video."""
+    profile_name = ""
+    profile_id = _verify_session(request.cookies.get(SESSION_COOKIE))
+    if profile_id:
+        try:
+            _p = _PROFILES_DIR / f"{profile_id}.json"
+            if _p.exists():
+                _pd = json.loads(_p.read_text(encoding="utf-8"))
+                profile_name = (_pd.get("name") or "").split()[0] if _pd.get("name") else ""
+        except Exception:
+            pass
+
+    job_id = "".join(c for c in job if c.isalnum() or c in "-_")  # sanitize
+    download_href = f"/api/download/{job_id}" if job_id else "/app"
+
+    greeting = f"Ta vidéo est prête, {profile_name}." if profile_name else "Ta vidéo est prête."
+
+    html = (
+        '<!DOCTYPE html><html lang="fr"><head>'
+        '<meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<title>Ta vidéo est prête - LeanRetention</title>'
+        '<style>'
+        '*{box-sizing:border-box;margin:0;padding:0}'
+        'body{font-family:"Helvetica Neue",Arial,sans-serif;background:#0d0d0d;color:#F5F5F6;'
+        'min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 24px}'
+        '.logo{margin-bottom:48px}'
+        '.logo img{height:36px;display:block}'
+        '.card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);'
+        'border-radius:16px;padding:40px;max-width:560px;width:100%}'
+        'h1{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.2;margin-bottom:8px}'
+        '.sub{font-size:16px;color:rgba(245,245,246,.55);margin-bottom:32px;line-height:1.6}'
+        '.dl-btn{display:inline-block;background:#FF7751;color:#fff;padding:14px 28px;'
+        'border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;'
+        'box-shadow:0 0 24px rgba(255,119,81,.35);margin-bottom:40px}'
+        '.divider{border:none;border-top:1px solid rgba(255,255,255,.08);margin:0 0 32px}'
+        '.seen{font-size:13px;text-transform:uppercase;letter-spacing:.08em;'
+        'color:rgba(245,245,246,.35);margin-bottom:20px}'
+        '.features{list-style:none;margin-bottom:32px}'
+        '.features li{padding:12px 0;border-bottom:1px solid rgba(255,255,255,.06);'
+        'font-size:15px;color:rgba(245,245,246,.75);display:flex;align-items:center;gap:12px}'
+        '.features li:last-child{border-bottom:none}'
+        '.dot{width:8px;height:8px;background:#FF7751;border-radius:50%;flex-shrink:0}'
+        '.pricing-btn{display:inline-block;border:1px solid rgba(255,119,81,.5);color:#FF7751;'
+        'padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;'
+        'transition:background .15s}'
+        '.back{display:block;margin-top:24px;font-size:13px;color:rgba(245,245,246,.35);'
+        'text-align:center;text-decoration:none}'
+        '.back:hover{color:rgba(245,245,246,.6)}'
+        '</style></head><body>'
+        '<div class="logo">'
+        '<img src="/public/logo.png" alt="LeanRetention" />'
+        '</div>'
+        '<div class="card">'
+        f'<h1>{greeting}</h1>'
+        '<p class="sub">Tu viens de voir LeanRetention a 100% de ses capacites.<br>'
+        'Voici ce que tu peux faire avec un plan Starter.</p>'
+        f'<a href="{download_href}" class="dl-btn" download>Télécharger ma vidéo →</a>'
+        '<hr class="divider">'
+        '<p class="seen">Plan Starter - 9€/mois</p>'
+        '<ul class="features">'
+        '<li><span class="dot"></span>15 vidéos par mois, sans limite de durée</li>'
+        '<li><span class="dot"></span>6 styles visuels au choix (cartes, captions, overlays)</li>'
+        '<li><span class="dot"></span>Export HD - rendu final sans filigrane</li>'
+        '<li><span class="dot"></span>Suppression automatique des silences et des répétitions</li>'
+        '<li><span class="dot"></span>Hook réécrit par IA sur chaque vidéo</li>'
+        '</ul>'
+        '<a href="/#pricing" class="pricing-btn">Voir tous les plans →</a>'
+        '</div>'
+        '<a href="/app" class="back">Revenir a ma bibliotheque</a>'
+        '</body></html>'
+    )
+    return Response(content=html, media_type="text/html; charset=utf-8")
+
 
 if editor_dir.exists():
     @app.get("/", include_in_schema=False)

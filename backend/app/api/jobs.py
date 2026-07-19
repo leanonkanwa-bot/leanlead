@@ -66,6 +66,8 @@ class Job:
     is_retry: bool = False          # True if created via /api/retry — excluded from quota counting
     # Trash (Feature: soft-delete with 7-day auto-purge)
     trashed_at: float | None = None  # unix timestamp when moved to trash; None = not trashed
+    # Wall-clock time when status reached "done" — used for render-time reporting
+    completed_at: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

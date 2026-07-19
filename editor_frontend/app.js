@@ -317,6 +317,32 @@ function loadVideoLibrary() {
       img.addEventListener("error", () => img.setAttribute("data-error", "1"));
     });
   } catch {}
+
+  // Quota notice — only in the active tab, never for trash
+  try {
+    const noticeEl = $("libraryQuotaNotice");
+    if (noticeEl && _libTab === "active" && _cachedUsage && _cachedUsage.exceeded) {
+      if (_cachedUsage.period === "lifetime") {
+        noticeEl.innerHTML =
+          "Tu as utilisé ta vidéo d'essai. " +
+          '<a href="/#pricing" style="color:#FF7751;text-decoration:none;font-weight:600">Passe à Starter</a>' +
+          " pour continuer — 15 vidéos par mois.";
+      } else {
+        const now = new Date();
+        const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+        const resetStr = nextReset.toLocaleDateString("fr-FR", { day: "numeric", month: "long", timeZone: "UTC" });
+        const n = _cachedUsage.limit;
+        noticeEl.innerHTML =
+          `Tu as utilisé tes ${n} vidéo${n > 1 ? "s" : ""} ce mois. ` +
+          `Renouvellement le ${resetStr} ou ` +
+          '<a href="/#pricing" style="color:#FF7751;text-decoration:none;font-weight:600">passe à Starter</a>' +
+          " pour continuer maintenant.";
+      }
+      noticeEl.style.display = "block";
+    } else if (noticeEl) {
+      noticeEl.style.display = "none";
+    }
+  } catch {}
 }
 
 document.getElementById("libTabActive")?.addEventListener("click", () => {
@@ -556,6 +582,8 @@ function loadProfileSection() {
   loadPlanUsage();
 }
 
+let _cachedUsage = null;
+
 async function loadPlanUsage() {
   const profileId = localStorage.getItem("profile_id");
   const nameEl = $("profilePlanName");
@@ -565,6 +593,7 @@ async function loadPlanUsage() {
     const res = await apiFetch(`/api/billing/usage/${profileId}`);
     if (!res.ok) return;
     const u = await res.json();
+    _cachedUsage = u;
     nameEl.textContent = u.plan_label || u.plan;
     const period = u.period === "monthly" ? " ce mois" : " (essai)";
     usageEl.textContent = `${u.used}/${u.limit} vidéos${period}`;
@@ -1404,8 +1433,10 @@ async function showResult(jobId, result) {
   }
 
   // ── Save to localStorage with retention_score ────────────────────────────
+  let _isFirstRender = false;
   try {
     const videos = JSON.parse(localStorage.getItem("edited_videos") || "[]");
+    _isFirstRender = videos.length === 0;
     const selectedFormat = document.querySelector('input[name="format_hint"]:checked')?.value || "auto";
     const instructions = document.querySelector('textarea[name="instructions"]')?.value || "";
     videos.unshift({
@@ -1430,6 +1461,22 @@ async function showResult(jobId, result) {
     updateDashboardStats();
     updateAchievements();
   } catch {}
+
+  // After first free render — full-page clarity (not a popup)
+  if (_isFirstRender) {
+    try {
+      const _pid = localStorage.getItem("profile_id");
+      if (_pid) {
+        const _ur = await apiFetch(`/api/billing/usage/${_pid}`);
+        if (_ur.ok) {
+          const _uu = await _ur.json();
+          if (_uu.plan === "free") {
+            setTimeout(() => { window.location.href = `/upsell?job=${jobId}`; }, 1800);
+          }
+        }
+      }
+    } catch {}
+  }
 
   _currentJobId = jobId;
   await loadPublishConnections();

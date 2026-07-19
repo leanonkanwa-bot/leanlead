@@ -1470,6 +1470,7 @@ def run_render_phase(job_id: str, src: Path) -> None:
         store.update(
             job_id,
             status="done",
+            completed_at=time.time(),
             progress=100,
             message="Done.",
             result={
