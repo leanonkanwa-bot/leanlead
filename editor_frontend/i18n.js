@@ -15,7 +15,7 @@
       // ── HERO ─────────────────────────────────────────────────────────────────
       hero_title1: "Vos vidéos brutes.",
       hero_glow: "Éditées comme un pro.",
-      hero_sub: "LeanRetention analyse votre contenu, réécrit votre hook, supprime les silences et publie automatiquement.",
+      hero_sub: "LeanRetention analyse votre contenu, ajoute des captions synchronisées, des graphics animés et exporte en 9:16 ou 16:9 automatiquement.",
       hero_cta1: "Éditer ma première vidéo →",
       hero_cta2: "Voir comment ça marche",
       trust_free: "Première vidéo gratuite",
@@ -170,6 +170,11 @@
       lib_tab_trash: "Corbeille",
       lib_empty: "Aucune vidéo éditée pour l'instant.<br>Déposez votre première vidéo dans l'éditeur.",
 
+      // ── INDEX — QUOTA NOTICE (lifetime trial exhausted) ──────────────────────
+      quota_trial_used: "Tu as utilisé ta vidéo d'essai.",
+      quota_upgrade_cta: "Passe à Starter",
+      quota_trial_continue: "pour continuer, 15 vidéos par mois.",
+
       // ── INDEX — PROFILE ───────────────────────────────────────────────────────
       profile_plan: "Mon plan",
       profile_icp: "Client idéal (ICP)",
@@ -189,7 +194,7 @@
       // ── HERO ─────────────────────────────────────────────────────────────────
       hero_title1: "Your raw footage.",
       hero_glow: "Edited like a pro.",
-      hero_sub: "LeanRetention analyzes your content, rewrites your hook, removes silences, and publishes automatically.",
+      hero_sub: "LeanRetention analyzes your content, adds synced captions, animated graphics, and exports in 9:16 or 16:9 automatically.",
       hero_cta1: "Edit my first video →",
       hero_cta2: "See how it works",
       trust_free: "First video free",
@@ -343,6 +348,11 @@
       lib_tab_active: "Library",
       lib_tab_trash: "Trash",
       lib_empty: "No edited videos yet.<br>Drop your first video in the editor.",
+
+      // ── INDEX — QUOTA NOTICE (lifetime trial exhausted) ──────────────────────
+      quota_trial_used: "You have used your free trial video.",
+      quota_upgrade_cta: "Upgrade to Starter",
+      quota_trial_continue: "to continue, 15 videos per month.",
 
       // ── INDEX — PROFILE ───────────────────────────────────────────────────────
       profile_plan: "My plan",

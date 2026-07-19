@@ -323,10 +323,11 @@ function loadVideoLibrary() {
     const noticeEl = $("libraryQuotaNotice");
     if (noticeEl && _libTab === "active" && _cachedUsage && _cachedUsage.exceeded) {
       if (_cachedUsage.period === "lifetime") {
+        var _t = window.t || function(k) { return k; };
         noticeEl.innerHTML =
-          "Tu as utilisé ta vidéo d'essai. " +
-          '<a id="noticeStarterBtn" href="#" style="color:#FF7751;text-decoration:none;font-weight:600">Passe à Starter</a>' +
-          " pour continuer, 15 vidéos par mois.";
+          _t("quota_trial_used") + " " +
+          '<a id="noticeStarterBtn" href="#" style="color:#FF7751;text-decoration:none;font-weight:600">' + _t("quota_upgrade_cta") + '</a>' +
+          " " + _t("quota_trial_continue");
         const _nsb = noticeEl.querySelector("#noticeStarterBtn");
         if (_nsb) _nsb.addEventListener("click", function(e) {
           e.preventDefault();
