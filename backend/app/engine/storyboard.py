@@ -376,9 +376,11 @@ def _generate_graphic_cards(
     from anthropic import Anthropic
     from app.core.config import settings
 
-    # Compute card density per graphic-overlays formula
+    # Compute card density per graphic-overlays formula.
+    # Short format (<60s) gets a denser ceiling (~1 card per 4.5s) to improve
+    # watch-time retention. Long format keeps its original pace tiers unchanged.
     if trimmed_duration < 60:
-        base_pace = 7
+        base_pace = 4.5 if format_hint == "short" else 7
     elif trimmed_duration < 180:
         base_pace = 10
     elif trimmed_duration < 600:
@@ -567,7 +569,7 @@ ZONES — where the card sits on screen:
   NEVER use "lower-third" — that zone is reserved for captions only.
 {f"SUBJECT POSITION: the speaker occupies the {subject_side} side of the frame. Place data-heavy cards (stat, list, comparison) on the OPPOSITE side so they don't obscure the face." if subject_side and subject_side != "center" else ""}
 RULES:
-- Target {target_cards} cards for a {trimmed_duration:.0f}s video
+- CARD COUNT CEILING: {target_cards} cards maximum for a {trimmed_duration:.0f}s video. This is a hard ceiling, not a target — only place a card when the moment genuinely deserves one. A video with 5 high-quality cards is better than one with 10 forced cards. Never invent or pad cards just to approach the ceiling.
 - Card startSec/endSec must be within [0, {trimmed_duration:.1f}]
 - Cards should NOT overlap each other in time
 - Most cards should last 3-8 seconds
@@ -1038,7 +1040,7 @@ SEGMENT DETAILS (scores, reasons, retention notes):
 KEY LINES (most memorable moments):
 {json.dumps(key_lines)}
 
-Design {target_cards} graphic overlay cards for this video."""
+Design graphic overlay cards for this video — up to {target_cards} maximum. Place a card only at moments that genuinely earn one: a key claim, a surprising stat, a narrative turning point, or a concept the viewer needs to see to understand. Skip the moment if no card adds value. Quality and narrative relevance always take priority over reaching the card count ceiling."""
 
     client = Anthropic()
     try:
