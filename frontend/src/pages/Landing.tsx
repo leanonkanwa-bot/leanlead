@@ -376,6 +376,7 @@ function Features({ t }: { t: (k: Parameters<typeof tr>[1]) => string }) {
     { icon: "💬", title: t("feat_4_title"), desc: t("feat_4_desc") },
     { icon: "📊", title: t("feat_5_title"), desc: t("feat_5_desc") },
     { icon: "🎯", title: t("feat_6_title"), desc: t("feat_6_desc") },
+    { icon: "🎬", title: t("feat_7_title"), desc: t("feat_7_desc") },
   ];
   return (
     <section id="features" className="py-32 px-6 relative">
@@ -503,7 +504,7 @@ function Pricing({ t }: { t: (k: Parameters<typeof tr>[1]) => string }) {
             name={t("plan_free_name")}
             price={t("plan_free_price")}
             sub={t("plan_free_sub")}
-            features={[t("plan_free_f1"), t("plan_free_f2"), t("plan_free_f3"), t("plan_free_f4")]}
+            features={[t("plan_free_f1"), t("plan_free_f2"), t("plan_free_f3"), t("plan_free_f4"), t("plan_free_f5")]}
             cta={t("plan_free_cta")}
             popularLabel={t("plan_popular")}
             perMonth={t("plan_per_month")}
@@ -512,7 +513,7 @@ function Pricing({ t }: { t: (k: Parameters<typeof tr>[1]) => string }) {
             name={t("plan_pro_name")}
             price={t("plan_pro_price")}
             sub={t("plan_pro_sub")}
-            features={[t("plan_pro_f1"), t("plan_pro_f2"), t("plan_pro_f3"), t("plan_pro_f4"), t("plan_pro_f5"), t("plan_pro_f6")]}
+            features={[t("plan_pro_f1"), t("plan_pro_f2"), t("plan_pro_f3"), t("plan_pro_f4"), t("plan_pro_f5"), t("plan_pro_f6"), t("plan_pro_f7")]}
             hot
             cta={t("plan_pro_cta")}
             popularLabel={t("plan_popular")}
@@ -522,7 +523,7 @@ function Pricing({ t }: { t: (k: Parameters<typeof tr>[1]) => string }) {
             name={t("plan_agency_name")}
             price={t("plan_agency_price")}
             sub={t("plan_agency_sub")}
-            features={[t("plan_agency_f1"), t("plan_agency_f2"), t("plan_agency_f3"), t("plan_agency_f4"), t("plan_agency_f5")]}
+            features={[t("plan_agency_f1"), t("plan_agency_f2"), t("plan_agency_f3"), t("plan_agency_f4"), t("plan_agency_f5"), t("plan_agency_f6")]}
             cta={t("plan_agency_cta")}
             popularLabel={t("plan_popular")}
             perMonth={t("plan_per_month")}

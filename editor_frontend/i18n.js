@@ -175,7 +175,7 @@
       // ── INDEX — QUOTA NOTICE (lifetime trial exhausted) ──────────────────────
       quota_trial_used: "Tu as utilisé ta vidéo d'essai.",
       quota_upgrade_cta: "Passe à Starter",
-      quota_trial_continue: "pour continuer, 15 vidéos par mois.",
+      quota_trial_continue: "pour continuer, 15 vidéos par mois et l'export 4K.",
 
       // ── INDEX — PROFILE ───────────────────────────────────────────────────────
       profile_plan: "Mon plan",
@@ -356,7 +356,7 @@
       // ── INDEX — QUOTA NOTICE (lifetime trial exhausted) ──────────────────────
       quota_trial_used: "You have used your free trial video.",
       quota_upgrade_cta: "Upgrade to Starter",
-      quota_trial_continue: "to continue, 15 videos per month.",
+      quota_trial_continue: "to continue, 15 videos per month and 4K export.",
 
       // ── INDEX — PROFILE ───────────────────────────────────────────────────────
       profile_plan: "My plan",

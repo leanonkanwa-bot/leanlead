@@ -2605,6 +2605,7 @@ def upsell_page(request: Request, job: str = "") -> Response:
         '<li><span class="dot"></span>15 vidéos par mois, sans limite de durée</li>'
         '<li><span class="dot"></span>6 styles visuels au choix (cartes, captions, overlays)</li>'
         '<li><span class="dot"></span>Export HD - rendu final sans filigrane</li>'
+        '<li><span class="dot"></span>Export 4K pour YouTube et les réseaux sociaux</li>'
         '</ul>'
         '<a href="https://leanretention.com/#pricing" class="pricing-btn">Voir tous les plans →</a>'
         '</div>'

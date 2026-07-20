@@ -79,6 +79,8 @@ export const translations = {
     feat_5_desc: "Cartes stats, timelines, checklists, scores — générées automatiquement depuis ta transcription et superposées au bon moment.",
     feat_6_title: "Coach de rétention",
     feat_6_desc: "Après chaque montage, ton coach IA t'explique chaque décision, analyse tes performances et te suggère tes prochains angles.",
+    feat_7_title: "Export 4K",
+    feat_7_desc: "Exportez vos vidéos en résolution 4K pour un rendu professionnel sur YouTube et les réseaux sociaux. Disponible sur les plans payants.",
 
     // Coach section
     coach_eyebrow: "TON COACH, PAS JUSTE TON MONTEUR",
@@ -107,6 +109,7 @@ export const translations = {
     plan_free_f2: "Transcription automatique",
     plan_free_f3: "Captions animées",
     plan_free_f4: "Export 9:16 et 16:9",
+    plan_free_f5: "Export 1080p",
 
     plan_pro_name: "Pro",
     plan_pro_price: "79€",
@@ -118,6 +121,7 @@ export const translations = {
     plan_pro_f4: "Graphics dynamiques auto",
     plan_pro_f5: "Coach de rétention + analyse de perfs",
     plan_pro_f6: "Support prioritaire",
+    plan_pro_f7: "Export 4K",
 
     plan_agency_name: "Agency",
     plan_agency_price: "199€",
@@ -128,6 +132,7 @@ export const translations = {
     plan_agency_f3: "Accès API",
     plan_agency_f4: "Branding personnalisé",
     plan_agency_f5: "Support Slack dédié",
+    plan_agency_f6: "Export 4K",
 
     // Final CTA
     cta_eyebrow: "Prêt à scaler ?",
@@ -223,6 +228,8 @@ export const translations = {
     feat_5_desc: "Stat cards, timelines, checklists, scores — auto-generated from your transcript and overlaid at the right moment.",
     feat_6_title: "Retention coach",
     feat_6_desc: "After every edit, your AI coach explains each decision, analyzes your performance, and suggests your next content angles.",
+    feat_7_title: "4K Export",
+    feat_7_desc: "Export your videos in 4K resolution for a professional result on YouTube and social media. Available on paid plans.",
 
     // Coach section
     coach_eyebrow: "YOUR COACH, NOT JUST YOUR EDITOR",
@@ -251,6 +258,7 @@ export const translations = {
     plan_free_f2: "Automatic transcription",
     plan_free_f3: "Animated captions",
     plan_free_f4: "9:16 and 16:9 export",
+    plan_free_f5: "1080p export",
 
     plan_pro_name: "Pro",
     plan_pro_price: "$79",
@@ -262,6 +270,7 @@ export const translations = {
     plan_pro_f4: "Auto dynamic graphics",
     plan_pro_f5: "Retention coach + performance analysis",
     plan_pro_f6: "Priority support",
+    plan_pro_f7: "4K export",
 
     plan_agency_name: "Agency",
     plan_agency_price: "$199",
@@ -272,6 +281,7 @@ export const translations = {
     plan_agency_f3: "API access",
     plan_agency_f4: "Custom branding",
     plan_agency_f5: "Dedicated Slack support",
+    plan_agency_f6: "4K export",
 
     // Final CTA
     cta_eyebrow: "Ready to scale?",
