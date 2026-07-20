@@ -61,11 +61,11 @@ _ZONE_BOUNDS_PORTRAIT = {
     "fullscreen":     {"left": 0,   "top": 0,    "width": 1080, "height": 1920},
     "hook-title":     {"left": 0,   "top": 0,    "width": 1080, "height": 288},
     "upper-right":          {"left": 540, "top": 100,  "width": 500,  "height": 320},   # B-roll compact upper-right
-    "upper-data":           {"left": 540, "top": 175,  "width": 520,  "height": 360},   # alias
+    "upper-data":           {"left": 540, "top": 260,  "width": 520,  "height": 400},   # alias
     # Positional-variety zones — standard data cards alternate left/right per card index
     # (face-biased when subject_position available) so consecutive cards never land in the
     # same corner.  upper-data (right) already exists above; upper-left-data-sm mirrors it.
-    "upper-left-data-sm":   {"left": 30,  "top": 175,  "width": 540,  "height": 360},   # standard, left side
+    "upper-left-data-sm":   {"left": 30,  "top": 260,  "width": 540,  "height": 400},   # standard, left side
     # Multi-item data cards (4-6 rows each) need more height than upper-data's 320 px and
     # more left-margin than upper-data's 40 px right gap.  Two mirrors: left (default when
     # face is right) and right (for left-biased faces, safe because 28 px compact font
@@ -73,9 +73,9 @@ _ZONE_BOUNDS_PORTRAIT = {
     "upper-left-data":      {"left": 30,  "top": 80,   "width": 540,  "height": 500},   # tall multi-item, left side
     "upper-right-data-tall": {"left": 540, "top": 80,  "width": 500,  "height": 500},   # tall multi-item, right side
     # 5-position rotation — center zones (face zone, 34–50% height). Backdrop-dim applied.
-    "portrait-center-left":  {"left": 20,  "top": 660, "width": 480, "height": 300},
-    "portrait-center-right": {"left": 580, "top": 660, "width": 480, "height": 300},
-    "portrait-center-full":  {"left": 40,  "top": 640, "width": 1000, "height": 320},
+    "portrait-center-left":  {"left": 20,  "top": 660, "width": 480, "height": 340},
+    "portrait-center-right": {"left": 580, "top": 660, "width": 480, "height": 340},
+    "portrait-center-full":  {"left": 40,  "top": 640, "width": 1000, "height": 360},
     # Legacy bottom zones (kept for backward compat, not used in the rotation sequence).
     "portrait-bottom-left":  {"left": 30,  "top": 1070, "width": 500, "height": 250},
     "portrait-bottom-right": {"left": 540, "top": 1070, "width": 500, "height": 250},
@@ -571,13 +571,13 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
     if compact:
         def _s(px_str: str, f: float) -> str:
             return f"{int(float(px_str.replace('px', '')) * f)}px"
-        _title_scale    = 0.45 if content_style in _TALL_DATA_PANEL_TYPES else 0.65
+        _title_scale    = 0.52 if content_style in _TALL_DATA_PANEL_TYPES else 0.75
         title_size_eff  = _s(p["title_size"],  _title_scale)
         number_size_eff = _s(p["number_size"], 0.67)
-        detail_size_eff = "20px"
-        kicker_size_eff = "16px"
-        list_item_size  = "18px"
-        chk_item_size   = "17px"
+        detail_size_eff = "23px"
+        kicker_size_eff = "18px"
+        list_item_size  = "21px"
+        chk_item_size   = "20px"
         panel_padding   = "28px 32px"
         root_padding    = "32px"
         text_align      = "left"
@@ -3096,7 +3096,7 @@ def _build_caption_card_html(card: dict, pack: dict | None = None) -> str:
         f'  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;\n'
         f'  gap: 0.3em; padding: 16px 24px;\n'
         f'  font-family: {p["font"]};\n'
-        f'  font-size: 48px; font-weight: 700; color: #FFFFFF;\n'
+        f'  font-size: 62px; font-weight: 700; color: #FFFFFF;\n'
         f'  text-shadow: 0 2px 8px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.9);\n'
         f'  text-align: center; line-height: 1.4;\n'
         f'}}\n'
