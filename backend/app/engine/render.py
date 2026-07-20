@@ -2199,14 +2199,21 @@ def _render_hyperframes(
             _mem_avail_gb = max(0.5, _mem_limit_gb - _mem_used_gb)
         else:
             _mem_avail_gb = _mem_limit_gb * 0.6   # conservative fallback
-        _mem_workers = min(24, max(4, int(_mem_avail_gb / 1.0)))
+        # Size Node heap first; Chrome workers get what's left.
+        # Both pools draw from the same cgroup limit — the old formula computed
+        # them independently, causing the 24 GB plan to allocate 8 GB Node +
+        # 14 workers × 700 MB steady (21 GB JIT peak) → OOM → SwiftShader crash.
+        _node_heap_mb = max(4096, min(8192, int(_mem_avail_gb * 512)))  # 50% of avail, 4–8 GB
+        _chrome_budget_gb = max(2.0, _mem_avail_gb - (_node_heap_mb / 1024) - 2.0)
+        _mem_workers = min(24, max(4, int(_chrome_budget_gb / 1.5)))  # 1.5 GB/worker (JIT peak)
         _cpu_count = _os.cpu_count() or 8
         _cpu_workers = max(4, _cpu_count - 2)
         _n_workers = max(4, min(_mem_workers, _cpu_workers))
         print(
             f"[HF] workers: {_n_workers}"
             f" (limit={_mem_limit_gb:.1f}GB used={_mem_used_gb:.1f}GB"
-            f" avail={_mem_avail_gb:.1f}GB→{_mem_workers},"
+            f" avail={_mem_avail_gb:.1f}GB node={_node_heap_mb // 1024}GB"
+            f" chrome_budget={_chrome_budget_gb:.1f}GB→{_mem_workers},"
             f" cpu {_cpu_count}→{_cpu_workers})",
             flush=True,
         )
@@ -2222,7 +2229,6 @@ def _render_hyperframes(
         # Raise Node.js V8 heap beyond its ~4 GB default. Railway containers have
         # 22 GB cgroup RAM; without this, the frame-capture JSON serialisation OOMs
         # around the halfway point on any video longer than ~20s.
-        _node_heap_mb = max(4096, min(8192, int(_mem_avail_gb * 512)))  # 50 % of avail, 4–8 GB
         env["NODE_OPTIONS"] = f"--max-old-space-size={_node_heap_mb}"
         print(f"[HF] NODE_OPTIONS: --max-old-space-size={_node_heap_mb} ({_node_heap_mb // 1024}GB)", flush=True)
 
