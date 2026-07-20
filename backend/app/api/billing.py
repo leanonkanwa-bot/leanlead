@@ -24,7 +24,7 @@ from fastapi import APIRouter, Body, HTTPException, Request
 
 from app.api.jobs import store as job_store
 from app.core.config import settings
-from app.core.plans import DEFAULT_PLAN, effective_plan_info
+from app.core.plans import DEFAULT_PLAN, effective_plan_info, has_4k_access
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,7 @@ def get_usage(profile_id: str) -> dict:
         "limit": info["limit"],
         "period": info["period"],
         "exceeded": used >= info["limit"],
+        "has_4k": has_4k_access(profile),
     }
 
 

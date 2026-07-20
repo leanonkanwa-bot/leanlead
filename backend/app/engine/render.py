@@ -1824,21 +1824,12 @@ def _upscale_to_source_resolution(output_path: Path, src: Path, short_form: bool
     if not allow_4k:
         return {"upscaled": False, "output_resolution": f"{base_w}x{base_h}"}
 
-    info = _probe_video_info(src)
-    src_w, src_h = info.get("width", 0), info.get("height", 0)
-    src_max = max(src_w, src_h)
+    # Always target 4K (2× base) for entitled users regardless of source resolution.
+    target_w = _round_even(base_w * 2.0)   # 2160 portrait / 3840 landscape
+    target_h = _round_even(base_h * 2.0)   # 3840 portrait / 2160 landscape
+    crf = "14"
 
-    scale = max(1.0, min(src_max / 1920.0, 2.0))  # 1.0 = no-op, 2.0 = 4K cap
-
-    if scale <= 1.0001:
-        return {"upscaled": False, "output_resolution": f"{base_w}x{base_h}"}
-
-    target_w = _round_even(base_w * scale)
-    target_h = _round_even(base_h * scale)
-    is_4k_target = scale >= 1.999
-    crf = "14" if is_4k_target else "16"
-
-    print(f"[UPSCALE] source={src_w}x{src_h} -> target={target_w}x{target_h} (scale={scale:.2f}, crf={crf})")
+    print(f"[UPSCALE] {base_w}x{base_h} -> {target_w}x{target_h} (forced 4K, crf={crf})")
     t0 = time.perf_counter()
 
     tmp_path = output_path.with_suffix(".upscale_tmp.mp4")

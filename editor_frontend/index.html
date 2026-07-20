@@ -897,6 +897,22 @@
               <input type="hidden" name="style_pack" id="stylePackValue" value="lean_glass" />
             </div>
 
+            <!-- ── QUALITY SELECTOR ──────────────────────────────── -->
+            <div style="margin-top:1rem" id="qualityRow">
+              <div class="format-pills">
+                <div class="format-pill">
+                  <input type="radio" name="output_quality" id="qual-1080p" value="1080p" checked />
+                  <label for="qual-1080p">1080p</label>
+                </div>
+                <div class="format-pill" id="qual4kPill">
+                  <input type="radio" name="output_quality" id="qual-4k" value="4k" />
+                  <label for="qual-4k" data-i18n="quality_4k_label">4K</label>
+                </div>
+              </div>
+              <p id="quality4kNote" class="hint-text" style="display:none" data-i18n="quality_4k_note">Le rendu 4K prend 2–3 min supplémentaires.</p>
+              <p id="quality4kLocked" class="hint-text" style="display:none;opacity:.6" data-i18n="quality_4k_locked">4K disponible sur Starter et plus.</p>
+            </div>
+
             <div style="margin-top:1rem">
               <button type="submit" class="btn-submit" id="submit">
                 <span class="btn-shimmer"></span>

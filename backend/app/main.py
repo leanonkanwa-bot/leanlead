@@ -995,6 +995,8 @@ async def submit_edit(
     style_pack: str = Form("lean_glass"),
     # Coach profile (Feature 3)
     profile_id: str = Form(""),
+    # Output quality
+    output_quality: Literal["1080p", "4k"] = Form("1080p"),
 ) -> JSONResponse:
     if not settings.anthropic_api_key:
         raise HTTPException(500, "ANTHROPIC_API_KEY not set in backend/.env")
@@ -1085,6 +1087,7 @@ async def submit_edit(
         template_id=template_id,
         style_pack=style_pack,
         coach_profile=coach_profile,
+        output_quality=output_quality,
     )
     store.update(job.id, source_path=str(dest), params=run_params, profile_id=profile_id)
 

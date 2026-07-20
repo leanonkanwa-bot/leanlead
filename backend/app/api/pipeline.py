@@ -1434,7 +1434,7 @@ def run_render_phase(job_id: str, src: Path) -> None:
             subject_position=subject_pos,
             graphic_specs=graphic_specs,
             content_type=content_type,
-            allow_4k=has_4k_access(params.get("coach_profile")),
+            allow_4k=(params.get("output_quality", "1080p") == "4k") and has_4k_access(params.get("coach_profile")),
             filler_drops=filler_drops,
             virtual_drops=virtual_drops,
             source_words=source_words,

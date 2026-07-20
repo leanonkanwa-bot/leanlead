@@ -593,6 +593,24 @@ function loadProfileSection() {
 
 let _cachedUsage = null;
 
+function _updateQualitySelector() {
+  const pill4k   = document.getElementById("qual4kPill");
+  const input4k  = document.getElementById("qual-4k");
+  const locked   = document.getElementById("quality4kLocked");
+  if (!pill4k || !input4k) return;
+  const has4k = _cachedUsage?.has_4k === true;
+  input4k.disabled = !has4k;
+  pill4k.style.opacity = has4k ? "" : "0.4";
+  if (locked) locked.style.display = has4k ? "none" : "";
+}
+
+document.getElementById("qual-4k")?.addEventListener("change", () => {
+  document.getElementById("quality4kNote").style.display = "";
+});
+document.getElementById("qual-1080p")?.addEventListener("change", () => {
+  document.getElementById("quality4kNote").style.display = "none";
+});
+
 async function loadPlanUsage() {
   const profileId = localStorage.getItem("profile_id");
   const nameEl = $("profilePlanName");
@@ -603,6 +621,7 @@ async function loadPlanUsage() {
     if (!res.ok) return;
     const u = await res.json();
     _cachedUsage = u;
+    _updateQualitySelector();
     var _t = window.t || function(k) { return k; };
     var _planNames = { free: _t("plan_free_name") };
     nameEl.textContent = _planNames[u.plan] || u.plan_label || u.plan;

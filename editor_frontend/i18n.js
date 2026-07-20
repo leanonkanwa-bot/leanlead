@@ -137,6 +137,11 @@
       pack_craft_desc: "Pour qu'on sente que c'est VRAIMENT toi qui parles",
       pack_cinema_desc: "Pour transformer ton histoire en moment inoubliable",
 
+      // ── INDEX — QUALITY SELECTOR ──────────────────────────────────────────────
+      quality_4k_label:  "4K",
+      quality_4k_note:   "Le rendu 4K prend 2–3 min supplémentaires.",
+      quality_4k_locked: "4K disponible sur Starter et plus.",
+
       // ── INDEX — EDITOR SUBMIT ─────────────────────────────────────────────────
       editor_submit: "Éditer ma vidéo",
 
@@ -312,6 +317,11 @@
       pack_ledger_desc: "To earn the trust of investors and premium clients",
       pack_craft_desc: "To make it feel like it's truly YOU speaking",
       pack_cinema_desc: "To turn your story into an unforgettable moment",
+
+      // ── INDEX — QUALITY SELECTOR ──────────────────────────────────────────────
+      quality_4k_label:  "4K",
+      quality_4k_note:   "4K rendering takes 2–3 extra minutes.",
+      quality_4k_locked: "4K available on Starter and above.",
 
       // ── INDEX — EDITOR SUBMIT ─────────────────────────────────────────────────
       editor_submit: "Edit my video",

@@ -42,7 +42,11 @@ def effective_plan_info(profile: dict | None) -> dict:
 
 
 def has_4k_access(profile: dict | None) -> bool:
-    """4K upscale (lanczos 1080p->4K post-HF-render) is available to all
-    accounts regardless of plan.
+    """4K upscale is available to Starter, Pro, and Agency plans (all paid
+    tiers) as well as founder accounts. Free trial gets 1080p output only.
     """
-    return True
+    if not profile:
+        return False
+    if profile.get("is_founder"):
+        return True
+    return profile.get("plan", "free") in ("starter", "pro", "agency")
