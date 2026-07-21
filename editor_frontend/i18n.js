@@ -185,7 +185,22 @@
       profile_change_plan: "Changer de plan",
       profile_save_btn: "Enregistrer",
       profile_edit_btn: "Modifier ICP & piliers",
-      profile_saved_msg: "Profil enregistré."
+      profile_saved_msg: "Profil enregistré.",
+
+      // ── INDEX — LEANBRIEF ─────────────────────────────────────────────────────
+      lb_card_label: "Cours : les bases du montage qui retient",
+      lb1_title: "La structure qui retient l'attention",
+      lb1_body: "Une vidéo qui retient suit toujours la même architecture, dans cet ordre : <strong>Hook</strong> (0–3s, la promesse ou le choc qui arrête le scroll) → <strong>Contraste</strong> (ce qui rend la situation intéressante) → <strong>Conséquence</strong> (l'enjeu réel) → <strong>Loop</strong> (une question ouverte qui pousse à continuer) → <strong>Histoire</strong> → <strong>Réalisation</strong> → <strong>Principe</strong> → <strong>Reframe</strong> → <strong>Payoff</strong> → <strong>Closing</strong>. Sauter une étape, c'est perdre un point d'accroche.",
+      lb2_title: "Pourquoi on coupe les pauses et les répétitions",
+      lb2_body: "Une pause de plus de 0,3–0,5s sans intention fait perdre du rythme et invite au scroll. Une répétition ralentit la compréhension sans ajouter de sens. La règle : on coupe ce qui n'ajoute ni clarté ni émotion, on garde tout ce qui en ajoute.",
+      lb3_title: "Le zoom et le rythme",
+      lb3_body: "Le zoom lent avec punch-in ponctuel (100 % → 130 %) crée un mouvement continu qui empêche l'œil de se lasser. Trop de zoom = fatigue visuelle. Pas assez = statique. La cadence idéale suit les moments d'emphase du discours.",
+      lb4_title: "Le B-roll au service du propos",
+      lb4_body: "Un B-roll ne doit apparaître que quand il illustre vraiment ce qui est dit à l'instant précis, jamais pour remplir un silence. Trop de B-roll noie le message ; pas assez, le discours reste abstrait.",
+      lb5_title: "Construire une marque personnelle reconnaissable",
+      lb5_body: "Un spectateur qui voit 3 de tes vidéos doit pouvoir reconnaître ton style avant même de lire ton nom. La marque personnelle en vidéo, ce n'est pas ton logo ou ta couleur : c'est ta façon de te positionner dans le cadre, ton rythme de parole, tes expressions récurrentes, et le ton émotionnel que tu maintiens d'une vidéo à l'autre. Plus tu es cohérent, plus l'algorithme et ton audience t'associent à un territoire précis. Choisir un territoire, c'est renoncer à tout le reste ; et c'est exactement ce qui crée de la reconnaissance.",
+      lb6_title: "Garder le même pack visuel",
+      lb6_body: "Changer de style à chaque vidéo, c'est recommencer à zéro à chaque fois dans l'esprit du spectateur. Un pack visuel cohérent (même police, même couleur d'accent, même ambiance) crée une signature visuelle que ton audience reconnaît en 0,3 seconde au scroll, avant même d'entendre ta voix. LeanRetention te propose 6 packs, chacun avec une identité précise. Choisis celui qui correspond à ton positionnement, garde-le sur la durée, et laisse le contenu changer, pas l'habillage."
     },
 
     en: {
@@ -303,7 +318,7 @@
       ob_step5: "Complete your ICP profile",
 
       // ── INDEX — DROP ZONE ─────────────────────────────────────────────────────
-      drop_hint: "MP4, MOV, MKV - Up to 4 GB",
+      drop_hint: "MP4, MOV, MKV · Up to 30 GB",
 
       // ── INDEX — FORMAT PILLS ──────────────────────────────────────────────────
       fmt_short: "Short · Reels",
@@ -366,7 +381,22 @@
       profile_change_plan: "Change plan",
       profile_save_btn: "Save",
       profile_edit_btn: "Edit ICP & pillars",
-      profile_saved_msg: "Profile saved."
+      profile_saved_msg: "Profile saved.",
+
+      // ── INDEX — LEANBRIEF ─────────────────────────────────────────────────────
+      lb_card_label: "Course: the foundations of retention editing",
+      lb1_title: "The Structure That Holds Attention",
+      lb1_body: "A video that retains viewers always follows the same architecture, in this order: <strong>Hook</strong> (0–3s, the promise or shock that stops the scroll) → <strong>Contrast</strong> (what makes the situation interesting) → <strong>Consequence</strong> (the real stakes) → <strong>Loop</strong> (an open question that pushes viewers to keep watching) → <strong>Story</strong> → <strong>Realization</strong> → <strong>Principle</strong> → <strong>Reframe</strong> → <strong>Payoff</strong> → <strong>Closing</strong>. Skip a step and you lose a retention anchor.",
+      lb2_title: "Why We Cut Pauses and Repetitions",
+      lb2_body: "A pause longer than 0.3–0.5s without intent kills the rhythm and invites a swipe. A repetition slows comprehension without adding meaning. The rule: cut what adds neither clarity nor emotion, keep everything that does.",
+      lb3_title: "Zoom and Pacing",
+      lb3_body: "A slow zoom with a periodic punch-in (100% to 130%) creates continuous movement that keeps the eye engaged. Too much zoom causes visual fatigue. Too little feels static. The ideal cadence follows the emphasis points of the speech.",
+      lb4_title: "B-Roll in Service of the Message",
+      lb4_body: "B-roll should only appear when it genuinely illustrates what is being said at that exact moment, never to fill a silence. Too much B-roll drowns the message; too little leaves the content abstract.",
+      lb5_title: "Building a Recognizable Personal Brand",
+      lb5_body: "A viewer who watches three of your videos should recognize your style before even reading your name. Your personal brand in video is not your logo or your color: it is how you position yourself in the frame, your speaking rhythm, your recurring expressions, and the emotional tone you maintain from one video to the next. The more consistent you are, the more the algorithm and your audience associate you with a specific niche. Choosing a niche means letting go of everything else, and that is exactly what creates recognition.",
+      lb6_title: "Sticking to the Same Visual Pack",
+      lb6_body: "Changing style with every video means starting from scratch in the viewer's mind each time. A consistent visual pack (same font, same accent color, same atmosphere) creates a visual signature your audience recognizes in 0.3 seconds while scrolling, before they even hear your voice. LeanRetention offers 6 packs, each with a distinct identity. Choose the one that fits your positioning, stick with it over time, and let the content change, not the look."
     }
   };
 
