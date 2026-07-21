@@ -352,6 +352,8 @@
     .pricing-price sup { font-size: 1rem; font-weight: 600; vertical-align: super; }
     .pricing-period { font-size: .78rem; color: var(--muted); margin-left: .25rem; }
     .pricing-desc { font-size: .82rem; color: var(--muted); line-height: 1.5; }
+    .price-usd-hint { display: none; font-size: .72rem; color: var(--muted); margin-top: .15rem; font-weight: 400; letter-spacing: 0; }
+    html[lang="en"] .price-usd-hint { display: block; }
     .pricing-features { list-style: none; display: flex; flex-direction: column; gap: .5rem; flex: 1; }
     .pricing-features li { font-size: .83rem; display: flex; align-items: flex-start; gap: .5rem; }
     .pricing-check { color: var(--salmon); flex-shrink: 0; margin-top: .05rem; }
@@ -566,6 +568,7 @@
           <div>
             <div class="pricing-name">Starter</div>
             <div class="pricing-price"><sup>€</sup>29<span class="pricing-period" data-i18n="pricing_per_month">/ mois</span></div>
+            <div class="price-usd-hint">~$32/mo</div>
             <div class="pricing-desc" style="margin-top:.5rem" data-i18n="plan_starter_desc">Pour le coach solo qui démarre sa présence vidéo.</div>
           </div>
           <ul class="pricing-features">
@@ -583,6 +586,7 @@
             <span class="pricing-badge" data-i18n="pricing_popular">POPULAIRE</span>
             <div class="pricing-name">Pro</div>
             <div class="pricing-price"><sup>€</sup>79<span class="pricing-period" data-i18n="pricing_per_month">/ mois</span></div>
+            <div class="price-usd-hint">~$87/mo</div>
             <div class="pricing-desc" style="margin-top:.5rem" data-i18n="plan_pro_desc">Pour le créateur établi qui poste quotidiennement.</div>
             <video class="pricing-preview-vid" src="/demo/after" autoplay muted loop playsinline></video>
           </div>
@@ -601,6 +605,7 @@
           <div>
             <div class="pricing-name">Agency</div>
             <div class="pricing-price"><sup>€</sup>199<span class="pricing-period" data-i18n="pricing_per_month">/ mois</span></div>
+            <div class="price-usd-hint">~$219/mo</div>
             <div class="pricing-desc" style="margin-top:.5rem" data-i18n="plan_agency_desc">Pour les agences gérant plusieurs créateurs.</div>
           </div>
           <ul class="pricing-features">
