@@ -61,11 +61,11 @@ _ZONE_BOUNDS_PORTRAIT = {
     "fullscreen":     {"left": 0,   "top": 0,    "width": 1080, "height": 1920},
     "hook-title":     {"left": 0,   "top": 0,    "width": 1080, "height": 288},
     "upper-right":          {"left": 540, "top": 100,  "width": 500,  "height": 320},   # B-roll compact upper-right
-    "upper-data":           {"left": 270, "top": 260,  "width": 780,  "height": 480},   # alias
+    "upper-data":           {"left": 270, "top": 340,  "width": 780,  "height": 480},   # alias
     # Positional-variety zones — standard data cards alternate left/right per card index
     # (face-biased when subject_position available) so consecutive cards never land in the
     # same corner.  upper-data (right) already exists above; upper-left-data-sm mirrors it.
-    "upper-left-data-sm":   {"left": 20,  "top": 260,  "width": 660,  "height": 480},   # standard, left side
+    "upper-left-data-sm":   {"left": 20,  "top": 340,  "width": 660,  "height": 480},   # standard, left side
     # Multi-item data cards (4-6 rows each) need more height than upper-data's 320 px and
     # more left-margin than upper-data's 40 px right gap.  Two mirrors: left (default when
     # face is right) and right (for left-biased faces, safe because 28 px compact font
