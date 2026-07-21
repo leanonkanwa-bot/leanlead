@@ -172,7 +172,7 @@ def _build_card_host(card: dict, layout: str, track_index: int, pack: dict | Non
         inner = _build_caption_card_html(card, pack=pack)
     else:
         compact = zone in _SIDE_PANEL_ZONES
-        inner = _build_graphic_card_html(card, pack=pack, compact=compact)
+        inner = _build_graphic_card_html(card, pack=pack, compact=compact, layout=layout)
 
     return (
         f'<div class="card-host clip" data-card-id="{card_id}" '
@@ -540,7 +540,7 @@ def _split_title_accent(title: str, accent_word: str, card_id: str) -> str:
     )
 
 
-def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool = False) -> str:
+def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool = False, layout: str = "portrait") -> str:
     """Build inner HTML for a graphic overlay card using the given style pack."""
     card_id = card["id"]
 
@@ -571,15 +571,18 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
     if compact:
         def _s(px_str: str, f: float) -> str:
             return f"{int(float(px_str.replace('px', '')) * f)}px"
-        _title_scale    = 0.64 if content_style in _TALL_DATA_PANEL_TYPES else 0.92
+        if layout == "portrait":
+            _title_scale    = 0.55 if content_style in _TALL_DATA_PANEL_TYPES else 0.80
+        else:
+            _title_scale    = 0.52 if content_style in _TALL_DATA_PANEL_TYPES else 0.75
         title_size_eff  = _s(p["title_size"],  _title_scale)
         number_size_eff = _s(p["number_size"], 0.67)
-        detail_size_eff = "28px"
-        kicker_size_eff = "22px"
+        detail_size_eff = "25px" if layout == "portrait" else "23px"
+        kicker_size_eff = "20px" if layout == "portrait" else "18px"
         list_item_size  = "21px"
         chk_item_size   = "20px"
-        panel_padding   = "32px 36px"
-        root_padding    = "24px"
+        panel_padding   = "28px 32px"
+        root_padding    = "32px"
         text_align      = "left"
         panel_align     = "flex-start"
         max_width_eff   = "92%"
@@ -679,7 +682,7 @@ def _build_graphic_card_html(card: dict, pack: dict | None = None, compact: bool
         rv = hints.get("right_value", "")
         max_val_len = max(len(str(lv)), len(str(rv)))
         if compact:
-            val_size = "23px" if max_val_len > 15 else "31px" if max_val_len > 8 else "53px"
+            val_size = "23px" if max_val_len > 15 else "31px" if max_val_len > 8 else title_size_eff
         else:
             val_size = "36px" if max_val_len > 15 else "48px" if max_val_len > 8 else title_size_eff
         parts.append(f'.card[data-card-id="{card_id}"] .cmp-row {{')
