@@ -122,7 +122,7 @@
       ob_step5: "Compléter votre profil ICP",
 
       // ── INDEX — DROP ZONE ─────────────────────────────────────────────────────
-      drop_hint: "MP4, MOV, MKV · Jusqu'à 4 Go",
+      drop_hint: "MP4, MOV, MKV · Jusqu'à 30 Go",
 
       // ── INDEX — FORMAT PILLS ──────────────────────────────────────────────────
       fmt_short: "Court · Reels",
